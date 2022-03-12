@@ -3,7 +3,6 @@ use hex;
 use lazy_static::lazy_static;
 use rand::prelude::*;
 use regex::Regex;
-use std::cmp;
 
 lazy_static! {
 	static ref RANDOMID_PATTERN: regex::Regex = 
@@ -15,7 +14,7 @@ lazy_static! {
 /// are random and no version information is stored in them. The only null value for the RandomID
 /// is all zeroes. Lastly, the only permissible format for the string version of the RandomID
 /// has all letters in lowercase and dashes are placed in the same places as for UUIDs. 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, PartialOrd)]
 pub struct RandomID {
 	data: String
 }
@@ -64,17 +63,6 @@ impl fmt::Display for RandomID {
 
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 	write!(f, "{}", self.data)
-	}
-}
-
-impl cmp::PartialEq for RandomID {
-
-	fn eq(&self, other: &RandomID) -> bool {
-		self.data == other.data
-	}
-
-	fn ne(&self, other: &RandomID) -> bool {
-		self.data != other.data
 	}
 }
 
