@@ -3,6 +3,7 @@ use hex;
 use lazy_static::lazy_static;
 use rand::prelude::*;
 use regex::Regex;
+use std::cmp;
 
 lazy_static! {
 	static ref RANDOMID_PATTERN: regex::Regex = 
@@ -33,9 +34,9 @@ impl RandomID {
 		let mut rdata: [u8; 16] = [0; 16];
 		rand::thread_rng().fill_bytes(&mut rdata[..]);
 		let out = RandomID {
-			data: format!("{}-{}-{}-{}-{}", hex::encode(&rdata[0..8]), hex::encode(&rdata[8..12]),
-						hex::encode(&rdata[12..16]), hex::encode(&rdata[16..20]),
-						hex::encode(&rdata[20..])) };
+			data: format!("{}-{}-{}-{}-{}", hex::encode(&rdata[0..4]), hex::encode(&rdata[4..6]),
+						hex::encode(&rdata[6..8]), hex::encode(&rdata[8..10]),
+						hex::encode(&rdata[10..])) };
 
 		out
 	}
@@ -66,3 +67,27 @@ impl fmt::Display for RandomID {
     }
 }
 
+impl cmp::PartialEq for RandomID {
+
+	fn eq(&self, other: &RandomID) -> bool {
+		self.data == other.data
+	}
+
+	fn ne(&self, other: &RandomID) -> bool {
+		self.data != other.data
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use crate::*;
+
+	#[test]
+	fn test_randomid() {
+
+		let testid = RandomID::generate();
+		
+		let strid = RandomID::from_str(testid.as_string());
+		assert_ne!(strid, None);
+	}
+}
