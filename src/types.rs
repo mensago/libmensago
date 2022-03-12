@@ -195,8 +195,8 @@ impl MAddress {
 	}
 
 	/// Returns the MAddress as a string
-	pub fn as_string(&self) -> &str {
-		format!("{}/{}", self.uid, self.domain)
+	pub fn as_string(&self) -> String {
+		String::from(format!("{}/{}", self.uid, self.domain))
 	}
 
 }
