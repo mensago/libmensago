@@ -18,6 +18,12 @@ lazy_static! {
 		.unwrap();
 }
 
+#[derive(Debug, PartialEq, PartialOrd, Clone, Copy)]
+pub enum IDType {
+	WorkspaceID,
+	UserID
+}
+
 /// The RandomID class is similar to v4 UUIDs. To obtain the maximum amount of entropy, all bits
 /// are random and no version information is stored in them. The only null value for the RandomID
 /// is all zeroes. Lastly, the only permissible format for the string version of the RandomID
@@ -80,7 +86,7 @@ impl fmt::Display for RandomID {
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub struct UserID {
 	data: String,
-	wid: bool
+	idtype: IDType
 }
 
 impl UserID {
@@ -88,16 +94,23 @@ impl UserID {
 	/// Creates a UserID from an existing string. If it contains illegal characters, it will
 	/// return None. All capital letters will have their case squashed for compliance.
 	pub fn from_str(data: &str) -> Option<UserID> {
+
+		if data.len() > 64 || data.len() == 0 {
+			return None
+		}
+
 		if !USERID_PATTERN.is_match(data) {
 			return None
 		}
 
-		let mut out = UserID { data: String::from(data), wid: false };
+		let mut out = UserID { data: String::from(data), idtype: IDType::UserID };
 		out.data = data.to_lowercase();
 
-		if RANDOMID_PATTERN.is_match(&out.data) {
-			out.wid = true;
-		}
+		out.idtype = if RANDOMID_PATTERN.is_match(&out.data) {
+			IDType::WorkspaceID
+		} else {
+			IDType::UserID
+		};
 
 		Some(out)
 	}
@@ -108,8 +121,8 @@ impl UserID {
 	}
 
 	/// Returns true if the UserID is also a workspace ID.
-	pub fn is_wid(&self) -> bool {
-		self.wid
+	pub fn get_type(&self) -> IDType {
+		self.idtype
 	}
 }
 
@@ -156,6 +169,45 @@ impl fmt::Display for Domain {
 	}
 }
 
+/// A basic data type representing a full Mensago address. It is used to ensure passing around
+/// valid data within the library.
+#[derive(Debug, PartialEq, PartialOrd, Clone)]
+pub struct MAddress {
+	uid: UserID,
+	domain: Domain,
+}
+
+impl MAddress {
+
+	/// Creates a new MAddress from a string. If the string does not contain a valid Mensago
+	/// address, None will be returned.
+	pub fn from_str(data: &str) -> Option<MAddress> {
+
+		let parts = data.split("/").collect::<Vec<&str>>();
+
+		if parts.len() != 2 {
+			return None
+		}
+		
+		let out = MAddress { uid: UserID::from_str(parts[0])?, domain: Domain::from_str(parts[1])? };
+
+		Some(out)
+	}
+
+	/// Returns the MAddress as a string
+	pub fn as_string(&self) -> &str {
+		format!("{}/{}", self.uid, self.domain)
+	}
+
+}
+
+impl fmt::Display for MAddress {
+
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		write!(f, "{}/{}", self.uid, self.domain)
+	}
+}
+
 #[cfg(test)]
 mod tests {
 	use crate::*;
@@ -176,7 +228,7 @@ mod tests {
 		
 		match UserID::from_str("11111111-1111-1111-1111-111111111111") {
 			Some(v) => {
-				assert!(v.is_wid())
+				assert!(v.get_type() == IDType::WorkspaceID)
 			},
 			None => {
 				panic!("test_userid failed workspace ID assignment")
@@ -212,5 +264,20 @@ mod tests {
 		
 		assert_eq!(Domain::from_str("a bad-id.com"), None);
 		assert_eq!(Domain::from_str("also_bad.org"), None);
+	}
+
+	#[test]
+	fn test_maddress() {
+		
+		assert_ne!(MAddress::from_str("cats4life/example.com"), None);
+		assert_ne!(MAddress::from_str("5a56260b-aa5c-4013-9217-a78f094432c3/example.com"), None);
+
+		assert_eq!(MAddress::from_str("has spaces/example.com"), None);
+		assert_eq!(MAddress::from_str(r#"has_a_"/example.com"#), None);
+		assert_eq!(MAddress::from_str("\\not_allowed/example.com"), None);
+		assert_eq!(MAddress::from_str("/example.com"), None);
+		assert_eq!(MAddress::from_str(
+			"5a56260b-aa5c-4013-9217-a78f094432c3/example.com/example.com"), None);
+		assert_eq!(MAddress::from_str("5a56260b-aa5c-4013-9217-a78f094432c3"), None);
 	}
 }
