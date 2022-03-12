@@ -6,6 +6,10 @@ lazy_static! {
 	static ref USERID_PATTERN: regex::Regex = 
 		Regex::new(r"^([a-zA-Z0-9_-]|\.[^.])+$")
 		.unwrap();
+	
+	static ref WID_PATTERN: regex::Regex = 
+		Regex::new(r"^[\da-fA-F]{8}-[\da-fA-F]{4}-[\da-fA-F]{4}-[\da-fA-F]{4}-[\da-fA-F]{12}$")
+		.unwrap();
 }
 
 /// A basic data type for housing Mensago user IDs. User IDs on the Mensago platform must be no
@@ -13,7 +17,8 @@ lazy_static! {
 /// numbers, a dash, or an underscore. Periods may also be used so long as they are not consecutive.
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub struct UserID {
-	data: String
+	data: String,
+	wid: bool
 }
 
 impl UserID {
@@ -25,8 +30,12 @@ impl UserID {
 			return None
 		}
 
-		let mut out = UserID { data: String::from(data) };
+		let mut out = UserID { data: String::from(data), wid: false };
 		out.data = data.to_lowercase();
+
+		if WID_PATTERN.is_match(&out.data) {
+			out.wid = true;
+		}
 
 		Some(out)
 	}
@@ -34,6 +43,11 @@ impl UserID {
 	/// Returns the UserID as a string
 	pub fn as_string(&self) -> &str {
 		&self.data
+	}
+
+	/// Returns true if the UserID is also a workspace ID.
+	pub fn is_wid(&self) -> bool {
+		self.wid
 	}
 }
 
@@ -51,8 +65,16 @@ mod tests {
 	#[test]
 	fn test_userid() {
 
-		assert_ne!(UserID::from_str("11111111-1111-1111-1111-111111111111"), None);
 		assert_ne!(UserID::from_str("valid_e-mail.123"), None);
+		
+		match UserID::from_str("11111111-1111-1111-1111-111111111111") {
+			Some(v) => {
+				assert!(v.is_wid())
+			},
+			None => {
+				panic!("test_userid failed workspace ID assignment")
+			}
+		}
 
 		match UserID::from_str("Valid.but.needs_case-squashed") {
 			Some(v) => {
