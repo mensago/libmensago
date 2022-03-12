@@ -13,5 +13,6 @@ categories = ["network-programming"]
 exclude = [".gitignore"]
 
 [dependencies]
-uuid = { version = "0.8.2", features = ["serde", "v4"] }
+hex = "0.4.3"
 rand = "0.8.5"
+uuid = { version = "0.8.2", features = ["serde", "v4"] }
