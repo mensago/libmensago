@@ -6,7 +6,7 @@ use regex::Regex;
 
 lazy_static! {
 	static ref RANDOMID_PATTERN: regex::Regex = 
-		Regex::new(r"[\da-fA-F]{8}-[\da-fA-F]{4}-[\da-fA-F]{4}-[\da-fA-F]{4}-[\da-fA-F]{12}")
+		Regex::new(r"^[\da-fA-F]{8}-[\da-fA-F]{4}-[\da-fA-F]{4}-[\da-fA-F]{4}-[\da-fA-F]{12}$")
 		.unwrap();
 }
 
