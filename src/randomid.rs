@@ -14,7 +14,7 @@ lazy_static! {
 /// are random and no version information is stored in them. The only null value for the RandomID
 /// is all zeroes. Lastly, the only permissible format for the string version of the RandomID
 /// has all letters in lowercase and dashes are placed in the same places as for UUIDs. 
-#[derive(Debug, PartialEq, PartialOrd)]
+#[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub struct RandomID {
 	data: String
 }
