@@ -63,8 +63,8 @@ impl RandomID {
 impl fmt::Display for RandomID {
 
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.data)
-    }
+	write!(f, "{}", self.data)
+	}
 }
 
 impl cmp::PartialEq for RandomID {
