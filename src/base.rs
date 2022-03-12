@@ -1,5 +1,4 @@
 
-// TODO: UUID class
 // TODO: UserID class
 // TODO: Domain
 // TODO: MAddress class
