@@ -1,5 +1,14 @@
+use std::fmt;
 use hex;
+use lazy_static::lazy_static;
 use rand::prelude::*;
+use regex::Regex;
+
+lazy_static! {
+	static ref RANDOMID_PATTERN: regex::Regex = 
+		Regex::new(r"[\da-fA-F]{8}-[\da-fA-F]{4}-[\da-fA-F]{4}-[\da-fA-F]{4}-[\da-fA-F]{12}")
+		.unwrap();
+}
 
 /// The RandomID class is similar to v4 UUIDs. To obtain the maximum amount of entropy, all bits
 /// are random and no version information is stored in them. The only null value for the RandomID
@@ -18,6 +27,7 @@ impl RandomID {
 		return RandomID{ data: String::from("00000000-0000-0000-0000-000000000000")};
 	}
 
+	/// Creates a new populated RandomID
 	pub fn generate() -> RandomID {
 		
 		let mut rdata: [u8; 16] = [0; 16];
@@ -30,7 +40,29 @@ impl RandomID {
 		out
 	}
 
+	/// Creates a RandomID from an existing string and ensures that formatting is correct.
+	pub fn from_str(data: &str) -> Option<RandomID> {
+		if !RANDOMID_PATTERN.is_match(data) {
+			return None
+		}
+
+		let mut out = RandomID::new();
+		out.data = data.to_lowercase();
+
+		Some(out)
+	}
+
+	/// Returns the RandomID as a string
 	pub fn as_string(&self) -> &str {
 		&self.data
 	}
+
 }
+
+impl fmt::Display for RandomID {
+
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.data)
+    }
+}
+

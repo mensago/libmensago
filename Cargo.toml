@@ -14,5 +14,7 @@ exclude = [".gitignore"]
 
 [dependencies]
 hex = "0.4.3"
+lazy_static = "1.4.0"
 rand = "0.8.5"
+regex = "1.5.5"
 uuid = { version = "0.8.2", features = ["serde", "v4"] }
