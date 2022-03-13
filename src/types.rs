@@ -208,6 +208,45 @@ impl fmt::Display for MAddress {
 	}
 }
 
+/// A basic data type representing a full Mensago address. It is used to ensure passing around
+/// valid data within the library.
+#[derive(Debug, PartialEq, PartialOrd, Clone)]
+pub struct WAddress {
+	wid: RandomID,
+	domain: Domain,
+}
+
+impl WAddress {
+
+	/// Creates a new WAddress from a string. If the string does not contain a valid workspace
+	/// address, None will be returned.
+	pub fn from_str(data: &str) -> Option<WAddress> {
+
+		let parts = data.split("/").collect::<Vec<&str>>();
+
+		if parts.len() != 2 {
+			return None
+		}
+		
+		let out = WAddress { wid: RandomID::from_str(parts[0])?, domain: Domain::from_str(parts[1])? };
+
+		Some(out)
+	}
+
+	/// Returns the WAddress as a string
+	pub fn as_string(&self) -> String {
+		String::from(format!("{}/{}", self.wid, self.domain))
+	}
+
+}
+
+impl fmt::Display for WAddress {
+
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		write!(f, "{}/{}", self.wid, self.domain)
+	}
+}
+
 #[cfg(test)]
 mod tests {
 	use crate::*;
@@ -279,5 +318,12 @@ mod tests {
 		assert_eq!(MAddress::from_str(
 			"5a56260b-aa5c-4013-9217-a78f094432c3/example.com/example.com"), None);
 		assert_eq!(MAddress::from_str("5a56260b-aa5c-4013-9217-a78f094432c3"), None);
+	}
+
+	#[test]
+	fn test_waddress() {
+		
+		assert_ne!(WAddress::from_str("5a56260b-aa5c-4013-9217-a78f094432c3/example.com"), None);
+		assert_eq!(WAddress::from_str("cats4life/example.com"), None);
 	}
 }
