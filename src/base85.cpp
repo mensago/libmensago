@@ -3,7 +3,7 @@
 const char *B85_TO_CHAR =
 	"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!#$%&()*+-;<=>?@^_`{|}~";
 
-bool c85_to_byte(const char &c85, unsigned char &out) {
+bool byte_to_c85(const char &c85, unsigned char &out) {
 
 	if (c85 > 84) return false;
 
@@ -11,7 +11,7 @@ bool c85_to_byte(const char &c85, unsigned char &out) {
 	return true;
 }
 
-unsigned char byte_to_c85(const unsigned char &b)
+unsigned char c85_to_byte(const unsigned char &b)
 {
 	if (b >= '0' && b <= '9') return b - '0';
 	if (b >= 'A' && b <= 'Z') return b - 'A' + 10;
@@ -56,7 +56,7 @@ void base85encode(const QByteArray &ba, QString &out)
 	out.clear();
 	if (ba.length() == 0) return;
 
-	size_t length = out.length();
+	size_t length = ba.length();
 	size_t chunk_count = (length / 4);
 	size_t data_index = 0;
 
@@ -67,14 +67,20 @@ void base85encode(const QByteArray &ba, QString &out)
 			| ((uint32_t)ba[data_index + 2]) << 8
 			| ((uint32_t)ba[data_index + 3]);
 		
-		out.push_back(QChar(byte_to_c85(((size_t)decnum / 52200625))));
+		unsigned char converted = 0;
+		byte_to_c85((size_t)decnum / 52200625, converted);
+		out.push_back(QChar(converted));
 		size_t remainder = (size_t)decnum % 52200625;
-		out.push_back(QChar(byte_to_c85((remainder / 614125))));
+		byte_to_c85((remainder / 614125), converted);
+		out.push_back(QChar(converted));
 		remainder %= 614125;
-		out.push_back(QChar(byte_to_c85((remainder / 7225))));
+		byte_to_c85((remainder / 7225), converted);
+		out.push_back(QChar(converted));
 		remainder %= 7225;
-		out.push_back(QChar(byte_to_c85((remainder / 85))));
-		out.push_back(QChar(byte_to_c85((remainder % 85))));
+		byte_to_c85((remainder / 85), converted);
+		out.push_back(QChar(converted));
+		byte_to_c85((remainder % 85), converted);
+		out.push_back(QChar(converted));
 
 		data_index += 4;
 	}
@@ -98,19 +104,24 @@ void base85encode(const QByteArray &ba, QString &out)
 			i--;
 		}
 		
-		out.push_back(QChar(byte_to_c85(((size_t)last_chunk / 52200625))));
+		unsigned char converted = 0;
+		byte_to_c85((size_t)last_chunk / 52200625, converted);
+		out.push_back(QChar(converted));
 		size_t remainder = (size_t)last_chunk % 52200625;
-		out.push_back(QChar(byte_to_c85((remainder / 614125))));
+		byte_to_c85(remainder / 614125, converted);
+		out.push_back(QChar(converted));
 		
 		if (extra_bytes > 1)
 		{
 			remainder %= 614125;
-			out.push_back(QChar(byte_to_c85((remainder / 7225))));
+			byte_to_c85(remainder / 7225, converted);
+			out.push_back(QChar(converted));
 
 			if (extra_bytes > 2)
 			{
 				remainder %= 7225;
-				out.push_back(QChar(byte_to_c85((remainder / 85))));
+				byte_to_c85(remainder / 85, converted);
+				out.push_back(QChar(converted));
 			}
 		}
 	}
@@ -126,7 +137,7 @@ bool base85decode(const QString &s, QByteArray &out)
 		return false;
 	}
 	
-	uint32_t accumulator;
+	uint32_t accumulator = 0;
 	uint32_t in_index = 0;
 	uint32_t chunk_count = length / 5;
 	for (uint32_t chunk = 0; chunk < chunk_count; chunk++)
@@ -140,22 +151,17 @@ bool base85decode(const QString &s, QByteArray &out)
 				in_index++;
 				continue;
 			}
+			
+			unsigned char c = c85_to_byte(s[in_index].toLatin1());
+			accumulator = (accumulator * 85) + (uint32_t)c;
+			in_index++;
 		}
 
-		unsigned char c;
-		if (!c85_to_byte(s[in_index].toLatin1(), c))
-		{
-			out.clear();
-			return false;
-		}
-		accumulator = (accumulator * 85) + (uint32_t)c;
-		in_index++;
+		out.push_back((char)(accumulator >> 24));
+		out.push_back((char)((accumulator >> 16) & 255));
+		out.push_back((char)((accumulator >> 8) & 255));
+		out.push_back((char)(accumulator & 255));
 	}
-	
-	out.push_back((char)(accumulator >> 24));
-	out.push_back((char)((accumulator >> 16) & 255));
-	out.push_back((char)((accumulator >> 8) & 255));
-	out.push_back((char)(accumulator & 255));
 	
 	auto remainder = length % 5;
 	if (remainder > 0)
@@ -175,11 +181,7 @@ bool base85decode(const QString &s, QByteArray &out)
 					continue;
 				}
 
-				if (!c85_to_byte(s[in_index].toLatin1(), c))
-				{
-					out.clear();
-					return false;
-				}
+				c = c85_to_byte(s[in_index].toLatin1());
 			}
 			else
 			{
@@ -195,15 +197,18 @@ bool base85decode(const QString &s, QByteArray &out)
 				out.push_back((char)(accumulator >> 24));
 				out.push_back((char)((accumulator >> 16) & 255));
 				out.push_back((char)((accumulator >> 8) & 255));
+				break;
 			}
 			case 3:
 			{
 				out.push_back((char)(accumulator >> 24));
 				out.push_back((char)((accumulator >> 16) & 255));
+				break;
 			}
 			case 2:
 			{
 				out.push_back((char)(accumulator >> 24));
+				break;
 			}
 		}
 	}

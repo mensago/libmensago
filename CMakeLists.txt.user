@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE QtCreatorProject>
-<!-- Written by QtCreator 6.0.2, 2022-03-20T13:10:02. -->
+<!-- Written by QtCreator 6.0.2, 2022-03-20T15:27:11. -->
 <qtcreator>
  <data>
   <variable>EnvironmentId</variable>
@@ -68,8 +68,8 @@
     <value type="bool" key="AutoTest.Framework.QtTest">true</value>
    </valuemap>
    <valuemap type="QVariantMap" key="AutoTest.CheckStates">
-    <value type="Qt::CheckState" key="1@/home/owner/code/libmensago/tests/base85_test.cpp:/home/owner/code/libmensago/tests/base85_test.cpp">Checked</value>
-    <value type="Qt::CheckState" key="1@/home/owner/code/libmensago/tests/base85_test.cpp:Base85 encoding">Checked</value>
+    <value type="Qt::CheckState" key="1@/home/owner/code/libmensago/tests/base85_test.cpp:TestBase85">Checked</value>
+    <value type="Qt::CheckState" key="1@/home/owner/code/libmensago/tests/base85_test.cpp:encode_decode">Checked</value>
    </valuemap>
    <value type="int" key="AutoTest.RunAfterBuild">0</value>
    <value type="bool" key="AutoTest.UseGlobal">true</value>
@@ -297,9 +297,9 @@
     <valuelist type="QVariantList" key="CustomOutputParsers"/>
     <value type="int" key="PE.EnvironmentAspect.Base">2</value>
     <valuelist type="QVariantList" key="PE.EnvironmentAspect.Changes"/>
-    <value type="QString" key="ProjectExplorer.ProjectConfiguration.DisplayName">tests</value>
-    <value type="QString" key="ProjectExplorer.ProjectConfiguration.Id">CMakeProjectManager.CMakeRunConfiguration.tests</value>
-    <value type="QString" key="ProjectExplorer.RunConfiguration.BuildKey">tests</value>
+    <value type="QString" key="ProjectExplorer.ProjectConfiguration.DisplayName">base85_test</value>
+    <value type="QString" key="ProjectExplorer.ProjectConfiguration.Id">CMakeProjectManager.CMakeRunConfiguration.base85_test</value>
+    <value type="QString" key="ProjectExplorer.RunConfiguration.BuildKey">base85_test</value>
     <value type="bool" key="RunConfiguration.UseCppDebugger">false</value>
     <value type="bool" key="RunConfiguration.UseCppDebuggerAuto">true</value>
     <value type="bool" key="RunConfiguration.UseLibrarySearchPath">true</value>
