@@ -12,12 +12,14 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(QT NAMES Qt6 Qt5 COMPONENTS Core REQUIRED)
 find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Core REQUIRED)
 
+include_directories(${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/include)
+
 add_library(mensago SHARED
-	libmensago.h
-	base85.h
-	cryptostring.h
-	base85.cpp
-	cryptostring.cpp
+	include/libmensago.h
+	include/base85.h
+	include/cryptostring.h
+	src/base85.cpp
+	src/cryptostring.cpp
 )
 
 target_link_libraries(mensago PRIVATE Qt${QT_VERSION_MAJOR}::Core)
