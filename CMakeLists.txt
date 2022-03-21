@@ -30,3 +30,7 @@ target_compile_definitions(mensago PRIVATE LIBMENSAGO_LIBRARY)
 add_executable(base85_test tests/base85_test.cpp)
 add_test(NAME base85_test COMMAND base85_test)
 target_link_libraries(base85_test PRIVATE mensago Qt::Test)
+
+add_executable(cryptostring_test tests/cryptostring_test.cpp)
+add_test(NAME cryptostring_test COMMAND cryptostring_test)
+target_link_libraries(cryptostring_test PRIVATE mensago Qt::Test)
