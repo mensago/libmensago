@@ -1,33 +1,20 @@
 #include <QtTest>
 
-// add necessary includes here
+#include "cryptostring.h"
 
 class cryptostring_test : public QObject
 {
 	Q_OBJECT
 
-public:
-	cryptostring_test();
-	~cryptostring_test();
-
 private slots:
-	void test_case1();
+	void test_constructors();
 
 };
 
-cryptostring_test::cryptostring_test()
+void cryptostring_test::test_constructors()
 {
-
-}
-
-cryptostring_test::~cryptostring_test()
-{
-
-}
-
-void cryptostring_test::test_case1()
-{
-
+	CryptoString cs = CryptoString("CURVE25519:(B2XX5|<+lOSR>_0mQ=KX4o<aOvXe6M`Z5ldINd`");
+	QVERIFY2(cs.IsValid(), "CryptoString::test_constructors failed on valid const char * input");
 }
 
 QTEST_APPLESS_MAIN(cryptostring_test)
