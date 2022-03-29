@@ -21,8 +21,8 @@ CryptoString::CryptoString(const QString &from):
 }
 
 CryptoString::CryptoString(const QString &algorithm, const QByteArray &from):
-	fIsValid(false),
-	fSplitPoint(0)
+	fSplitPoint(0),
+	fIsValid(false)
 {
 	if (algorithm.length() == 0 || from.length() == 0) return;
 	if (!sCryptoStringPrefixPattern.match(from).hasMatch()) return;
