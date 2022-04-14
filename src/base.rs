@@ -5,6 +5,7 @@ pub enum MensagoError {
 	ErrEmptyData,
 	ErrExists,
 	ErrFilesytemError,
+	ErrReserved,
 	ErrUnimplemented,
 }
 
@@ -16,6 +17,7 @@ impl fmt::Display for MensagoError {
 			MensagoError::ErrEmptyData => write!(f, "Empty data error"),
 			MensagoError::ErrExists => write!(f, "Resource already exists"),
 			MensagoError::ErrFilesytemError => write!(f, "Filesystem error"),
+			MensagoError::ErrReserved => write!(f, "Reserved"),
 			MensagoError::ErrUnimplemented => write!(f, "Function unimplemented"),
 		}
 	}
