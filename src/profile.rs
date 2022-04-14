@@ -59,6 +59,10 @@ impl ProfileManager {
 		}
 
 		let name_squashed = name.to_lowercase();
+		if name_squashed == "default" {
+			return Err(MensagoError::ErrReserved)
+		}
+		
 		match index_for_name(&name_squashed) {
 			Some(_) => return Err(MensagoError::ErrExists),
 			None => { /* do nothing */ }
