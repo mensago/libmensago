@@ -24,8 +24,8 @@ impl Profile {
 
 }
 
-/// The ProfileManager is a singleton object which creates and deletes user on-disk profiles and
-/// otherwise provides access to them.
+/// The ProfileManager is an type which creates and deletes user on-disk profiles and otherwise
+/// provides access to them.
 #[derive(Debug)]
 pub struct ProfileManager {
 	profiles: Vec<Profile>,
