@@ -1,5 +1,5 @@
-use std::fs::DirBuilder;
-use std::path::PathBuf;
+use std::fs::{remove_dir_all, DirBuilder};
+use std::path::{Path, PathBuf};
 use crate::base::*;
 use crate::types::*;
 
@@ -62,8 +62,8 @@ impl ProfileManager {
 		if name_squashed == "default" {
 			return Err(MensagoError::ErrReserved)
 		}
-		
-		match index_for_name(&name_squashed) {
+
+		match self.index_for_name(&name_squashed) {
 			Some(_) => return Err(MensagoError::ErrExists),
 			None => { /* do nothing */ }
 		}
@@ -96,7 +96,29 @@ impl ProfileManager {
 		Ok(self.profiles.get(self.profiles.len()-1).unwrap())
 	}
 
-	pub fn delete_profile(name: &str) -> Option<MensagoError> {
+	/// Deletes the named profile and all files on disk contained in it.
+	pub fn delete_profile(&mut self, name: &str) -> Option<MensagoError> {
+
+		if name.len() == 0 {
+			return Some(MensagoError::ErrEmptyData)
+		}
+
+		let name_squashed = name.to_lowercase();
+		if name_squashed == "default" {
+			return Some(MensagoError::ErrReserved)
+		}
+
+		let pindex = match self.index_for_name(&name_squashed) {
+			None => return Some(MensagoError::ErrNotFound),
+			Some(v) => v,
+		};
+
+		let profile = self.profiles.remove(pindex);
+		if Path::new(profile.path.as_path()).exists() {
+			// match remove_dir_all(profile.path.as_path()) {
+			// 	Err(e) => 	
+			// }
+		}
 
 		// TODO: Implement delete_profile()
 
@@ -131,18 +153,18 @@ impl ProfileManager {
 		Some(MensagoError::ErrUnimplemented)
 	}
 
-	pub fn set_default_profile(name: &str) -> Option<&'static Profile> {
+	pub fn set_default_profile(name: &str) -> Option<&Profile> {
 
 		// TODO: Implement set_default_profile()
 
 		None
 	}
 
+	fn index_for_name(&self, name: &str) -> Option<usize> {
+	
+		// TODO: Implement index_for_name()
+		
+		None
+	}	
 }
 
-fn index_for_name(name: &str) -> Option<&'static Profile> {
-	
-	// TODO: Implement index_for_name()
-	
-	None
-}	
