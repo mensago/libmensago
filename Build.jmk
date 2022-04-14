@@ -1,3 +1,0 @@
-type = top
-
-subprojects = [ mensago, base85_test, cryptostring_test ]

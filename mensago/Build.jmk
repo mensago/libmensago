@@ -1,4 +1,0 @@
-name = mensago
-type = library
-
-qt = [ core ]
