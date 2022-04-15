@@ -175,10 +175,21 @@ impl ProfileManager {
 		None
 	}
 
+	/// Obtains the index for a profile with the supplied name. Returns None on error.
 	fn index_for_name(&self, name: &str) -> Option<usize> {
-	
-		// TODO: Implement index_for_name()
 		
+		if name.len() == 0 {
+			return None
+		}
+
+		for i in 0..self.profiles.len() {
+			let p = self.profiles.get(i)?;
+			
+			if p.name == name {
+				return Some(i);
+			}
+		}
+
 		None
 	}	
 }
