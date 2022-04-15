@@ -22,6 +22,17 @@ pub struct Profile {
 
 impl Profile {
 
+	/// Sets the profile's internal flag that it is the default profile
+	pub fn set_default(&mut self, is_default: bool) -> Option<String> {
+
+		return Some(String::from("Unimplemented"))
+	}
+
+	/// Returns true if the profile has been told it's the default
+	pub fn is_default(&self) -> bool {
+		return self.is_default;
+	}
+
 }
 
 /// The ProfileManager is an type which creates and deletes user on-disk profiles and otherwise
@@ -96,33 +107,37 @@ impl ProfileManager {
 		Ok(self.profiles.get(self.profiles.len()-1).unwrap())
 	}
 
-	/// Deletes the named profile and all files on disk contained in it.
-	pub fn delete_profile(&mut self, name: &str) -> Option<MensagoError> {
+	/// Deletes the named profile and all files on disk contained in it. On error, it returns a
+	/// string description of the error or None on success.
+	pub fn delete_profile(&mut self, name: &str) -> Option<String> {
 
 		if name.len() == 0 {
-			return Some(MensagoError::ErrEmptyData)
+			return Some(String::from("Empty data"))
 		}
 
 		let name_squashed = name.to_lowercase();
 		if name_squashed == "default" {
-			return Some(MensagoError::ErrReserved)
+			return Some(String::from("Profile name 'default' is reserved"))
 		}
 
 		let pindex = match self.index_for_name(&name_squashed) {
-			None => return Some(MensagoError::ErrNotFound),
+			None => return Some(String::from("Index not found")),
 			Some(v) => v,
 		};
 
 		let profile = self.profiles.remove(pindex);
 		if Path::new(profile.path.as_path()).exists() {
-			// match remove_dir_all(profile.path.as_path()) {
-			// 	Err(e) => 	
-			// }
+			match remove_dir_all(profile.path.as_path()) {
+				Err(e) => return Some(e.to_string()),
+				Ok(_) => { /* continue on */ }
+			}
 		}
 
-		// TODO: Implement delete_profile()
+		if profile.is_default() && self.profiles.len() > 0 {
+			self.profiles[0].set_default(true);
+		}
 
-		Some(MensagoError::ErrUnimplemented)
+		None
 	}
 
 	/// Returns the active profile
