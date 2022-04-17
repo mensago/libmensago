@@ -1,5 +1,4 @@
 use std::path::PathBuf;
-use eznacl::*;
 use crate::types::*;
 
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
@@ -10,5 +9,5 @@ pub struct Workspace {
 	wid: RandomID,
 	domain: Domain,
 	_type: String,
-	pw: Password,
+	pw: String,
 }
