@@ -1,26 +1,21 @@
-use std::fmt;
+use thiserror::Error;
 
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum MensagoError {
+
+	#[error("Empty data error")]
 	ErrEmptyData,
+	#[error("Resource already exists")]
 	ErrExists,
+	#[error("Filesystem error")]
 	ErrFilesytemError,
+	#[error("Not found")]
 	ErrNotFound,
+	#[error("Reserved")]
 	ErrReserved,
+	#[error("Function unimplemented")]
 	ErrUnimplemented,
-}
 
-impl std::error::Error for MensagoError {}
-
-impl fmt::Display for MensagoError {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		match self {
-			MensagoError::ErrEmptyData => write!(f, "Empty data error"),
-			MensagoError::ErrExists => write!(f, "Resource already exists"),
-			MensagoError::ErrFilesytemError => write!(f, "Filesystem error"),
-			MensagoError::ErrNotFound => write!(f, "Not found"),
-			MensagoError::ErrReserved => write!(f, "Reserved"),
-			MensagoError::ErrUnimplemented => write!(f, "Function unimplemented"),
-		}
-	}
+	#[error(transparent)]
+    IOError(#[from] std::io::Error),
 }
