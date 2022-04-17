@@ -4,6 +4,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use crate::base::*;
 use crate::types::*;
+use crate::workspace::*;
 
 
 /// The Profile type is the client's entry point to interacting with storage. One major point to
@@ -40,6 +41,36 @@ impl Profile {
 		})
 	}
 
+	/// Connects the profile to its associated database
+	pub fn activate(&mut self) -> Result<(), MensagoError> {
+
+		// TODO: Implement Profile::activate()
+
+		return Err(MensagoError::ErrUnimplemented)
+	}
+
+	/// Loads the config file for the profile
+	pub fn load_config(&mut self) -> Result<(), MensagoError> {
+
+		// TODO: Implement Profile::load_config()
+
+		return Err(MensagoError::ErrUnimplemented)
+	}
+
+	/// Saves the config file for the profile
+	pub fn save_config(&mut self) -> Result<(), MensagoError> {
+
+		// TODO: Implement Profile::save_config()
+
+		return Err(MensagoError::ErrUnimplemented)
+	}
+
+	/// Disconnects the profile to its associated database
+	pub fn deactivate(&mut self) {
+
+		// TODO: Implement Profile::deactivate()
+	}
+
 	/// Sets the profile's internal flag that it is the default profile
 	pub fn set_default(&mut self, is_default: bool) -> Result<(), MensagoError> {
 
@@ -55,6 +86,29 @@ impl Profile {
 		return self.is_default;
 	}
 
+	/// Returns the identity workspace address for the profile
+	pub fn get_identity(&self) -> Result<MAddress,MensagoError> {
+
+		return Err(MensagoError::ErrUnimplemented)
+	}
+
+	/// Assigns an identity workspace to the profile
+	pub fn set_identity(&self, w: Workspace) -> Result<(),MensagoError> {
+
+		return Err(MensagoError::ErrUnimplemented)
+	}
+
+	/// Reinitializes the profile's database to empty
+	pub fn reset_db(&self) -> Result<(),MensagoError> {
+
+		return Err(MensagoError::ErrUnimplemented)
+	}
+	
+	/// Resolves a Mensago address to its corresponding workspace ID
+	pub fn resolve_address(&self, a: MAddress) -> Result<RandomID,MensagoError> {
+
+		return Err(MensagoError::ErrUnimplemented)
+	}
 }
 
 /// The ProfileManager is an type which creates and deletes user on-disk profiles and otherwise
@@ -262,11 +316,31 @@ impl ProfileManager {
 		Ok(())
 	}
 
-	pub fn rename_profile(&mut self, oldname: &str, newname: &str) -> Option<MensagoError> {
+	pub fn rename_profile(&mut self, oldname: &str, newname: &str) -> Result<(), MensagoError> {
 
-		// TODO: Implement rename_profile()
+		if oldname.len() == 0 || newname.len() == 0 {
+			return Err(MensagoError::ErrEmptyData)
+		}
 
-		Some(MensagoError::ErrUnimplemented)
+		let old_squashed = oldname.to_lowercase();
+		let new_squashed = newname.to_lowercase();
+
+		let index = match self.index_for_name(&old_squashed) {
+			Some(v) => v,
+			None => return Err(MensagoError::ErrNotFound)
+		};
+
+		if self.index_for_name(&new_squashed) != None {
+			return Err(MensagoError::ErrExists)
+		}
+
+		if index == self.active_index as usize {
+			// TODO: deactivate profile
+		}
+
+		// TODO: Finish implementing rename_profile()
+
+		Err(MensagoError::ErrUnimplemented)
 	}
 
 	pub fn set_default_profile(&mut self, name: &str) -> Option<&Profile> {
