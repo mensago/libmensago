@@ -206,7 +206,10 @@ impl ProfileManager {
 		}
 
 		if profile.is_default() && self.profiles.len() > 0 {
-			self.profiles[0].set_default(true);
+			match self.profiles[0].set_default(true) {
+				Ok(_) => { /* Do nothing */ },
+				Err(e) => return Err(e)
+			}
 		}
 
 		Ok(())
