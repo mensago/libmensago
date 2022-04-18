@@ -338,12 +338,23 @@ impl ProfileManager {
 		}
 
 		if index == self.active_index as usize {
-			// TODO: deactivate profile
+			self.profiles[index].deactivate();
 		}
 
-		// TODO: Finish implementing rename_profile()
+		let oldpath = self.profiles[index].path.clone();
+		let mut newpath = oldpath.parent().unwrap().to_path_buf();
+		newpath.push(&new_squashed);
 
-		Err(MensagoError::ErrUnimplemented)
+		fs::rename(&oldpath, &newpath)?;
+
+		self.profiles[index].name = new_squashed;
+		self.profiles[index].path = newpath;
+
+		if index == self.active_index as usize {
+			self.profiles[index].activate()?;
+		}
+
+		Ok(())
 	}
 
 	pub fn set_default_profile(&mut self, name: &str) -> Option<&Profile> {
