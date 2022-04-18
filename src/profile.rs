@@ -319,6 +319,7 @@ impl ProfileManager {
 		Ok(())
 	}
 
+	/// Renames the profile from the old name to the new one
 	pub fn rename_profile(&mut self, oldname: &str, newname: &str) -> Result<(), MensagoError> {
 
 		if oldname.len() == 0 || newname.len() == 0 {
@@ -357,11 +358,35 @@ impl ProfileManager {
 		Ok(())
 	}
 
-	pub fn set_default_profile(&mut self, name: &str) -> Option<&Profile> {
+	/// Sets the default profile
+	pub fn set_default_profile(&mut self, name: &str) -> Result<(), MensagoError> {
 
-		// TODO: Implement set_default_profile()
+		if name.len() == 0 {
+			return Err(MensagoError::ErrEmptyData)
+		}
 
-		None
+		if self.profiles.len() == 1 {
+			if !self.profiles[0].is_default() {
+				self.profiles[0].set_default(true)?;
+			}
+
+			return Ok(());
+		}
+
+		let mut oldindex: isize = -1;
+		for i in 0..self.profiles.len() {
+			if self.profiles[i].is_default() {
+				oldindex = i as isize;
+				break
+			}
+		}
+
+		let name_squashed = name.to_lowercase();
+		let newindex = self.index_for_name(&name_squashed);
+
+		// TODO: Finish implementing set_default_profile()
+
+		Err(MensagoError::ErrUnimplemented)
 	}
 
 	/// Obtains the index for a profile with the supplied name. Returns None on error.
