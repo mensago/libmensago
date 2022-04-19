@@ -119,15 +119,36 @@ pub struct ProfileManager {
 	profile_folder: PathBuf,
 	active_index: isize,
 	default_index: isize,
+	profile_id: String,
 }
 
 impl ProfileManager {
 
 	pub fn activate_profile(&mut self, name: &str) -> Result<&Profile, MensagoError> {
 
-		// TODO: Implement activate_profile()
+		if name.len() == 0 {
+			return Err(MensagoError::ErrEmptyData);
+		}
 
-		return Err(MensagoError::ErrUnimplemented);
+		let name_squashed = name.to_lowercase();
+		let active_index = match self.index_for_name(&name_squashed) {
+			x if x >= 0 => x,
+			_ => return Err(MensagoError::ErrNotFound)
+		};
+
+		if active_index >= 0 {
+			self.profiles[active_index as usize].deactivate();
+			self.active_index = -1;
+		}
+
+		self.profile_id = name_squashed;
+		self.active_index = active_index;
+		self.profiles[active_index as usize].activate()?;
+
+		// Force loading of basic identity info if it hasn't already been done
+		self.profiles[active_index as usize].get_identity()?;
+
+		return Ok(&self.profiles[active_index as usize]);
 	}
 
 	/// Returns the number of profiles in the user's profile folder
@@ -150,9 +171,8 @@ impl ProfileManager {
 			return Err(MensagoError::ErrReserved)
 		}
 
-		match self.index_for_name(&name_squashed) {
-			Some(_) => return Err(MensagoError::ErrExists),
-			None => { /* do nothing */ }
+		if self.index_for_name(&name_squashed) >= 0 {
+			return Err(MensagoError::ErrExists);
 		}
 
 		let mut new_profile_path = PathBuf::from(&self.profile_folder);
@@ -196,11 +216,11 @@ impl ProfileManager {
 		}
 
 		let pindex = match self.index_for_name(&name_squashed) {
-			None => return Err(MensagoError::ErrNotFound),
-			Some(v) => v,
+			v if v >= 0 => v,
+			_ => return Err(MensagoError::ErrNotFound),
 		};
 
-		let profile = self.profiles.remove(pindex);
+		let profile = self.profiles.remove(pindex as usize);
 		if Path::new(profile.path.as_path()).exists() {
 			fs::remove_dir_all(profile.path.as_path())?
 		}
@@ -330,29 +350,29 @@ impl ProfileManager {
 		let new_squashed = newname.to_lowercase();
 
 		let index = match self.index_for_name(&old_squashed) {
-			Some(v) => v,
-			None => return Err(MensagoError::ErrNotFound)
+			v if v >= 0 => v,
+			_ => return Err(MensagoError::ErrNotFound)
 		};
 
-		if self.index_for_name(&new_squashed) != None {
+		if self.index_for_name(&new_squashed) >= 0 {
 			return Err(MensagoError::ErrExists)
 		}
 
-		if index == self.active_index as usize {
-			self.profiles[index].deactivate();
+		if index == self.active_index {
+			self.profiles[index as usize].deactivate();
 		}
 
-		let oldpath = self.profiles[index].path.clone();
+		let oldpath = self.profiles[index as usize].path.clone();
 		let mut newpath = oldpath.parent().unwrap().to_path_buf();
 		newpath.push(&new_squashed);
 
 		fs::rename(&oldpath, &newpath)?;
 
-		self.profiles[index].name = new_squashed;
-		self.profiles[index].path = newpath;
+		self.profiles[index as usize].name = new_squashed;
+		self.profiles[index as usize].path = newpath;
 
-		if index == self.active_index as usize {
-			self.profiles[index].activate()?;
+		if index == self.active_index {
+			self.profiles[index as usize].activate()?;
 		}
 
 		Ok(())
@@ -383,10 +403,8 @@ impl ProfileManager {
 
 		let name_squashed = name.to_lowercase();
 		let newindex = match self.index_for_name(&name_squashed) {
-			Some(v) => v,
-			None => {
-				return Err(MensagoError::ErrNotFound)
-			}
+			x if x >= 0 => x,
+			_ => return Err(MensagoError::ErrNotFound)
 		};
 
 		if oldindex <= 0 {
@@ -400,21 +418,24 @@ impl ProfileManager {
 	}
 
 	/// Obtains the index for a profile with the supplied name. Returns None on error.
-	fn index_for_name(&self, name: &str) -> Option<usize> {
+	fn index_for_name(&self, name: &str) -> isize {
 		
 		if name.len() == 0 {
-			return None
+			return -1
 		}
 
 		for i in 0..self.profiles.len() {
-			let p = self.profiles.get(i)?;
+			let p = match self.profiles.get(i) {
+				Some(v) => v,
+				None => { return -1; },
+			};
 			
 			if p.name == name {
-				return Some(i);
+				return i as isize;
 			}
 		}
 
-		None
+		-1
 	}	
 }
 
