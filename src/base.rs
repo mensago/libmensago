@@ -20,4 +20,7 @@ pub enum MensagoError {
 
 	#[error(transparent)]
     IOError(#[from] std::io::Error),
+
+	#[error(transparent)]
+    RusqliteError(#[from] rusqlite::Error),
 }
