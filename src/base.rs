@@ -5,6 +5,8 @@ pub enum MensagoError {
 
 	#[error("Empty data error")]
 	ErrEmptyData,
+	#[error("Bad value")]
+	ErrBadValue,
 	#[error("Resource already exists")]
 	ErrExists,
 	#[error("Filesystem error")]
