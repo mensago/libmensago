@@ -55,9 +55,21 @@ impl Profile {
 		if defpath.exists() {
 			profile.is_default = true;
 		}
-		
-		// TODO: Finish immplementing Profile::new()
 
+		match profile.load_config() {
+			Ok(_) => {
+				if profile.devid == None {
+					profile.devid = Some(RandomID::generate());
+				}
+			},
+			Err(_) => {
+				if profile.devid == None {
+					profile.devid = Some(RandomID::generate());
+				}
+				profile.save_config()?
+			}
+		}
+		
 		Ok(profile)
 	}
 
