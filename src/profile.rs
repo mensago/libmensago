@@ -382,11 +382,21 @@ impl ProfileManager {
 		}
 
 		let name_squashed = name.to_lowercase();
-		let newindex = self.index_for_name(&name_squashed);
+		let newindex = match self.index_for_name(&name_squashed) {
+			Some(v) => v,
+			None => {
+				return Err(MensagoError::ErrNotFound)
+			}
+		};
 
-		// TODO: Finish implementing set_default_profile()
+		if oldindex <= 0 {
+			if name_squashed == self.profiles[oldindex as usize].name {
+				return Ok(())
+			}
+			self.profiles[oldindex as usize].set_default(false)?;
+		}
 
-		Err(MensagoError::ErrUnimplemented)
+		self.profiles[newindex as usize].set_default(true)
 	}
 
 	/// Obtains the index for a profile with the supplied name. Returns None on error.
