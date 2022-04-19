@@ -28,17 +28,37 @@ impl Profile {
 	/// Creates a new profile from a specified path
 	pub fn new(profpath: &Path) -> Result<Profile, MensagoError> {
 
-		// TODO: Finish immplementing Profile::new()
-
-		Ok(Profile{
-			name: String::from(""),
+		let mut profname = match profpath.to_str() {
+			Some(v) => v,
+			None =>  { return Err(MensagoError::ErrBadValue) },
+		};
+		if profname.len() == 0 {
+			return Err(MensagoError::ErrEmptyData);
+		}
+		profname = match profpath.parent() {
+			Some(v) => v.to_str().unwrap(),
+			None => { return Err(MensagoError::ErrBadValue) },
+		};
+		
+		let mut profile = Profile{
+			name: String::from(profname),
 			path: PathBuf::from(profpath),
 			is_default: false,
 			uid: None,
 			wid: None,
 			domain: None,
 			devid: None,
-		})
+		};
+		
+		let mut defpath = profile.path.to_path_buf();
+		defpath.push("default.txt");
+		if defpath.exists() {
+			profile.is_default = true;
+		}
+		
+		// TODO: Finish immplementing Profile::new()
+
+		Ok(profile)
 	}
 
 	/// Connects the profile to its associated database
