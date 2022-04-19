@@ -1,4 +1,5 @@
 use anyhow::Result;
+use rusqlite;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -18,7 +19,7 @@ pub struct Profile {
 	is_default: bool,
 	uid: Option<UserID>,
 	wid: Option<RandomID>,
-	// db: rusqlite::Connection,
+	db: Option<rusqlite::Connection>,
 	domain: Option<Domain>,
 	devid: Option<RandomID>
 }
@@ -46,6 +47,7 @@ impl Profile {
 			is_default: false,
 			uid: None,
 			wid: None,
+			db: None,
 			domain: None,
 			devid: None,
 		};
@@ -76,9 +78,24 @@ impl Profile {
 	/// Connects the profile to its associated database
 	pub fn activate(&mut self) -> Result<(), MensagoError> {
 
-		// TODO: Implement Profile::activate()
+		let mut tempdir = self.path.clone();
+		tempdir.push("temp");
+		if !tempdir.exists() {
+			fs::create_dir_all(tempdir)?;
+		}
 
-		return Err(MensagoError::ErrUnimplemented)
+		let mut dbpath = self.path.clone();
+		dbpath.push("storage.db");
+		if dbpath.exists() {
+
+			self.db = Some(rusqlite::Connection::open(dbpath)?);
+
+			// TODO: load app config from database
+
+			return Ok(())
+		}
+
+		self.reset_db()
 	}
 
 	/// Loads the config file for the profile
@@ -220,7 +237,7 @@ impl ProfileManager {
 			is_default: false,
 			uid: None,
 			wid: None,
-			// db: rusqlite::Connection,
+			db: None,
 			domain: None,
 			devid: None
 		};
