@@ -73,7 +73,7 @@ impl Profile {
 		Ok(profile)
 	}
 
-	/// Connects the profile to its associated database
+	/// Connects the profile to its associated database, initializing it if necessary.
 	pub fn activate(&mut self) -> Result<(), MensagoError> {
 
 		let mut tempdir = self.path.clone();
