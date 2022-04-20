@@ -141,6 +141,30 @@ impl Profile {
 	/// Returns the identity workspace address for the profile
 	pub fn get_identity(&self) -> Result<MAddress,MensagoError> {
 
+		if self.uid.is_some() && self.domain.is_some() {
+			return Ok(MAddress::from_parts(self.uid.as_ref().unwrap(),
+				self.domain.as_ref().unwrap()))
+			
+		}
+
+		if self.wid.is_some() && self.domain.is_some() {
+			return Ok(MAddress::from_parts(&UserID::from_wid(self.wid.as_ref().unwrap()),
+				self.domain.as_ref().unwrap()))
+			
+		}
+
+		// We got this far, which means we need to get the info from the profile database
+
+		let db = self.open_db()?;
+
+		// We don't care if there's an error closing the database--we can't do anything about it if
+		// there is.
+		match db.close() { _ => { /* do nothing */ } }
+
+		
+
+		// TODO: Finish implementing get_identity()
+
 		return Err(MensagoError::ErrUnimplemented)
 	}
 
