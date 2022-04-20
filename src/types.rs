@@ -115,6 +115,14 @@ impl UserID {
 		Some(out)
 	}
 
+	/// Creates a UserID from a workspace ID
+	pub fn from_wid(wid: &RandomID) -> UserID {
+		UserID {
+			data: String::from(wid.as_string()),
+			idtype: IDType::WorkspaceID,
+		}
+	}
+
 	/// Returns the UserID as a string
 	pub fn as_string(&self) -> &str {
 		&self.data
@@ -173,8 +181,8 @@ impl fmt::Display for Domain {
 /// valid data within the library.
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub struct MAddress {
-	uid: UserID,
-	domain: Domain,
+	pub uid: UserID,
+	pub domain: Domain,
 }
 
 impl MAddress {
@@ -192,6 +200,14 @@ impl MAddress {
 		let out = MAddress { uid: UserID::from_str(parts[0])?, domain: Domain::from_str(parts[1])? };
 
 		Some(out)
+	}
+
+	/// Creates an MAddress from its components
+	pub fn from_parts(uid: &UserID, domain: &Domain) -> MAddress {
+		MAddress {
+			uid: uid.clone(),
+			domain: domain.clone(),
+		}
 	}
 
 	/// Returns the MAddress as a string
@@ -231,6 +247,14 @@ impl WAddress {
 		let out = WAddress { wid: RandomID::from_str(parts[0])?, domain: Domain::from_str(parts[1])? };
 
 		Some(out)
+	}
+
+	/// Creates a WAddress from its components
+	pub fn from_parts(wid: &RandomID, domain: &Domain) -> WAddress {
+		WAddress {
+			wid: wid.clone(),
+			domain: domain.clone(),
+		}
 	}
 
 	/// Returns the WAddress as a string
