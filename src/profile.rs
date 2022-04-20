@@ -19,7 +19,6 @@ pub struct Profile {
 	is_default: bool,
 	uid: Option<UserID>,
 	wid: Option<RandomID>,
-	db: Option<rusqlite::Connection>,
 	domain: Option<Domain>,
 	devid: Option<RandomID>
 }
@@ -47,7 +46,6 @@ impl Profile {
 			is_default: false,
 			uid: None,
 			wid: None,
-			db: None,
 			domain: None,
 			devid: None,
 		};
@@ -88,11 +86,12 @@ impl Profile {
 		dbpath.push("storage.db");
 		if dbpath.exists() {
 
-			self.db = Some(rusqlite::Connection::open(dbpath)?);
+			let db = rusqlite::Connection::open(dbpath)?;
 
 			// TODO: load app config from database
 
-			return Ok(())
+			db.close().expect("BUG: Profile.activate(): error closing database");
+			return Ok(());
 		}
 
 		self.reset_db()
@@ -112,12 +111,6 @@ impl Profile {
 		// TODO: Implement Profile::save_config()
 
 		return Err(MensagoError::ErrUnimplemented)
-	}
-
-	/// Disconnects the profile to its associated database
-	pub fn deactivate(&mut self) {
-
-		// TODO: Implement Profile::deactivate()
 	}
 
 	/// Sets the profile's internal flag that it is the default profile
@@ -186,7 +179,6 @@ impl ProfileManager {
 		};
 
 		if active_index >= 0 {
-			self.profiles[active_index as usize].deactivate();
 			self.active_index = -1;
 		}
 
@@ -237,7 +229,6 @@ impl ProfileManager {
 			is_default: false,
 			uid: None,
 			wid: None,
-			db: None,
 			domain: None,
 			devid: None
 		};
@@ -405,10 +396,6 @@ impl ProfileManager {
 
 		if self.index_for_name(&new_squashed) >= 0 {
 			return Err(MensagoError::ErrExists)
-		}
-
-		if index == self.active_index {
-			self.profiles[index as usize].deactivate();
 		}
 
 		let oldpath = self.profiles[index as usize].path.clone();
