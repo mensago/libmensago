@@ -17,6 +17,15 @@ pub enum MensagoError {
 	ErrReserved,
 	#[error("Function unimplemented")]
 	ErrUnimplemented,
+	
+	// Database exceptions are *bad*. This is returned only when there is a major problem with the
+	// data in the database, such as a workspace having no identity entry.
+	#[error("Database exception: {0}")]
+	ErrDatabaseException(String),
+
+	// Program exceptions are also extremely bad, but also highly unlikely thanks to Rust
+	#[error("Program exception: {0}")]
+	ErrProgramException(String),
 
 	#[error(transparent)]
     IOError(#[from] std::io::Error),
