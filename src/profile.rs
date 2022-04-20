@@ -139,7 +139,7 @@ impl Profile {
 	}
 
 	/// Returns the identity workspace address for the profile
-	pub fn get_identity(&self) -> Result<MAddress,MensagoError> {
+	pub fn get_identity(&mut self) -> Result<MAddress,MensagoError> {
 
 		if self.uid.is_some() && self.domain.is_some() {
 			return Ok(MAddress::from_parts(self.uid.as_ref().unwrap(),
@@ -154,18 +154,77 @@ impl Profile {
 		}
 
 		// We got this far, which means we need to get the info from the profile database
+		{
+			let conn = self.open_db()?;
 
-		let db = self.open_db()?;
+			let mut stmt = match conn
+				.prepare("SELECT wid,domain,userid FROM workspaces WHERE type = 'identity'") {
+					Ok(v) => v,
+					Err(e) => {
+						return Err(MensagoError::ErrDatabaseException(e.to_string()))
+					}
+				};
+			
+			// Queries with rusqlite are extremely ugly because the results wrapped several layers
+			// deep. The query() call returns a Result containing a Rows() structure. If we get an
+			// error here, there was a problem either with the query or the database.
+			let mut rows = match stmt.query([]) {
+				Ok(v) => v,
+				Err(e) => {
+					return Err(MensagoError::ErrDatabaseException(e.to_string()))
+				}
+			};
 
-		// We don't care if there's an error closing the database--we can't do anything about it if
-		// there is.
-		match db.close() { _ => { /* do nothing */ } }
+			// The Rows::next() call returns Result<Some<Result<Row>>>. Seriously. The possible
+			// return values are:
+			//
+			// Err() -> an error occurred getting the next row
+			// Ok(Some(Row)) -> another row was returned
+			// Ok(None) -> all results have been returned
+			
+			let option_row = match rows.next() {
+				Ok(v) => v,
+				Err(e) => {
+					return Err(MensagoError::ErrDatabaseException(e.to_string()))
+				}
+			};
 
-		
+			// We've actually removed enough layers to get an idea of if we actually were successful
+			// in finding the identity info.
+			if option_row.is_none() {
+				// We have a problem: no identity entry in the database for the workspace.
+				return Err(MensagoError::ErrDatabaseException(
+						String::from("Database has no identity entry in 'workspaces'")));
+			}
 
-		// TODO: Finish implementing get_identity()
+			let row = option_row.unwrap();
+			if self.wid.is_none() {
+				self.wid = RandomID::from_str(&row.get::<usize,String>(0).unwrap());
+			}
+			if self.domain.is_none() {
+				self.domain = Domain::from_str(&row.get::<usize,String>(1).unwrap());
+			}
+			if self.uid.is_none() {
+				self.uid = UserID::from_str(&row.get::<usize,String>(3).unwrap());
+			}
 
-		return Err(MensagoError::ErrUnimplemented)
+			// Connection to the database will be closed when the connection object is dropped
+		}
+
+		if self.uid.is_some() && self.domain.is_some() {
+			return Ok(MAddress::from_parts(self.uid.as_ref().unwrap(),
+				self.domain.as_ref().unwrap()))
+			
+		}
+
+		if self.wid.is_some() && self.domain.is_some() {
+			return Ok(MAddress::from_parts(&UserID::from_wid(self.wid.as_ref().unwrap()),
+				self.domain.as_ref().unwrap()))
+			
+		}
+
+		return Err(MensagoError::ErrProgramException(
+			String::from("BUG: Malformed MAddress returned from get_identity")))
 	}
 
 	/// Assigns an identity workspace to the profile
