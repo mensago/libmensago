@@ -116,11 +116,21 @@ impl Profile {
 	/// Sets the profile's internal flag that it is the default profile
 	pub fn set_default(&mut self, is_default: bool) -> Result<(), MensagoError> {
 
-		// TODO: Implement Profile::set_default()
-	
+		let mut dbpath = self.path.clone();
+		dbpath.push("default.txt");
+		if is_default {
+			if !dbpath.exists() {
+				let _handle = fs::File::create(dbpath)?;
+			}
+		} else {
+			if dbpath.exists() {
+				fs::remove_file(dbpath)?;
+			}
+		}
+
 		self.is_default = is_default;
 
-		return Err(MensagoError::ErrUnimplemented)
+		Ok(())
 	}
 
 	/// Returns true if the profile has been told it's the default
@@ -150,6 +160,15 @@ impl Profile {
 	pub fn resolve_address(&self, a: MAddress) -> Result<RandomID,MensagoError> {
 
 		return Err(MensagoError::ErrUnimplemented)
+	}
+
+	/// Private function to make code that deals with the database easier. It also ensures that
+	/// an error is returned if the database doesn't exist.
+	fn open_db(&self) -> Result<rusqlite::Connection, rusqlite::Error> {
+		
+		let mut dbpath = self.path.clone();
+		dbpath.push("storage.db");
+		rusqlite::Connection::open_with_flags(dbpath, rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE)
 	}
 }
 
