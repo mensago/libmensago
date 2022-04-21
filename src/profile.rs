@@ -600,7 +600,10 @@ impl ProfileManager {
 		
 		let default_name = match self.get_default_profile() {
 			Some(v) => String::from(&v.name),
-			None => panic!("BUG: Couldn't find default profile in load_profiles()"),
+			None => {
+				return Err(MensagoError::ErrProgramException( 
+					String::from("BUG: Couldn't find default profile in load_profiles()")));
+			},
 		};
 
 		self.activate_profile(&default_name)?;
