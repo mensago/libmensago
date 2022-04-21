@@ -8,7 +8,7 @@ use crate::types::*;
 use crate::workspace::*;
 
 // String for initializing a new profile database
-static db_setup_commands: &str = "
+static DB_SETUP_COMMANDS: &str = "
 	CREATE TABLE workspaces (
 		'wid' TEXT NOT NULL UNIQUE,
 		'userid' TEXT,
@@ -355,7 +355,7 @@ impl Profile {
 				}
 			};
 
-			match conn.execute(db_setup_commands, []) {
+			match conn.execute(DB_SETUP_COMMANDS, []) {
 				Ok(_) => { /* do nothing. YAY */ },
 				Err(e) => {
 					return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())));
@@ -590,7 +590,7 @@ impl ProfileManager {
 		if self.profiles.len() == 0 {
 			match self.create_profile("primary") {
 				Ok(_) => {
-					self.set_default_profile("primary");
+					self.set_default_profile("primary")?;
 				},
 				Err(e) => {
 					return Err(e);
