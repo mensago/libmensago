@@ -1,13 +1,47 @@
 use std::path::PathBuf;
+use crate::base::*;
 use crate::types::*;
 
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub struct Workspace {
-	// db: rusqlite::Connection,
+	dbpath: PathBuf,
 	path: PathBuf,
-	uid: UserID,
-	wid: RandomID,
-	domain: Domain,
+	uid: Option<UserID>,
+	wid: Option<RandomID>,
+	domain: Option<Domain>,
 	_type: String,
 	pw: String,
+}
+
+impl Workspace {
+
+	/// Creates a new, uninitialized Workspace object
+	pub fn new(dbpath: &PathBuf, path: &PathBuf) -> Workspace {
+
+		return Workspace{
+			dbpath: dbpath.clone(),
+			path: path.clone(),
+			uid: None,
+			wid: None,
+			domain: None,
+			_type: String::from("identity"),
+			pw: String::from(""),
+		}
+	}
+
+	/// Creates all the data needed for an individual workspace account
+	pub fn generate(&mut self, uid: &UserID, server: &Domain, wid: &RandomID, pw: &str) 
+		-> Result<(),MensagoError> {
+		
+		self.uid = Some(uid.clone());
+		self.wid = Some(wid.clone());
+		self.domain = Some(server.clone());
+		self.pw = String::from(pw);
+
+		let address = MAddress::from_parts(&UserID::from_wid(wid), server);
+		
+		// TODO: Finish implementing Workspace::generate()
+
+		Err(MensagoError::ErrUnimplemented)
+	}
 }
