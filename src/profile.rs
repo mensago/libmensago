@@ -340,7 +340,30 @@ impl Profile {
 	/// Reinitializes the profile's database to empty
 	pub fn reset_db(&self) -> Result<(),MensagoError> {
 
-		return Err(MensagoError::ErrUnimplemented)
+		let mut dbpath = self.path.clone();
+		dbpath.push("storage.db");
+
+		if dbpath.exists() {
+			fs::remove_file(&dbpath)?;
+		}
+
+		{
+			let conn = match rusqlite::Connection::open(&dbpath) {
+				Ok(v) => v,
+				Err(e) => {
+					return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())));
+				}
+			};
+
+			match conn.execute(db_setup_commands, []) {
+				Ok(_) => { /* do nothing. YAY */ },
+				Err(e) => {
+					return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())));
+				}
+			}
+		}
+
+		Ok(())
 	}
 	
 	/// Resolves a Mensago address to its corresponding workspace ID
