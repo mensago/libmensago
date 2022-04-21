@@ -7,6 +7,110 @@ use crate::base::*;
 use crate::types::*;
 use crate::workspace::*;
 
+// String for initializing a new profile database
+static db_setup_commands: &str = "
+	CREATE TABLE workspaces (
+		'wid' TEXT NOT NULL UNIQUE,
+		'userid' TEXT,
+		'domain' TEXT,
+		'password' TEXT,
+		'pwhashtype' TEXT,
+		'type' TEXT
+	);
+	CREATE table 'folders'(
+		'fid' TEXT NOT NULL UNIQUE,
+		'address' TEXT NOT NULL,
+		'keyid' TEXT NOT NULL,
+		'path' TEXT NOT NULL,
+		'name' TEXT NOT NULL,
+		'permissions' TEXT NOT NULL
+	);
+	CREATE table 'sessions'(
+		'address' TEXT NOT NULL,
+		'devid' TEXT NOT NULL,
+		'devname' TEXT NOT NULL,
+		'public_key' TEXT NOT NULL,
+		'private_key' TEXT NOT NULL,
+		'os' TEXT NOT NULL
+	);
+	CREATE table 'keys'(
+		'keyid' TEXT NOT NULL UNIQUE,
+		'address' TEXT NOT NULL,
+		'type' TEXT NOT NULL,
+		'category' TEXT NOT NULL,
+		'private' TEXT NOT NULL,
+		'public' TEXT,
+		'timestamp' TEXT NOT NULL
+	);
+	CREATE table 'keycards'(
+		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
+		'owner' TEXT NOT NULL,
+		'index' INTEGER,
+		'type' TEXT NOT NULL,
+		'entry' BLOB NOT NULL,
+		'textentry' TEXT NOT NULL,
+		'hash' TEXT NOT NULL,
+		'expires' TEXT NOT NULL,
+		'timestamp' TEXT NOT NULL
+	);
+	CREATE table 'messages'(
+		'id' TEXT NOT NULL UNIQUE,
+		'from'  TEXT NOT NULL,
+		'address' TEXT NOT NULL,
+		'cc'  TEXT,
+		'bcc' TEXT,
+		'date' TEXT NOT NULL,
+		'thread_id' TEXT NOT NULL,
+		'subject' TEXT,
+		'body' TEXT,
+		'attachments' TEXT
+	);
+	CREATE TABLE 'contactinfo' (
+		'id' TEXT NOT NULL,
+		'fieldname' TEXT NOT NULL,
+		'fieldvalue' TEXT,
+		'contactgroup' TEXT
+	);
+	CREATE TABLE 'userinfo' (
+		'fieldname' TEXT NOT NULL,
+		'fieldvalue' TEXT
+	);
+	CREATE TABLE 'annotations' (
+		'id' TEXT NOT NULL,
+		'fieldname' TEXT NOT NULL,
+		'fieldvalue' TEXT,
+		'contactgroup' TEXT
+	);
+	CREATE TABLE 'updates' (
+		'id' TEXT NOT NULL UNIQUE,
+		'type' TEXT NOT NULL,
+		'data' TEXT NOT NULL,
+		'time' TEXT NOT NULL
+	);''','''
+	CREATE TABLE 'photos' (
+		'id' TEXT NOT NULL,
+		'type' TEXT NOT NULL,
+		'photodata' BLOB,
+		'isannotation' TEXT NOT NULL,
+		'contactgroup' TEXT
+	);
+	CREATE TABLE 'notes' (
+		'id'	TEXT NOT NULL UNIQUE,
+		'address' TEXT,
+		'title'	TEXT,
+		'body'	TEXT,
+		'notebook'	TEXT,
+		'tags'	TEXT,
+		'created'	TEXT NOT NULL,
+		'updated'	TEXT,
+		'attachments'	TEXT
+	);
+	CREATE TABLE 'files' (
+		'id'	TEXT NOT NULL UNIQUE,
+		'name'	TEXT NOT NULL,
+		'type'	TEXT NOT NULL,
+		'path'	TEXT NOT NULL
+	);";
 
 /// The Profile type is the client's entry point to interacting with storage. One major point to
 /// note is that it owns the database instance. Unless you are specifically managing profiles, you
