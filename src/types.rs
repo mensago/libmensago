@@ -215,6 +215,15 @@ impl MAddress {
 		String::from(format!("{}/{}", self.uid, self.domain))
 	}
 
+	/// Returns the UserID portion of the address
+	pub fn get_uid(&self) -> &UserID {
+		&self.uid
+	}
+
+	/// Returns the Domain portion of the address
+	pub fn get_domain(&self) -> &Domain {
+		&self.domain
+	}
 }
 
 impl fmt::Display for MAddress {
@@ -262,6 +271,15 @@ impl WAddress {
 		String::from(format!("{}/{}", self.wid, self.domain))
 	}
 
+	/// Returns the RandomID portion of the address
+	pub fn get_wid(&self) -> &RandomID {
+		&self.wid
+	}
+
+	/// Returns the Domain portion of the address
+	pub fn get_domain(&self) -> &Domain {
+		&self.domain
+	}
 }
 
 impl fmt::Display for WAddress {
