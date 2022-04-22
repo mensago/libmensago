@@ -271,6 +271,14 @@ impl fmt::Display for WAddress {
 	}
 }
 
+/// A basic data type representing a password hash. It is used to ensure passing around
+/// valid data within the library.
+#[derive(Debug, PartialEq, PartialOrd, Clone)]
+pub struct PassHash {
+	hash: String
+}
+
+
 #[cfg(test)]
 mod tests {
 	use crate::*;
