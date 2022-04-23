@@ -8,6 +8,8 @@ pub fn get_credentials(path: PathBuf, waddr: WAddress) -> Result<ArgonHash, Mens
 	let mut dbpath = path.clone();
 	dbpath.push("storage.db");
 
+	let passhash: ArgonHash;
+	
 	{	// Begin Query
 		// For the fully-commented version of this code, see profile::get_identity()
 		let conn = match rusqlite::Connection::open_with_flags(dbpath, 
@@ -42,11 +44,10 @@ pub fn get_credentials(path: PathBuf, waddr: WAddress) -> Result<ArgonHash, Mens
 		};
 
 		// Query unwrapping complete. Start extracting the data
+		let row = option_row.unwrap();
+		passhash = ArgonHash::from_str(&row.get::<usize,String>(0).unwrap());
 
-		// TODO: Finish extracting data from the query
 	}	// End Query
 	
-	// TODO: implement auth.get_credentials()
-	
-	Err(MensagoError::ErrUnimplemented)
+	Ok(passhash)
 }
