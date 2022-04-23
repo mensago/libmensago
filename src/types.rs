@@ -289,13 +289,27 @@ impl fmt::Display for WAddress {
 	}
 }
 
-/// A basic data type representing a password hash. It is used to ensure passing around
-/// valid data within the library.
+/// A basic data type representing an Argon2id password hash. It is used to ensure passing around
+/// valid data within the library. This might someday be genericized, but for now it's fine.
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
-pub struct PassHash {
+pub struct ArgonHash {
 	hash: String
 }
 
+impl ArgonHash {
+
+	/// Creates a new ArgonHash from the provided password
+	pub fn new(password: &str) -> ArgonHash {
+		ArgonHash {
+			hash: eznacl::hash_password(password, eznacl::HashStrength::Basic)
+		}
+	}
+
+	/// Returns the object's hash string
+	pub fn get_hash(&self) -> &str {
+		&self.hash
+	}
+}
 
 #[cfg(test)]
 mod tests {

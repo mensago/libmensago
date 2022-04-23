@@ -3,7 +3,7 @@ use rusqlite;
 use crate::base::*;
 use crate::types::*;
 
-pub fn get_credentials(path: PathBuf, waddr: WAddress) -> Result<PassHash, MensagoError> {
+pub fn get_credentials(path: PathBuf, waddr: WAddress) -> Result<ArgonHash, MensagoError> {
 	
 	let mut dbpath = path.clone();
 	dbpath.push("storage.db");
