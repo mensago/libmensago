@@ -1,5 +1,3 @@
-use std::path::{PathBuf};
-
 use eznacl::*;
 use sys_info;
 use rusqlite;
@@ -7,66 +5,43 @@ use rusqlite;
 use crate::base::*;
 use crate::types::*;
 
-pub fn get_credentials(path: &PathBuf, waddr: &WAddress) -> Result<ArgonHash, MensagoError> {
+pub fn get_credentials(conn: &rusqlite::Connection, waddr: &WAddress)
+		-> Result<ArgonHash, MensagoError> {
 	
-	let mut dbpath = path.clone();
-	dbpath.push("storage.db");
-
-	let passhash: ArgonHash;
-
-	{	// Begin Query
-		// For the fully-commented version of this code, see profile::get_identity()
-		let conn = match rusqlite::Connection::open_with_flags(dbpath, 
-			rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE) {
-				Ok(v) => v,
-				Err(e) => {
-					return Err(MensagoError::ErrDatabaseException(e.to_string()))
-				}
-			};
-	
-		let mut stmt = match conn
-			.prepare("SELECT password,pwhashtype FROM workspaces WHERE wid=?1 AND domain=?2") {
-				Ok(v) => v,
-				Err(e) => {
-					return Err(MensagoError::ErrDatabaseException(e.to_string()))
-				}
-			};
-		
-		let mut rows = match stmt.query([waddr.get_wid().as_string(),
-			waddr.get_domain().as_string()]) {
+	// For the fully-commented version of this query, see profile::get_identity()
+	let mut stmt = match conn
+		.prepare("SELECT password,pwhashtype FROM workspaces WHERE wid=?1 AND domain=?2") {
 			Ok(v) => v,
 			Err(e) => {
 				return Err(MensagoError::ErrDatabaseException(e.to_string()))
 			}
 		};
+	
+	let mut rows = match stmt.query([waddr.get_wid().as_string(),
+		waddr.get_domain().as_string()]) {
+		Ok(v) => v,
+		Err(e) => {
+			return Err(MensagoError::ErrDatabaseException(e.to_string()))
+		}
+	};
 
-		let option_row = match rows.next() {
-			Ok(v) => v,
-			Err(e) => {
-				return Err(MensagoError::ErrDatabaseException(e.to_string()))
-			}
-		};
+	let option_row = match rows.next() {
+		Ok(v) => v,
+		Err(e) => {
+			return Err(MensagoError::ErrDatabaseException(e.to_string()))
+		}
+	};
 
-		// Query unwrapping complete. Start extracting the data
-		let row = option_row.unwrap();
-		passhash = ArgonHash::from_str(&row.get::<usize,String>(0).unwrap());
-
-	}	// End Query
+	// Query unwrapping complete. Start extracting the data
+	let row = option_row.unwrap();
+	let passhash = ArgonHash::from_str(&row.get::<usize,String>(0).unwrap());
 	
 	Ok(passhash)
 }
 
 /// Sets the password and hash type for the specified workspace
-pub fn set_credentials(dbpath: &PathBuf, waddr: &WAddress, pwh: &ArgonHash) -> Result<(),MensagoError> {
+pub fn set_credentials(conn: &rusqlite::Connection, waddr: &WAddress, pwh: &ArgonHash) -> Result<(),MensagoError> {
 
-	let conn = match rusqlite::Connection::open_with_flags(dbpath, 
-		rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE) {
-			Ok(v) => v,
-			Err(e) => {
-				return Err(MensagoError::ErrDatabaseException(e.to_string()))
-			}
-		};
-	
 	check_workspace_exists(&conn, waddr)?;
 
 	match conn.execute("UPDATE workspaces SET password=?1,pwhashtype=?2 WHERE wid=?3 AND domain=?4",
@@ -80,20 +55,12 @@ pub fn set_credentials(dbpath: &PathBuf, waddr: &WAddress, pwh: &ArgonHash) -> R
 }
 
 /// Adds a device ID to a workspace
-pub fn add_device_session(dbpath: &PathBuf, waddr: &WAddress, devid: &RandomID, 
+pub fn add_device_session(conn: &rusqlite::Connection, waddr: &WAddress, devid: &RandomID, 
 	devpair: &EncryptionPair, devname: Option<&str>) -> Result<(),MensagoError> {
 
 	if devpair.get_algorithm() != "CURVE25519" {
 		return Err(MensagoError::ErrUnsupportedAlgorithm)
 	}
-	
-	let conn = match rusqlite::Connection::open_with_flags(dbpath, 
-		rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE) {
-			Ok(v) => v,
-			Err(e) => {
-				return Err(MensagoError::ErrDatabaseException(e.to_string()))
-			}
-		};
 	
 	check_workspace_exists(&conn, waddr)?;
 	
@@ -144,15 +111,7 @@ pub fn add_device_session(dbpath: &PathBuf, waddr: &WAddress, devid: &RandomID,
 }
 
 /// Removes an authorized device from the workspace
-pub fn remove_device_session(dbpath: &PathBuf, devid: &RandomID) -> Result<(),MensagoError> {
-
-	let conn = match rusqlite::Connection::open_with_flags(dbpath, 
-		rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE) {
-			Ok(v) => v,
-			Err(e) => {
-				return Err(MensagoError::ErrDatabaseException(e.to_string()))
-			}
-		};
+pub fn remove_device_session(conn: &rusqlite::Connection, devid: &RandomID) -> Result<(),MensagoError> {
 
 	// Check to see if the device ID passed to the function exists
 	let mut stmt = match conn.prepare("SELECT devid FROM sessions WHERE devid=?1") {
