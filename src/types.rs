@@ -293,7 +293,8 @@ impl fmt::Display for WAddress {
 /// valid data within the library. This might someday be genericized, but for now it's fine.
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub struct ArgonHash {
-	hash: String
+	hash: String,
+	hashtype: String
 }
 
 impl ArgonHash {
@@ -301,20 +302,27 @@ impl ArgonHash {
 	/// Creates a new ArgonHash from the provided password
 	pub fn new(password: &str) -> ArgonHash {
 		ArgonHash {
-			hash: eznacl::hash_password(password, eznacl::HashStrength::Basic)
+			hash: eznacl::hash_password(password, eznacl::HashStrength::Basic),
+			hashtype: String::from("argon2id"),
 		}
 	}
 
 	/// Creates an ArgonHash object from a verified string
 	pub fn from_str(passhash: &str) -> ArgonHash {
 		ArgonHash {
-			hash: String::from(passhash)
+			hash: String::from(passhash),
+			hashtype: String::from("argon2id"),
 		}
 	}
 
 	/// Returns the object's hash string
 	pub fn get_hash(&self) -> &str {
 		&self.hash
+	}
+
+	/// Returns the object's hash type
+	pub fn get_hashtype(&self) -> &str {
+		&self.hashtype
 	}
 }
 
