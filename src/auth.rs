@@ -143,11 +143,59 @@ pub fn add_device_session(dbpath: &PathBuf, waddr: &WAddress, devid: &RandomID,
 	}
 }
 
+/// Removes an authorized device from the workspace
+pub fn remove_device_session(dbpath: &PathBuf, devid: &RandomID) -> Result<(),MensagoError> {
+
+	let conn = match rusqlite::Connection::open_with_flags(dbpath, 
+		rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrDatabaseException(e.to_string()))
+			}
+		};
+
+	// Check to see if the device ID passed to the function exists
+	let mut stmt = match conn.prepare("SELECT devid FROM sessions WHERE devid=?1") {
+		Ok(v) => v,
+		Err(e) => {
+			return Err(MensagoError::ErrDatabaseException(e.to_string()))
+		}
+	};
+		
+	let mut rows = match stmt.query([devid.as_string()]) {
+		Ok(v) => v,
+		Err(e) => {
+			return Err(MensagoError::ErrDatabaseException(e.to_string()))
+		}
+	};
+
+	match rows.next() {
+		Ok(optrow) => {
+			match optrow {
+				// This means that the device ID wasn't found
+				None => { return Err(MensagoError::ErrNotFound) },
+				Some(_) => { /* Do nothing. The device exists. */ }
+			}
+		},
+		Err(e) => {
+			return Err(MensagoError::ErrDatabaseException(e.to_string()))
+		}
+	};
+
+	match conn.execute("DELETE FROM sessions WHERE devid=?1)", [devid.as_string()]) {
+		
+		Ok(_) => { return Ok(()) },
+		Err(e) => {
+			return Err(MensagoError::ErrDatabaseException(e.to_string()))
+		}
+	}
+}
+
 /// Utility function that just checks to see if a specific workspace exists in the database
 fn check_workspace_exists(conn: &rusqlite::Connection, waddr: &WAddress)
 	-> Result<(),MensagoError> {
 	
-	// Check to see if the workspace address passed tothe function exists
+	// Check to see if the workspace address passed to the function exists
 	let mut stmt = match conn.prepare("SELECT wid FROM workspaces WHERE wid=?1 AND domain=?2") {
 		Ok(v) => v,
 		Err(e) => {
