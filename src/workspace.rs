@@ -44,4 +44,22 @@ impl Workspace {
 
 		Err(MensagoError::ErrUnimplemented)
 	}
+
+	// TODO: Implement load_from_db()
+
+	// TODO: Implement add_to_db()
+
+	// TODO: Implement remove_from_db()
+
+	// TODO: Implement remove_workspace_entry()
+
+	// TODO: Implement add_folder()
+
+	// TODO: Implement remove_folder()
+
+	// TODO: Implement get_folder()
+
+	// TODO: Implement set_userid()
+
+	// TODO: Implement get_userid()
 }
