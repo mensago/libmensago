@@ -225,6 +225,7 @@ fn check_workspace_exists(conn: &rusqlite::Connection, waddr: &WAddress)
 	Ok(())
 }
 
+/// Internal function to construct a device name based on platform and OS
 fn make_device_name() -> String {
 	let hostname = match sys_info::hostname() {
 		Ok(v) => v.to_lowercase(),
