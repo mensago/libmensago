@@ -191,6 +191,55 @@ pub fn remove_device_session(dbpath: &PathBuf, devid: &RandomID) -> Result<(),Me
 	}
 }
 
+/// Returns the device key for a server session
+pub fn get_session_keypair(conn: &rusqlite::Connection, waddr: WAddress)
+		-> Result<EncryptionPair, MensagoError> {
+	
+	let out: EncryptionPair;
+	{	// Begin Query
+		// For the fully-commented version of this code, see profile::get_identity()
+	
+		let mut stmt = match conn
+			.prepare("SELECT public_key,private_key FROM sessions WHERE address=?1") {
+				Ok(v) => v,
+				Err(e) => {
+					return Err(MensagoError::ErrDatabaseException(e.to_string()))
+				}
+			};
+		
+		let mut rows = match stmt.query([waddr.as_string()]) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrDatabaseException(e.to_string()))
+			}
+		};
+
+		let option_row = match rows.next() {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrDatabaseException(e.to_string()))
+			}
+		};
+
+		// Query unwrapping complete. Start extracting the data
+		let row = option_row.unwrap();
+		out = match EncryptionPair::from_strings(
+			&row.get::<usize,String>(0).unwrap(),
+			&row.get::<usize,String>(1).unwrap()) {
+			
+			Some(v) => v,
+			None => { 
+				return Err(MensagoError::ErrProgramException(
+					String::from("Error obtaining encryption pair from database")
+				));
+			}
+		}
+
+	}	// End Query
+
+	Ok(out)
+}
+
 /// Utility function that just checks to see if a specific workspace exists in the database
 fn check_workspace_exists(conn: &rusqlite::Connection, waddr: &WAddress)
 	-> Result<(),MensagoError> {
