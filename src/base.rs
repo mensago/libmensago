@@ -15,6 +15,8 @@ pub enum MensagoError {
 	ErrNotFound,
 	#[error("Reserved")]
 	ErrReserved,
+	#[error("Unsupported algorithm")]
+	ErrUnsupportedAlgorithm,
 	#[error("Function unimplemented")]
 	ErrUnimplemented,
 	
