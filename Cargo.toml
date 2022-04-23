@@ -13,12 +13,13 @@ categories = ["network-programming"]
 exclude = [".gitignore"]
 
 [dependencies]
-anyhow = "1.0.56"
 eznacl = "1.0.0"
 hex = "0.4.3"
 lazy_static = "1.4.0"
+os_info = { version = "3", default-features = false }
 rand = "0.8.5"
 regex = "1.5.5"
 rusqlite = "0.27.0"
+sys-info = "0.9"
 thiserror = "1.0.30"
 uuid = { version = "0.8.2", features = ["serde", "v4"] }
