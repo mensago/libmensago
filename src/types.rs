@@ -305,6 +305,13 @@ impl ArgonHash {
 		}
 	}
 
+	/// Creates an ArgonHash object from a verified string
+	pub fn from_str(passhash: &str) -> ArgonHash {
+		ArgonHash {
+			hash: String::from(passhash)
+		}
+	}
+
 	/// Returns the object's hash string
 	pub fn get_hash(&self) -> &str {
 		&self.hash
