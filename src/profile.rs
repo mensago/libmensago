@@ -1,4 +1,3 @@
-use anyhow::Result;
 use rusqlite;
 use std::env;
 use std::fs;
