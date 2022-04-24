@@ -54,6 +54,38 @@ pub enum KeyCategory {
 	Storage,
 }
 
+impl fmt::Display for KeyCategory {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			KeyCategory::ConReqEncryption => write!(f, "crencryption"),
+			KeyCategory::ConReqSigning => write!(f, "crsigning"),
+			KeyCategory::Encryption => write!(f, "encryption"),
+			KeyCategory::Signing => write!(f, "signing"),
+			KeyCategory::Folder => write!(f, "folder"),
+			KeyCategory::PrimarySigning => write!(f, "orgsigning"),
+			KeyCategory::SecondarySigning => write!(f, "altorgsigning"),
+			KeyCategory::Storage => write!(f, "storage"),
+		}
+	}
+}
+
+impl KeyCategory {
+	pub fn from_str(from: &str) -> Option<KeyCategory> {
+		let squashed = from.to_lowercase();
+		match squashed.as_str() {
+			"crencryption" => Some(KeyCategory::ConReqEncryption),
+			"crsigning" => Some(KeyCategory::ConReqSigning),
+			"encryption" => Some(KeyCategory::Encryption),
+			"signing" => Some(KeyCategory::Signing),
+			"folder" => Some(KeyCategory::Folder),
+			"orgsigning" => Some(KeyCategory::PrimarySigning),
+			"altorgsigning" => Some(KeyCategory::SecondarySigning),
+			"storage" => Some(KeyCategory::Storage),
+			_ => None,
+		}
+	}
+}
+
 /// The RandomID class is similar to v4 UUIDs. To obtain the maximum amount of entropy, all bits
 /// are random and no version information is stored in them. The only null value for the RandomID
 /// is all zeroes. Lastly, the only permissible format for the string version of the RandomID

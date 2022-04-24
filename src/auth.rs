@@ -316,20 +316,9 @@ pub fn add_key(conn: &rusqlite::Connection, waddr: WAddress, key: &CryptoString,
 
 	let timestamp = get_timestamp();
 
-	let category_string = match category {
-		KeyCategory::ConReqEncryption => "crencryption",
-		KeyCategory::ConReqSigning => "crsigning",
-		KeyCategory::Encryption => "encryption",
-		KeyCategory::Signing => "signing",
-		KeyCategory::Folder => "folder",
-		KeyCategory::PrimarySigning => "orgsigning",
-		KeyCategory::SecondarySigning => "altorgsigning",
-		KeyCategory::Storage => "storage",
-	};
-
 	match conn.execute("INSERT INTO keys(keyid,address,type,category,private,public,timestamp)
 		VALUES(?1,?2,?3,?4,?5,?6,?7)",
-		[keyhash.as_str(), &waddr.to_string(), "symmetric", category_string, key.as_str(), 
+		[keyhash.as_str(), &waddr.to_string(), "symmetric", &category.to_string(), key.as_str(), 
 		key.as_str(), &timestamp]) {
 		
 		Ok(_) => { return Ok(()) },
@@ -379,6 +368,78 @@ pub fn remove_key(conn: &rusqlite::Connection, keyhash: &CryptoString) -> Result
 			return Err(MensagoError::ErrDatabaseException(e.to_string()))
 		}
 	}
+}
+
+/// Returns a pair of CryptoStrings, where the public key is in element 0 and the private key is in
+/// element 1. This is to accommodate retrieval of all key types. If a symmetric key is obtained
+/// through this call, the public and private key values will be the same.
+pub fn get_keypair(conn: &rusqlite::Connection, keyhash: &CryptoString)
+	-> Result<[CryptoString; 2], MensagoError> {
+
+	// For the fully-commented version of this code, see profile::get_identity()
+
+	let mut stmt = match conn
+		.prepare("SELECT public,private FROM keys WHERE keyid=?1") {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrDatabaseException(e.to_string()))
+			}
+		};
+	
+	let mut rows = match stmt.query([keyhash.as_str()]) {
+		Ok(v) => v,
+		Err(e) => {
+			return Err(MensagoError::ErrDatabaseException(e.to_string()))
+		}
+	};
+
+	let option_row = match rows.next() {
+		Ok(v) => v,
+		Err(e) => {
+			return Err(MensagoError::ErrDatabaseException(e.to_string()))
+		}
+	};
+
+	// Query unwrapping complete. Start extracting the data
+	let row = option_row.unwrap();
+
+	let pubcs = match &row.get::<usize,String>(0) {
+		Ok(v) => {
+			match eznacl::CryptoString::from(v) {
+				Some(cs) => cs,
+				None => {
+					return Err(MensagoError::ErrDatabaseException(
+						String::from(format!("Bad public key {} in get_key()", v))
+					))
+				}
+			}
+		},
+		Err(e) => {
+			return Err(MensagoError::ErrDatabaseException(
+				String::from(format!("Error getting public key in get_key(): {}", e))
+			))
+		}
+	};
+
+	let privcs = match &row.get::<usize,String>(1) {
+		Ok(v) => {
+			match eznacl::CryptoString::from(v) {
+				Some(cs) => cs,
+				None => {
+					return Err(MensagoError::ErrDatabaseException(
+						String::from(format!("Bad private key {} in get_key()", v))
+					))
+				}
+			}
+		},
+		Err(e) => {
+			return Err(MensagoError::ErrDatabaseException(
+				String::from(format!("Error getting private key in get_key(): {}", e))
+			))
+		}
+	};
+
+	Ok([pubcs, privcs])
 }
 
 /// Utility function that just checks to see if a specific workspace exists in the database
@@ -432,6 +493,8 @@ fn make_device_name() -> String {
 
 	format!("{}-{}",hostname, osname)
 }
+
+
 
 // TODO: Implement get_key
 
