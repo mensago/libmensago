@@ -199,6 +199,146 @@ pub fn get_session_keypair(conn: &rusqlite::Connection, waddr: WAddress)
 	Ok(out)
 }
 
+/// Adds a key pair to a workspace.
+pub fn add_keypair(conn: &rusqlite::Connection, waddr: WAddress, pubkey: &CryptoString,
+	privkey: &CryptoString, keytype: &KeyType, category: KeyCategory) -> Result<(), MensagoError> {
+	
+	let pubhash = match eznacl::get_hash("blake3-128", pubkey.as_bytes()) {
+		Ok(v) => v,
+		Err(e) => {
+			return Err(MensagoError::ErrProgramException(String::from(e.to_string())));
+		}
+	};
+
+	// Can't add the same keypair twice
+	{
+		let mut stmt = match conn.prepare("SELECT keyid FROM keys WHERE keyid=?1") {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrDatabaseException(e.to_string()))
+			}
+		};
+			
+		let mut rows = match stmt.query([pubhash.as_str()]) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrDatabaseException(e.to_string()))
+			}
+		};
+
+		match rows.next() {
+			Ok(optrow) => {
+				match optrow {
+					Some(_) => { return Err(MensagoError::ErrExists) },
+					None => { /* Do nothing. No existing session. */ }
+				}
+			},
+			Err(e) => {
+				return Err(MensagoError::ErrDatabaseException(e.to_string()))
+			}
+		};
+	}
+
+	let timestamp = get_timestamp();
+
+	let type_string = match keytype {
+		KeyType::AsymEncryptionKey => "asymmetric",
+		KeyType::SigningKey => "signing",
+
+		// add_key() is used for symmetric keys
+		KeyType::SymEncryptionKey => {
+			return Err(MensagoError::ErrTypeMismatch)
+		},
+	};
+
+	let category_string = match category {
+		KeyCategory::ConReqEncryption => "crencryption",
+		KeyCategory::ConReqSigning => "crsigning",
+		KeyCategory::Encryption => "encryption",
+		KeyCategory::Signing => "signing",
+		KeyCategory::Folder => "folder",
+		KeyCategory::PrimarySigning => "orgsigning",
+		KeyCategory::SecondarySigning => "altorgsigning",
+		KeyCategory::Storage => "storage",
+	};
+
+	match conn.execute("INSERT INTO keys(keyid,address,type,category,private,public,timestamp)
+		VALUES(?1,?2,?3,?4,?5,?6,?7)",
+		[pubhash.as_str(), &waddr.to_string(), type_string, category_string, privkey.as_str(), 
+		pubkey.as_str(), &timestamp]) {
+		
+		Ok(_) => { return Ok(()) },
+		Err(e) => {
+			return Err(MensagoError::ErrDatabaseException(e.to_string()))
+		}
+	}
+}
+
+/// Adds a single symmetric key to a workspace.
+pub fn add_key(conn: &rusqlite::Connection, waddr: WAddress, key: &CryptoString, 
+	category: KeyCategory) -> Result<(), MensagoError> {
+	
+	let keyhash = match eznacl::get_hash("blake3-128", key.as_bytes()) {
+		Ok(v) => v,
+		Err(e) => {
+			return Err(MensagoError::ErrProgramException(String::from(e.to_string())));
+		}
+	};
+
+	// Can't add the same keypair twice
+	{
+		let mut stmt = match conn.prepare("SELECT keyid FROM keys WHERE keyid=?1") {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrDatabaseException(e.to_string()))
+			}
+		};
+			
+		let mut rows = match stmt.query([keyhash.as_str()]) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrDatabaseException(e.to_string()))
+			}
+		};
+
+		match rows.next() {
+			Ok(optrow) => {
+				match optrow {
+					Some(_) => { return Err(MensagoError::ErrExists) },
+					None => { /* Do nothing. No existing session. */ }
+				}
+			},
+			Err(e) => {
+				return Err(MensagoError::ErrDatabaseException(e.to_string()))
+			}
+		};
+	}
+
+	let timestamp = get_timestamp();
+
+	let category_string = match category {
+		KeyCategory::ConReqEncryption => "crencryption",
+		KeyCategory::ConReqSigning => "crsigning",
+		KeyCategory::Encryption => "encryption",
+		KeyCategory::Signing => "signing",
+		KeyCategory::Folder => "folder",
+		KeyCategory::PrimarySigning => "orgsigning",
+		KeyCategory::SecondarySigning => "altorgsigning",
+		KeyCategory::Storage => "storage",
+	};
+
+	match conn.execute("INSERT INTO keys(keyid,address,type,category,private,public,timestamp)
+		VALUES(?1,?2,?3,?4,?5,?6,?7)",
+		[keyhash.as_str(), &waddr.to_string(), "symmetric", category_string, key.as_str(), 
+		key.as_str(), &timestamp]) {
+		
+		Ok(_) => { return Ok(()) },
+		Err(e) => {
+			return Err(MensagoError::ErrDatabaseException(e.to_string()))
+		}
+	}
+}
+
 /// Utility function that just checks to see if a specific workspace exists in the database
 fn check_workspace_exists(conn: &rusqlite::Connection, waddr: &WAddress)
 	-> Result<(),MensagoError> {
@@ -250,8 +390,6 @@ fn make_device_name() -> String {
 
 	format!("{}-{}",hostname, osname)
 }
-
-// TODO: Implement add_key
 
 // TODO: Implement remove_key
 
