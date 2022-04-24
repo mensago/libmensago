@@ -339,6 +339,48 @@ pub fn add_key(conn: &rusqlite::Connection, waddr: WAddress, key: &CryptoString,
 	}
 }
 
+/// Deletes a cryptography key from a workspace. Note that the algorithm must match, i.e. if a key
+/// is stored using a BLAKE2B-256 hash, passing a BLAKE3-128 hash of the exact same key will result
+/// in a ErrNotFound error.
+pub fn remove_key(conn: &rusqlite::Connection, keyhash: &CryptoString) -> Result<(), MensagoError> {
+
+	// Check to see if the key hash passed to the function exists
+	let mut stmt = match conn.prepare("SELECT keyid FROM keys WHERE keyid=?1") {
+		Ok(v) => v,
+		Err(e) => {
+			return Err(MensagoError::ErrDatabaseException(e.to_string()))
+		}
+	};
+		
+	let mut rows = match stmt.query([keyhash.as_str()]) {
+		Ok(v) => v,
+		Err(e) => {
+			return Err(MensagoError::ErrDatabaseException(e.to_string()))
+		}
+	};
+
+	match rows.next() {
+		Ok(optrow) => {
+			match optrow {
+				// This means that the key hash wasn't found
+				None => { return Err(MensagoError::ErrNotFound) },
+				Some(_) => { /* Do nothing. The device exists. */ }
+			}
+		},
+		Err(e) => {
+			return Err(MensagoError::ErrDatabaseException(e.to_string()))
+		}
+	};
+
+	match conn.execute("DELETE FROM keys WHERE keyid=?1)", [keyhash.as_str()]) {
+		
+		Ok(_) => { return Ok(()) },
+		Err(e) => {
+			return Err(MensagoError::ErrDatabaseException(e.to_string()))
+		}
+	}
+}
+
 /// Utility function that just checks to see if a specific workspace exists in the database
 fn check_workspace_exists(conn: &rusqlite::Connection, waddr: &WAddress)
 	-> Result<(),MensagoError> {
@@ -390,8 +432,6 @@ fn make_device_name() -> String {
 
 	format!("{}-{}",hostname, osname)
 }
-
-// TODO: Implement remove_key
 
 // TODO: Implement get_key
 
