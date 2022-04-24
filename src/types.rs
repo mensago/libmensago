@@ -24,6 +24,34 @@ pub enum IDType {
 	UserID
 }
 
+/// KeyType defines the cryptographic purpose for a key, as in if it is used for symmetric
+/// encryption, asymmetric encryption, or digital signatures
+#[derive(Debug, PartialEq, PartialOrd, Clone, Copy)]
+pub enum KeyType {
+	SymEncryptionKey,
+	AsymEncryptionKey,
+	SigningKey
+}
+
+/// KeyCategory defines the general usage of a key.
+/// - ConReqEncryption: Contact request encryption/decryption
+/// - ConReqSigning: Contact request signing/verification
+/// - Encryption: General-purpose encryption/decryption
+/// - Signing: General-purpose encryption/decryption
+/// - Folder: server-side path name storage encryption
+/// - PrimarySigning: organization primary signing/verification
+/// - SecondarySigning: organization secondary signing/verification
+#[derive(Debug, PartialEq, PartialOrd, Clone, Copy)]
+pub enum KeyCategory {
+	ConReqEncryption,
+	ConReqSigning,
+	Encryption,
+	Signing,
+	Folder,
+	PrimarySigning,
+	SecondarySigning,
+}
+
 /// The RandomID class is similar to v4 UUIDs. To obtain the maximum amount of entropy, all bits
 /// are random and no version information is stored in them. The only null value for the RandomID
 /// is all zeroes. Lastly, the only permissible format for the string version of the RandomID
