@@ -1,3 +1,4 @@
+use chrono::prelude::*;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -34,4 +35,14 @@ pub enum MensagoError {
 
 	#[error(transparent)]
     RusqliteError(#[from] rusqlite::Error),
+}
+
+/// Returns a string containing the current UTC with second precision in the format
+/// YYYYMMDDTHHMMSSZ.
+pub fn get_timestamp() -> String {
+
+	let utc: DateTime<Utc> = Utc::now();
+	let formatted = utc.format("%Y%m%dT%H%M%SZ");
+
+	String::from(formatted.to_string())
 }
