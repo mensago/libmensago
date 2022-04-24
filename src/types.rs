@@ -41,6 +41,7 @@ pub enum KeyType {
 /// - Folder: server-side path name storage encryption
 /// - PrimarySigning: organization primary signing/verification
 /// - SecondarySigning: organization secondary signing/verification
+/// - Storage: server-side file storage
 #[derive(Debug, PartialEq, PartialOrd, Clone, Copy)]
 pub enum KeyCategory {
 	ConReqEncryption,
@@ -50,6 +51,7 @@ pub enum KeyCategory {
 	Folder,
 	PrimarySigning,
 	SecondarySigning,
+	Storage,
 }
 
 /// The RandomID class is similar to v4 UUIDs. To obtain the maximum amount of entropy, all bits
