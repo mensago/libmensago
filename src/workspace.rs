@@ -82,11 +82,102 @@ impl Workspace {
 
 	/// Loads the workspace information from the local database. If no workspace ID is specified,
 	/// the identity workspace for the profile is loaded.
-	pub fn load_from_db(&mut self, waddr: Option<RandomID>) -> Result<(), MensagoError> {
+	pub fn load_from_db(&mut self, wid: Option<RandomID>) -> Result<(), MensagoError> {
 
-		// TODO: Implement load_from_db()
+		// For the fully-commented version of this code, see profile::get_identity()
 
-		Err(MensagoError::ErrUnimplemented)
+		let conn = match rusqlite::Connection::open_with_flags(&self.dbpath,
+			rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE) {
+				Ok(v) => v,
+				Err(e) => {
+					return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())));
+				}
+			};
+		
+		let widstr = match wid {
+			Some(w) => { String::from(w.to_string()) },
+			None => { 
+				let params = Vec::<String>::new();
+				match get_string_from_db(&conn,
+					"SELECT wid FROM workspaces WHERE type = 'identity'", &params) {
+					Ok(v) => v,
+					Err(e) => {
+						return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())));
+					}
+				}
+			},
+		};
+
+		let mut stmt = match conn
+			.prepare("SELECT domain,userid FROM workspaces WHERE wid = ?1") {
+				Ok(v) => v,
+				Err(e) => {
+					return Err(MensagoError::ErrDatabaseException(e.to_string()))
+				}
+			};
+		
+		let mut rows = match stmt.query([widstr.to_string()]) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrDatabaseException(e.to_string()))
+			}
+		};
+
+		let option_row = match rows.next() {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrDatabaseException(e.to_string()))
+			}
+		};
+
+		// Query unwrapping complete. Start extracting the data
+		let row = option_row.unwrap();
+
+		self.wid = match RandomID::from_str(&widstr.to_string()) {
+			Some(v) => Some(v),
+			None => {
+				return Err(MensagoError::ErrProgramException(String::from(
+					"BUG: Invalid workspace ID in load_from_db")))
+			},
+		};
+
+		self.domain = match &row.get::<usize,String>(0) {
+			Ok(v) => {
+				match Domain::from_str(v) {
+					Some(d) => Some(d),
+					None => {
+						return Err(MensagoError::ErrDatabaseException(
+							String::from(format!("Bad domain {} in load_from_db()", v))
+						))
+					}
+				}
+			},
+			Err(e) => {
+				return Err(MensagoError::ErrDatabaseException(
+					String::from(format!("Error getting domain in load_from_db(): {}", e))
+				))
+			}
+		};
+
+		self.uid = match &row.get::<usize,String>(0) {
+			Ok(v) => {
+				match UserID::from_str(v) {
+					Some(d) => Some(d),
+					None => {
+						return Err(MensagoError::ErrDatabaseException(
+							String::from(format!("Bad user ID {} in load_from_db()", v))
+						))
+					}
+				}
+			},
+			Err(e) => {
+				return Err(MensagoError::ErrDatabaseException(
+					String::from(format!("Error getting user ID in load_from_db(): {}", e))
+				))
+			}
+		};
+		
+		Ok(())
 	}
 
 	/// Adds a workspace to the storage database
