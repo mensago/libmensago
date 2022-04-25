@@ -563,9 +563,3 @@ fn make_device_name() -> String {
 
 	format!("{}-{}",hostname, osname)
 }
-
-
-
-// TODO: Implement get_key
-
-// TODO: Implement get_key_by_type
