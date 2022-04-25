@@ -200,8 +200,8 @@ pub fn get_session_keypair(conn: &rusqlite::Connection, waddr: WAddress)
 }
 
 /// Adds a key pair to a workspace.
-pub fn add_keypair(conn: &rusqlite::Connection, waddr: WAddress, pubkey: &CryptoString,
-	privkey: &CryptoString, keytype: &KeyType, category: KeyCategory) -> Result<(), MensagoError> {
+pub fn add_keypair(conn: &rusqlite::Connection, waddr: &WAddress, pubkey: &CryptoString,
+	privkey: &CryptoString, keytype: &KeyType, category: &KeyCategory) -> Result<(), MensagoError> {
 	
 	let pubhash = match eznacl::get_hash("blake3-128", pubkey.as_bytes()) {
 		Ok(v) => v,
@@ -275,8 +275,8 @@ pub fn add_keypair(conn: &rusqlite::Connection, waddr: WAddress, pubkey: &Crypto
 }
 
 /// Adds a single symmetric key to a workspace.
-pub fn add_key(conn: &rusqlite::Connection, waddr: WAddress, key: &CryptoString, 
-	category: KeyCategory) -> Result<(), MensagoError> {
+pub fn add_key(conn: &rusqlite::Connection, waddr: &WAddress, key: &CryptoString, 
+	category: &KeyCategory) -> Result<(), MensagoError> {
 	
 	let keyhash = match eznacl::get_hash("blake3-128", key.as_bytes()) {
 		Ok(v) => v,
