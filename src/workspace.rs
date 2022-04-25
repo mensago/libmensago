@@ -80,21 +80,79 @@ impl Workspace {
 		Err(MensagoError::ErrUnimplemented)
 	}
 
-	// TODO: Implement load_from_db()
+	/// Loads the workspace information from the local database. If no workspace ID is specified,
+	/// the identity workspace for the profile is loaded.
+	pub fn load_from_db(&mut self, waddr: Option<RandomID>) -> Result<(), MensagoError> {
 
-	// TODO: Implement add_to_db()
+		// TODO: Implement load_from_db()
 
-	// TODO: Implement remove_from_db()
+		Err(MensagoError::ErrUnimplemented)
+	}
 
-	// TODO: Implement remove_workspace_entry()
+	/// Adds a workspace to the storage database
+	pub fn add_to_db(&self, pw: &ArgonHash) -> Result<(), MensagoError> {
 
-	// TODO: Implement add_folder()
+		// TODO: Implement add_to_db()
 
-	// TODO: Implement remove_folder()
+		Err(MensagoError::ErrUnimplemented)
+	}
 
-	// TODO: Implement get_folder()
+	/// Removes ALL DATA associated with a workspace. Don't call this unless you mean to erase all
+	/// evidence that a particular workspace ever existed.
+	pub fn remove_from_db(&self) -> Result<(), MensagoError> {
 
-	// TODO: Implement set_userid()
+		// TODO: Implement remove_from_db()
 
-	// TODO: Implement get_userid()
+		Err(MensagoError::ErrUnimplemented)
+	}
+
+	/// Removes a workspace from the storage database. NOTE: This only removes the workspace entry
+	/// itself. It does not remove keys, sessions, or other associated data.
+	pub fn remove_workspace_entry() -> Result<(), MensagoError> {
+
+		// TODO: Implement remove_workspace_entry()
+
+		Err(MensagoError::ErrUnimplemented)
+	}
+	
+
+	// /// Adds a mapping of a folder ID to a specific path in the workspace
+	// pub fn add_folder(&self, fid: FolderMap) -> Result<(), MensagoError> {
+
+	// 	// TODO: Implement add_folder() once the DBFS layer is implemented
+
+	// 	Err(MensagoError::ErrUnimplemented)
+	// }
+
+	/// Deletes a folder mapping
+	pub fn remove_folder(&self, fid: &RandomID) -> Result<(), MensagoError> {
+
+		// TODO: Implement remove_folder()
+		
+		Err(MensagoError::ErrUnimplemented)
+	}
+	
+	// /// Gets the specified folder mapping.
+	// pub fn get_folder(self, fid: &RandomID) -> Result<FolderMap, MensagoError> {
+
+	// 	// TODO: Implement get_folder() once the DBFS layer is implemented
+
+	// 	Err(MensagoError::ErrUnimplemented)
+	// }
+	
+	/// Sets the human-friendly name for the workspace
+	pub fn set_userid(&mut self, uid: &UserID) -> Result<(), MensagoError> {
+
+		// TODO: Implement set_userid()
+		
+		Err(MensagoError::ErrUnimplemented)
+	}
+
+	/// Gets the human-friendly name for the workspace
+	pub fn get_userid(&self) -> Result<UserID, MensagoError> {
+
+		// TODO: Implement get_userid()
+		
+		Err(MensagoError::ErrUnimplemented)
+	}
 }
