@@ -1,6 +1,8 @@
 use std::path::PathBuf;
+use crate::auth;
 use crate::base::*;
 use crate::types::*;
+use eznacl::{ EncryptionPair, SigningPair, PublicKey, PrivateKey };
 
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub struct Workspace {
@@ -39,6 +41,39 @@ impl Workspace {
 		self.pw = String::from(pw);
 
 		let address = MAddress::from_parts(&UserID::from_wid(wid), server);
+		let waddr = WAddress::from_parts(&wid, &server);
+		
+		let conn = match rusqlite::Connection::open_with_flags(&self.dbpath,
+			rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE) {
+				Ok(v) => v,
+				Err(e) => {
+					return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())));
+				}
+			};
+		
+		// Generate and add the workspace's various crypto keys
+
+		let crepair = eznacl::EncryptionPair::generate().unwrap();
+		auth::add_keypair(&conn, &waddr, &crepair.get_public_key(), &crepair.get_private_key(),
+			&KeyType::AsymEncryptionKey, &KeyCategory::ConReqEncryption)?;
+
+		let crspair = eznacl::SigningPair::generate().unwrap();
+		auth::add_keypair(&conn, &waddr, &crspair.get_public_key(), &crspair.get_private_key(),
+			&KeyType::SigningKey, &KeyCategory::ConReqSigning)?;
+
+		let epair = eznacl::EncryptionPair::generate().unwrap();
+		auth::add_keypair(&conn, &waddr, &epair.get_public_key(), &epair.get_private_key(),
+			&KeyType::AsymEncryptionKey, &KeyCategory::Encryption)?;
+
+		let spair = eznacl::SigningPair::generate().unwrap();
+		auth::add_keypair(&conn, &waddr, &spair.get_public_key(), &spair.get_private_key(),
+			&KeyType::SigningKey, &KeyCategory::Signing)?;
+
+		let folderkey = eznacl::SecretKey::generate().unwrap();
+		auth::add_key(&conn, &waddr, &folderkey.get_public_key(), &KeyCategory::Folder)?;
+
+		let storagekey = eznacl::SecretKey::generate().unwrap();
+		auth::add_key(&conn, &waddr, &storagekey.get_public_key(), &KeyCategory::Storage)?;
 		
 		// TODO: Finish implementing Workspace::generate()
 
