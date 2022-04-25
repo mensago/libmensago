@@ -176,16 +176,57 @@ impl Workspace {
 				))
 			}
 		};
-		
+
 		Ok(())
 	}
 
-	/// Adds a workspace to the storage database
+	/// Adds the workspace instance to the storage database as the profile's identity workspace
 	pub fn add_to_db(&self, pw: &ArgonHash) -> Result<(), MensagoError> {
 
-		// TODO: Implement add_to_db()
+		let conn = match rusqlite::Connection::open_with_flags(&self.dbpath,
+			rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE) {
+				Ok(v) => v,
+				Err(e) => {
+					return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())));
+				}
+			};
 
-		Err(MensagoError::ErrUnimplemented)
+		let params = Vec::<String>::new();
+		match get_string_from_db(&conn,
+			"SELECT wid FROM workspaces WHERE type = 'identity'", &params) {
+			Ok(_) => { return Err(MensagoError::ErrExists) },
+			Err(_) => { /* continue on */ }
+		}
+
+		let uidstr = match &self.uid {
+			Some(v) => String::from(v.to_string()),
+			None => String::new(),
+		};
+	
+		if uidstr.len() > 0 {
+			match conn.execute("INSERT INTO workspaces(wid,userid,domain,password,pwhashtype,type)
+			VALUES(?1,?2,?3,?4,?5,?6)",
+				&[self.wid.as_ref().unwrap().as_string(), &uidstr, 
+					self.domain.as_ref().unwrap().as_string(), pw.get_hash(), pw.get_hashtype(), 
+					&self._type]) {
+				Ok(_) => { return Ok(()) },
+				Err(e) => {
+					return Err(MensagoError::ErrDatabaseException(e.to_string()))
+				}
+			}
+		} else {
+			match conn.execute("INSERT INTO workspaces(wid,userid,domain,password,pwhashtype,type)
+			VALUES(?1,?2,?3,?4,?5)",
+				&[self.wid.as_ref().unwrap().as_string(), self.domain.as_ref().unwrap().as_string(),
+					pw.get_hash(), pw.get_hashtype(), &self._type]) {
+				Ok(_) => { return Ok(()) },
+				Err(e) => {
+					return Err(MensagoError::ErrDatabaseException(e.to_string()))
+				}
+			}
+		}
+
+		Ok(())
 	}
 
 	/// Removes ALL DATA associated with a workspace. Don't call this unless you mean to erase all
