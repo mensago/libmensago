@@ -442,6 +442,76 @@ pub fn get_keypair(conn: &rusqlite::Connection, keyhash: &CryptoString)
 	Ok([pubcs, privcs])
 }
 
+/// Returns a keypair based on its category
+pub fn get_key_by_category(conn: &rusqlite::Connection, category: &KeyCategory)
+	-> Result<[CryptoString; 2], MensagoError> {
+
+	// For the fully-commented version of this code, see profile::get_identity()
+
+	let mut stmt = match conn
+		.prepare("SELECT public,private FROM keys WHERE category=?1") {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrDatabaseException(e.to_string()))
+			}
+		};
+	
+	let mut rows = match stmt.query([category.to_string()]) {
+		Ok(v) => v,
+		Err(e) => {
+			return Err(MensagoError::ErrDatabaseException(e.to_string()))
+		}
+	};
+
+	let option_row = match rows.next() {
+		Ok(v) => v,
+		Err(e) => {
+			return Err(MensagoError::ErrDatabaseException(e.to_string()))
+		}
+	};
+
+	// Query unwrapping complete. Start extracting the data
+	let row = option_row.unwrap();
+
+	let pubcs = match &row.get::<usize,String>(0) {
+		Ok(v) => {
+			match eznacl::CryptoString::from(v) {
+				Some(cs) => cs,
+				None => {
+					return Err(MensagoError::ErrDatabaseException(
+						String::from(format!("Bad public key {} in get_key()", v))
+					))
+				}
+			}
+		},
+		Err(e) => {
+			return Err(MensagoError::ErrDatabaseException(
+				String::from(format!("Error getting public key in get_key(): {}", e))
+			))
+		}
+	};
+
+	let privcs = match &row.get::<usize,String>(1) {
+		Ok(v) => {
+			match eznacl::CryptoString::from(v) {
+				Some(cs) => cs,
+				None => {
+					return Err(MensagoError::ErrDatabaseException(
+						String::from(format!("Bad private key {} in get_key()", v))
+					))
+				}
+			}
+		},
+		Err(e) => {
+			return Err(MensagoError::ErrDatabaseException(
+				String::from(format!("Error getting private key in get_key(): {}", e))
+			))
+		}
+	};
+
+	Ok([pubcs, privcs])
+}
+
 /// Utility function that just checks to see if a specific workspace exists in the database
 fn check_workspace_exists(conn: &rusqlite::Connection, waddr: &WAddress)
 	-> Result<(),MensagoError> {
