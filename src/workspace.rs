@@ -283,8 +283,9 @@ impl Workspace {
 	/// Gets the human-friendly name for the workspace
 	pub fn get_userid(&self) -> Result<UserID, MensagoError> {
 
-		// TODO: Implement get_userid()
-		
-		Err(MensagoError::ErrUnimplemented)
+		match self.uid.as_ref() {
+			Some(v) => return Ok(v.clone()),
+			None => return Err(MensagoError::ErrEmptyData)
+		}
 	}
 }
