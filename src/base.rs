@@ -48,3 +48,45 @@ pub fn get_timestamp() -> String {
 
 	String::from(formatted.to_string())
 }
+
+
+/// Returns a string, given a database query
+pub fn get_string_from_db(conn: &rusqlite::Connection, query: &str, params: &Vec<String>)
+	-> Result<String, MensagoError> {
+
+	let mut stmt = match conn
+		.prepare(query) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrDatabaseException(e.to_string()))
+			}
+		};
+
+	let mut rows = match stmt.query(rusqlite::params_from_iter(params.iter())) {
+		Ok(v) => v,
+		Err(e) => {
+			return Err(MensagoError::ErrDatabaseException(e.to_string()))
+		}
+	};
+
+	let option_row = match rows.next() {
+		Ok(v) => v,
+		Err(e) => {
+			return Err(MensagoError::ErrDatabaseException(e.to_string()))
+		}
+	};
+
+	// Query unwrapping complete. Start extracting the data
+	let row = option_row.unwrap();
+
+	let out = match &row.get::<usize,String>(0) {
+		Ok(v) => String::from(v),
+		Err(e) => {
+			return Err(MensagoError::ErrDatabaseException(
+				String::from(format!("Error getting string in get_string_from_db(): {}", e))
+			))
+		}
+	};
+
+	Ok(out)
+}
