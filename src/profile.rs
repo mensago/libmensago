@@ -394,6 +394,19 @@ pub struct ProfileManager {
 
 impl ProfileManager {
 
+	/// Creates a new, uninitialized ProfileManager
+	pub fn new(profile_path: &PathBuf) -> ProfileManager {
+
+		ProfileManager {
+			profiles: Vec::<Profile>::new(),
+			profile_folder: profile_path.clone(),
+			active_index: -1,
+			default_index: -1,
+			profile_id: String::from(""),
+		}
+	}
+
+	/// Sets the named profile as active.
 	pub fn activate_profile(&mut self, name: &str) -> Result<&Profile, MensagoError> {
 
 		if name.len() == 0 {
@@ -706,3 +719,9 @@ impl ProfileManager {
 	}	
 }
 
+#[cfg(test)]
+mod tests {
+	use crate::*;
+
+
+}
