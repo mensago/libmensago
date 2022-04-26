@@ -722,6 +722,23 @@ impl ProfileManager {
 #[cfg(test)]
 mod tests {
 	use crate::*;
+	use std::env;
+	use std::path::PathBuf;
+	use std::str::FromStr;
 
+	// Sets up the path to contain the profile tests
+	fn setup_test(name: &str) {
+		if name.len() < 1 {
+			panic!("Invalid name {} in setup_test", name);
+		}
+		let args: Vec<String> = env::args().collect();
+		let top_path = PathBuf::from_str(&args[0]).unwrap();
+		let mut top_path = top_path.parent().unwrap().to_path_buf();
+		top_path.push(name);
+	}
 
+	#[test]
+	fn test_create_profile() {
+
+	}
 }
