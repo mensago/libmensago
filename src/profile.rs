@@ -479,6 +479,7 @@ impl ProfileManager {
 			self.default_index = 1;
 		}
 		
+		profile.reset_db()?;
 		self.profiles.push(profile);
 
 		Ok(self.profiles.get(self.profiles.len()-1).unwrap())
@@ -669,7 +670,7 @@ impl ProfileManager {
 			if !self.profiles[0].is_default() {
 				self.profiles[0].set_default(true)?;
 			}
-
+			self.default_index = 0;
 			return Ok(());
 		}
 
@@ -766,8 +767,8 @@ mod tests {
 
 		let testname = String::from("profman_init");
 		let test_path = setup_test(&testname);
-		let mut p = ProfileManager::new(&test_path);
-		match p.load_profiles(Some(&test_path)) {
+		let mut pm = ProfileManager::new(&test_path);
+		match pm.load_profiles(Some(&test_path)) {
 			Ok(_) => { /* */ },
 			Err(e) => { panic!("{}: {}", testname, e.to_string()); }
 		}
