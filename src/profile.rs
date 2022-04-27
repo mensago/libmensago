@@ -205,7 +205,7 @@ impl Profile {
 
 		// TODO: Implement Profile::load_config()
 
-		return Err(MensagoError::ErrUnimplemented)
+		Ok(())
 	}
 
 	/// Saves the config file for the profile
@@ -213,7 +213,7 @@ impl Profile {
 
 		// TODO: Implement Profile::save_config()
 
-		return Err(MensagoError::ErrUnimplemented)
+		Ok(())
 	}
 
 	/// Sets the profile's internal flag that it is the default profile
