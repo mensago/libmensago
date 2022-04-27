@@ -723,22 +723,53 @@ impl ProfileManager {
 mod tests {
 	use crate::*;
 	use std::env;
+	use std::fs;
 	use std::path::PathBuf;
 	use std::str::FromStr;
 
 	// Sets up the path to contain the profile tests
-	fn setup_test(name: &str) {
+	fn setup_test(name: &str) -> PathBuf {
 		if name.len() < 1 {
 			panic!("Invalid name {} in setup_test", name);
 		}
 		let args: Vec<String> = env::args().collect();
-		let top_path = PathBuf::from_str(&args[0]).unwrap();
-		let mut top_path = top_path.parent().unwrap().to_path_buf();
-		top_path.push(name);
+		let test_path = PathBuf::from_str(&args[0]).unwrap();
+		let mut test_path = test_path.parent().unwrap().to_path_buf();
+		test_path.push("testfiles");
+		test_path.push(name);
+
+		if test_path.exists() {
+			fs::remove_dir_all(&test_path).unwrap();
+		}
+		fs::create_dir_all(&test_path).unwrap();
+
+		test_path
 	}
 
 	#[test]
-	fn test_create_profile() {
+	fn test_profile_dbinit() {
 
+		let testname = String::from("profile_dbinit");
+		let test_path = setup_test(&testname);
+		let p = match Profile::new(test_path.as_path()) {
+			Ok(v) => v,
+			Err(e) => { panic!("{}: {}", testname, e.to_string()); }
+		};
+		match p.reset_db() {
+			Ok(_) => { /* */ },
+			Err(e) => { panic!("{}: {}", testname, e.to_string()); }
+		}
+	}
+
+	#[test]
+	fn test_profman_init() {
+
+		let testname = String::from("profman_init");
+		let test_path = setup_test(&testname);
+		let mut p = ProfileManager::new(&test_path);
+		match p.load_profiles(Some(&test_path)) {
+			Ok(_) => { /* */ },
+			Err(e) => { panic!("{}: {}", testname, e.to_string()); }
+		}
 	}
 }
