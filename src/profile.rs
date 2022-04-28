@@ -766,6 +766,17 @@ mod tests {
 	#[test]
 	fn test_profman_init() {
 
+		// Because so much is done in the constructor, this unit performs basic tests on the
+		// following:
+		//
+		// load_profiles()
+		// _index_for_profile()
+		// create_profile()
+		// get_default_profile()
+		// set_default_profile()
+		// activate_profile()
+		// reset_db()
+	
 		let testname = String::from("profman_init");
 		let test_path = setup_test(&testname);
 		let mut pm = ProfileManager::new(&test_path);
