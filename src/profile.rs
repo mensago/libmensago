@@ -419,16 +419,17 @@ impl ProfileManager {
 			_ => return Err(MensagoError::ErrNotFound)
 		};
 
-		if active_index >= 0 {
-			self.active_index = -1;
-		}
-
 		self.profile_id = name_squashed;
 		self.active_index = active_index;
 		self.profiles[active_index as usize].activate()?;
 
 		// Force loading of basic identity info if it hasn't already been done
-		self.profiles[active_index as usize].get_identity()?;
+		match self.profiles[active_index as usize].get_identity() {
+			Ok(_) => { /* */ },
+			Err(_) => {
+				// We ignore errors because uninitialized profiles won't have any identity info
+			},
+		}
 
 		return Ok(&self.profiles[active_index as usize]);
 	}
