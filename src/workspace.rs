@@ -275,11 +275,34 @@ impl Workspace {
 
 	/// Removes a workspace from the storage database. NOTE: This only removes the workspace entry
 	/// itself. It does not remove keys, sessions, or other associated data.
-	pub fn remove_workspace_entry() -> Result<(), MensagoError> {
+	pub fn remove_workspace_entry(&self) -> Result<(), MensagoError> {
 
-		// TODO: Implement remove_workspace_entry()
+		let mut conn = match rusqlite::Connection::open_with_flags(&self.dbpath,
+			rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE) {
+				Ok(v) => v,
+				Err(e) => {
+					return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())));
+				}
+			};
+		
+		let mut params = Vec::<String>::new();
+		params.push(self.wid.as_ref().unwrap().to_string().clone());
+		params.push(self.domain.as_ref().unwrap().to_string().clone());
+		match get_string_from_db(&conn,
+			"SELECT wid FROM workspaces WHERE wid=?1 AND domain=?2", &params) {
+			Ok(_) => { return Err(MensagoError::ErrExists) },
+			Err(_) => { /* continue on */ }
+		}
 
-		Err(MensagoError::ErrUnimplemented)
+		match conn.execute("DELETE FROM workspaces WHERE wid=?1 AND domain=?2)",
+			&[self.wid.as_ref().unwrap().as_string(), self.domain.as_ref().unwrap().as_string()]) {
+			Ok(_) => { /*  */ },
+			Err(e) => {
+				return Err(MensagoError::ErrDatabaseException(e.to_string()))
+			}
+		}
+
+		Ok(())
 	}
 	
 
