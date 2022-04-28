@@ -225,17 +225,52 @@ impl Workspace {
 				}
 			}
 		}
-
-		Ok(())
 	}
 
 	/// Removes ALL DATA associated with a workspace. Don't call this unless you mean to erase all
 	/// evidence that a particular workspace ever existed.
 	pub fn remove_from_db(&self) -> Result<(), MensagoError> {
 
-		// TODO: Implement remove_from_db()
+		let mut conn = match rusqlite::Connection::open_with_flags(&self.dbpath,
+			rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE) {
+				Ok(v) => v,
+				Err(e) => {
+					return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())));
+				}
+			};
+		
+		let mut params = Vec::<String>::new();
+		params.push(self.wid.as_ref().unwrap().to_string().clone());
+		params.push(self.domain.as_ref().unwrap().to_string().clone());
+		match get_string_from_db(&conn,
+			"SELECT wid FROM workspaces WHERE wid=?1 AND domain=?2", &params) {
+			Ok(_) => { return Err(MensagoError::ErrExists) },
+			Err(_) => { /* continue on */ }
+		}
 
-		Err(MensagoError::ErrUnimplemented)
+		match conn.execute("DELETE FROM workspaces WHERE wid=?1 AND domain=?2)",
+			&[self.wid.as_ref().unwrap().as_string(), self.domain.as_ref().unwrap().as_string()]) {
+			Ok(_) => { /*  */ },
+			Err(e) => {
+				return Err(MensagoError::ErrDatabaseException(e.to_string()))
+			}
+		}
+
+		let address = WAddress::from_parts(self.wid.as_ref().unwrap(),
+			&self.domain.as_ref().unwrap());
+		
+		for table_name in ["folders", "sessions", "keys", "messages", "notes"] {
+
+			match conn.execute(format!("DELETE FROM {} WHERE address=?1)", table_name),
+				[address.as_string()]) {
+				Ok(_) => { /*  */ },
+				Err(e) => {
+					return Err(MensagoError::ErrDatabaseException(e.to_string()))
+				}
+			}
+		}
+
+		Ok(())
 	}
 
 	/// Removes a workspace from the storage database. NOTE: This only removes the workspace entry
