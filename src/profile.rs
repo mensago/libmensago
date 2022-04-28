@@ -915,6 +915,34 @@ mod tests {
 			},
 		}
 
+		match pm.create_profile("secondary") {
+			Ok(_) => { /* */ },
+			Err(e) => {
+				return Err(format!("{} failed to create test profile: {}", testname, e.to_string())) 
+			},
+		}
+
+		match pm.activate_profile("") {
+			Ok(_) => {
+				return Err(format!("{}: failed to handle empty string", testname)) 
+			},
+			Err(_) => { /* */ }
+		}
+
+		match pm.activate_profile("foo") {
+			Ok(_) => {
+				return Err(format!("{}: failed to handle nonexistent profile", testname)) 
+			},
+			Err(_) => { /* */ }
+		}
+
+		match pm.activate_profile("secondary") {
+			Ok(_) => { /* */ },
+			Err(e) => {
+				return Err(format!("{} failed to activate test profile: {}", testname, e.to_string())) 
+			},
+		}
+
 		Ok(())
 	}
 
