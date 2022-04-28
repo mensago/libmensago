@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use crate::auth;
 use crate::base::*;
 use crate::types::*;
-use eznacl::{ EncryptionPair, SigningPair, PublicKey, PrivateKey };
+use eznacl::{ PublicKey, PrivateKey };
 
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub struct Workspace {
