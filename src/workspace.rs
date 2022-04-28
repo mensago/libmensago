@@ -307,23 +307,23 @@ impl Workspace {
 	
 
 	// /// Adds a mapping of a folder ID to a specific path in the workspace
-	// pub fn add_folder(&self, fid: FolderMap) -> Result<(), MensagoError> {
+	// pub fn add_folder(&self, fid: &FolderMap) -> Result<(), MensagoError> {
 
 	// 	// TODO: Implement add_folder() once the DBFS layer is implemented
 
 	// 	Err(MensagoError::ErrUnimplemented)
 	// }
 
-	/// Deletes a folder mapping
-	pub fn remove_folder(&self, fid: &RandomID) -> Result<(), MensagoError> {
+	// /// Deletes a folder mapping
+	// pub fn remove_folder(&self, fid: &FolderMap) -> Result<(), MensagoError> {
 
-		// TODO: Implement remove_folder()
+	// 	// TODO: Implement remove_folder() once the DBFS layer is implemented
 		
-		Err(MensagoError::ErrUnimplemented)
-	}
+	// 	Err(MensagoError::ErrUnimplemented)
+	// }
 	
 	// /// Gets the specified folder mapping.
-	// pub fn get_folder(self, fid: &RandomID) -> Result<FolderMap, MensagoError> {
+	// pub fn get_folder(self, fid: &FolderMap) -> Result<FolderMap, MensagoError> {
 
 	// 	// TODO: Implement get_folder() once the DBFS layer is implemented
 
@@ -333,9 +333,25 @@ impl Workspace {
 	/// Sets the human-friendly name for the workspace
 	pub fn set_userid(&mut self, uid: &UserID) -> Result<(), MensagoError> {
 
-		// TODO: Implement set_userid()
+		let mut conn = match rusqlite::Connection::open_with_flags(&self.dbpath,
+			rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE) {
+				Ok(v) => v,
+				Err(e) => {
+					return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())));
+				}
+			};
 		
-		Err(MensagoError::ErrUnimplemented)
+		match conn.execute("UPDATE workspaces SET userid=?1 WHERE wid=?2 AND domain=?3)",
+			&[uid.as_string(), self.wid.as_ref().unwrap().as_string(),
+			self.domain.as_ref().unwrap().as_string()]) {
+			Ok(_) => { /*  */ },
+			Err(e) => {
+				return Err(MensagoError::ErrDatabaseException(e.to_string()))
+			}
+		}
+		self.uid = Some(uid.clone());
+
+		Ok(())
 	}
 
 	/// Gets the human-friendly name for the workspace
