@@ -4,6 +4,7 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum MensagoError {
 
+	// General error codes
 	#[error("Empty data error")]
 	ErrEmptyData,
 	#[error("Bad value")]
@@ -31,6 +32,26 @@ pub enum MensagoError {
 	// Program exceptions are also extremely bad, but also highly unlikely thanks to Rust
 	#[error("Program exception: {0}")]
 	ErrProgramException(String),
+
+	// Keycard error codes
+
+	#[error("Feature not available")]
+	ErrFeatureNotAvailable,
+	#[error("Unsupported keycard type")]
+	ErrUnsupportedKeycardType,
+	#[error("Unsupported hash type")]
+	ErrUnsupportedHashType,
+	#[error("Unsupported encryption type")]
+	ErrUnsupportedEncryptionType,
+	#[error("Invalid keycard")]
+	ErrInvalidKeycard,
+	#[error("Invalid hash")]
+	ErrInvalidHash,
+	#[error("Hash mismatch")]
+	ErrHashMismatch,
+
+
+	// Passthrough errors
 
 	#[error(transparent)]
     IOError(#[from] std::io::Error),
