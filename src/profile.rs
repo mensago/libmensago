@@ -749,22 +749,24 @@ mod tests {
 	}
 
 	#[test]
-	fn test_profile_dbinit() {
+	fn test_profile_dbinit() -> Result<(), String> {
 
 		let testname = String::from("profile_dbinit");
 		let test_path = setup_test(&testname);
 		let p = match Profile::new(test_path.as_path()) {
 			Ok(v) => v,
-			Err(e) => { panic!("{}: {}", testname, e.to_string()); }
+			Err(e) => { return Err(format!("{}: {}", testname, e.to_string())) }
 		};
 		match p.reset_db() {
 			Ok(_) => { /* */ },
-			Err(e) => { panic!("{}: {}", testname, e.to_string()); }
+			Err(e) => { return Err(format!("{}: {}", testname, e.to_string())) }
 		}
+		
+		Ok(())
 	}
 
 	#[test]
-	fn test_profman_init() {
+	fn test_profman_init() -> Result<(), String> {
 
 		// Because so much is done in the constructor, this unit performs basic tests on the
 		// following:
@@ -782,49 +784,65 @@ mod tests {
 		let mut pm = ProfileManager::new(&test_path);
 		match pm.load_profiles(Some(&test_path)) {
 			Ok(_) => { /* */ },
-			Err(e) => { panic!("{}: {}", testname, e.to_string()); }
+			Err(e) => { return Err(format!("{}: {}", testname, e.to_string())) }
 		}
+
+		Ok(())
 	}
 
 	#[test]
-	fn test_profman_create_delete() {
+	fn test_profman_create_delete() -> Result<(), String> {
 
 		let testname = String::from("profman_create_delete");
 		let test_path = setup_test(&testname);
 		let mut pm = ProfileManager::new(&test_path);
 		match pm.load_profiles(Some(&test_path)) {
 			Ok(_) => { /* */ },
-			Err(e) => { panic!("{} failed to load profiles: {}", testname, e.to_string()); }
+			Err(e) => {
+				return Err(format!("{} failed to load profiles: {}", testname, e.to_string())) 
+			},
 		}
 
 		match pm.create_profile("") {
-			Ok(_) => { panic!("{}: create failed to handle empty string", testname); },
+			Ok(_) => {
+				return Err(format!("{}: create failed to handle empty string", testname)) 
+			},
 			Err(_) => { /* */ }
 		}
 
 		match pm.create_profile("secondary") {
 			Ok(_) => { /* */ },
-			Err(e) => { panic!("{}: {}", testname, e.to_string()); }
+			Err(e) => {
+				return Err(format!("{} failed to create profile: {}", testname, e.to_string())) 
+			},
 		}
 
 		match pm.delete_profile("") {
-			Ok(_) => { panic!("{}: delete failed to handle empty string", testname); },
+			Ok(_) => {
+				return Err(format!("{}: delete failed to handle empty string", testname)) 
+			},
 			Err(_) => { /* */ }
 		}
 
 		match pm.delete_profile("secondary") {
 			Ok(_) => { /* */ },
-			Err(e) => { panic!("{} failed to delete profile: {}", testname, e.to_string()); }
+			Err(e) => {
+				return Err(format!("{} failed to delete profile: {}", testname, e.to_string())) 
+			},
 		}
 
 		match pm.delete_profile("secondary") {
-			Ok(_) => { panic!("{}: delete failed to handle nonexistent profile", testname); },
+			Ok(_) => {
+				return Err(format!("{}: delete failed to handle nonexistent profile", testname)) 
+			},
 			Err(_) => { /* */ }
 		}
+
+		Ok(())
 	}
 
 	#[test]
-	fn test_profman_rename() {
+	fn test_profman_rename() -> Result<(), String> {
 
 		// Rename tests: empty old name (fail), empty new name (fail), old name == new name,
 		// missing old name profile, existing new name profile, successful rename
@@ -834,37 +852,70 @@ mod tests {
 		let mut pm = ProfileManager::new(&test_path);
 		match pm.load_profiles(Some(&test_path)) {
 			Ok(_) => { /* */ },
-			Err(e) => { panic!("{} failed to load profiles: {}", testname, e.to_string()); }
+			Err(e) => {
+				return Err(format!("{} failed to load profiles: {}", testname, e.to_string())) 
+			},
 		}
 
 		match pm.rename_profile("", "foo") {
-			Ok(_) => { panic!("{}: rename failed to handle empty old name", testname); },
+			Ok(_) => {
+				return Err(format!("{}: rename failed to handle empty old name", testname)) 
+			},
 			Err(_) => { /* */ }
 		}
 
 		match pm.rename_profile("foo", "") {
-			Ok(_) => { panic!("{}: rename failed to handle empty new name", testname); },
+			Ok(_) => {
+				return Err(format!("{}: rename failed to handle empty new name", testname))
+			},
 			Err(_) => { /* */ }
 		}
 
 		match pm.rename_profile("secondary", "secondary") {
-			Ok(_) => { panic!("{}: rename failed to handle rename to self", testname); },
+			Ok(_) => {
+				return Err(format!("{}: rename failed to handle rename to self", testname))
+			},
 			Err(_) => { /* */ }
 		}
 
 		match pm.create_profile("foo") {
 			Ok(_) => { /* */ },
-			Err(e) => { panic!("{} failed to create test profile: {}", testname, e.to_string()); },
+			Err(e) => {
+				return Err(format!("{} failed to create test profile: {}", testname, e.to_string())) 
+			},
 		}
 
 		match pm.rename_profile("primary", "foo") {
-			Ok(_) => { panic!("{}: rename failed to handle existing new profile name", testname); },
+			Ok(_) => {
+				return Err(format!("{}: rename failed to handle existing new profile name", testname))
+			},
 			Err(_) => { /* */ }
 		}
-
+		
 		match pm.rename_profile("foo", "secondary") {
 			Ok(_) => { /* */ },
-			Err(e) => { panic!("{} failed to rename profile: {}", testname, e.to_string()); }
+			Err(e) => {
+				return Err(format!("{} failed to rename profile: {}", testname, e.to_string())) 
+			},
 		}
+
+		Ok(())
 	}
+
+	#[test]
+	fn test_profman_activate() -> Result<(), String> {
+
+		let testname = String::from("profman_activate");
+		let test_path = setup_test(&testname);
+		let mut pm = ProfileManager::new(&test_path);
+		match pm.load_profiles(Some(&test_path)) {
+			Ok(_) => { /* */ },
+			Err(e) => {
+				return Err(format!("{} failed to load profiles: {}", testname, e.to_string())) 
+			},
+		}
+
+		Ok(())
+	}
+
 }
