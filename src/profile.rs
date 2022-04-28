@@ -946,4 +946,58 @@ mod tests {
 		Ok(())
 	}
 
+	#[test]
+	fn test_profman_multitest() -> Result<(), String> {
+
+		let testname = String::from("profman_multitest");
+		let test_path = setup_test(&testname);
+		let mut pm = ProfileManager::new(&test_path);
+		match pm.load_profiles(Some(&test_path)) {
+			Ok(_) => { /* */ },
+			Err(e) => {
+				return Err(format!("{} failed to load profiles: {}", testname, e.to_string())) 
+			},
+		}
+
+		match pm.create_profile("secondary") {
+			Ok(_) => { /* */ },
+			Err(e) => {
+				return Err(format!("{} failed to create test profile: {}", testname, e.to_string())) 
+			},
+		}
+
+		match pm.activate_profile("secondary") {
+			Ok(_) => { /* */ },
+			Err(e) => {
+				return Err(format!(
+					"{} failed to activate secondary profile: {}", testname, e.to_string())) 
+			},
+		}
+
+		match pm.set_default_profile("secondary") {
+			Ok(_) => { /* */ },
+			Err(e) => {
+				return Err(format!(
+					"{} failed to secondary profile as default: {}", testname, e.to_string())) 
+			},
+		}
+
+		match pm.rename_profile("primary", "trash") {
+			Ok(_) => { /* */ },
+			Err(e) => {
+				return Err(format!(
+					"{} failed to rename primary profile to trash: {}", testname, e.to_string()))
+			},
+		}
+
+		match pm.delete_profile("trash") {
+			Ok(_) => { /* */ },
+			Err(e) => {
+				return Err(format!(
+					"{} failed to delete trash profile: {}", testname, e.to_string())) 
+			},
+		}
+
+		Ok(())
+	}
 }
