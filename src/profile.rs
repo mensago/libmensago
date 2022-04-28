@@ -774,4 +774,41 @@ mod tests {
 			Err(e) => { panic!("{}: {}", testname, e.to_string()); }
 		}
 	}
+
+	#[test]
+	fn test_profman_create_delete() {
+
+		let testname = String::from("profman_create_delete");
+		let test_path = setup_test(&testname);
+		let mut pm = ProfileManager::new(&test_path);
+		match pm.load_profiles(Some(&test_path)) {
+			Ok(_) => { /* */ },
+			Err(e) => { panic!("{} failed to create profile: {}", testname, e.to_string()); }
+		}
+
+		match pm.create_profile("") {
+			Ok(_) => { panic!("{}: create failed to handle empty string", testname); },
+			Err(_) => { /* */ }
+		}
+
+		match pm.create_profile("secondary") {
+			Ok(_) => { /* */ },
+			Err(e) => { panic!("{}: {}", testname, e.to_string()); }
+		}
+
+		match pm.delete_profile("") {
+			Ok(_) => { panic!("{}: delete failed to handle empty string", testname); },
+			Err(_) => { /* */ }
+		}
+
+		match pm.delete_profile("secondary") {
+			Ok(_) => { /* */ },
+			Err(e) => { panic!("{} failed to delete profile: {}", testname, e.to_string()); }
+		}
+
+		match pm.delete_profile("secondary") {
+			Ok(_) => { panic!("{}: delete failed to handle nonexistent profile", testname); },
+			Err(_) => { /* */ }
+		}
+	}
 }
