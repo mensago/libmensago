@@ -88,9 +88,15 @@ impl SignatureBlock for OrgSigBlock {
 
 	fn get_authstr(&self, astype: &AuthStrType) -> Result<CryptoString, MensagoError> {
 
-		// TODO: Implement OrgSigBlock::get_authstr()
+		let index = OrgSigBlock::astype_to_index(astype);
+		if index == 0 {
+			return Err(MensagoError::ErrBadValue)
+		}
 
-		return Err(MensagoError::ErrUnimplemented)
+		match self.signatures[index] {
+			Some(v) => Ok(v),
+			None => Err(MensagoError::ErrNotFound)
+		}
 	}
 
 	fn add_authstr(&mut self, astype: &AuthStrType, astr: &CryptoString)
