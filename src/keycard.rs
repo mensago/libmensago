@@ -45,12 +45,56 @@ trait SignatureBlock {
 	fn has_authstr(&self, astype: &AuthStrType) -> bool;
 	fn get_authstr(&self, astype: &AuthStrType) -> Result<CryptoString, MensagoError>;
 	fn add_authstr(&mut self, astype: &AuthStrType, astr: &CryptoString) -> Result<(), MensagoError>;
-	fn sign(&mut self, entry: &str, astype: &AuthStrType, signing_key: CryptoString);
-	fn verify(&mut self, entry: &str, astype: &AuthStrType, verify_key: CryptoString);
+	fn sign(&mut self, entry: &str, astype: &AuthStrType, signing_key: CryptoString)
+		-> Result<(), MensagoError>;
+	fn verify(&mut self, entry: &str, astype: &AuthStrType, verify_key: CryptoString)
+		-> Result<(), MensagoError>;
 }
 
+#[derive(Debug)]
 struct OrgSigBlock {
 	signatures: [Option<CryptoString>; 4]
+}
+
+impl SignatureBlock for OrgSigBlock {
+
+	fn has_authstr(&self, astype: &AuthStrType) -> bool {
+		
+		// TODO: Implement OrgSigBlock::has_authstr()
+
+		false
+	}
+
+	fn get_authstr(&self, astype: &AuthStrType) -> Result<CryptoString, MensagoError> {
+
+		// TODO: Implement OrgSigBlock::get_authstr()
+
+		return Err(MensagoError::ErrUnimplemented)
+	}
+
+	fn add_authstr(&mut self, astype: &AuthStrType, astr: &CryptoString)
+		-> Result<(), MensagoError> {
+
+		// TODO: Implement OrgSigBlock::add_authstr()
+
+		return Err(MensagoError::ErrUnimplemented)
+	}
+
+	fn sign(&mut self, entry: &str, astype: &AuthStrType, signing_key: CryptoString)
+		-> Result<(), MensagoError> {
+
+		// TODO: Implement OrgSigBlock::sign()
+
+		return Err(MensagoError::ErrUnimplemented)
+	}
+
+	fn verify(&mut self, entry: &str, astype: &AuthStrType, verify_key: CryptoString) 
+		-> Result<(), MensagoError> {
+
+		// TODO: Implement OrgSigBlock::verify()
+
+		return Err(MensagoError::ErrUnimplemented)
+	}
 }
 
 // KeycardBase implements the prts of the Keycard interface common to both keycard types
