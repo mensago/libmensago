@@ -56,13 +56,34 @@ struct OrgSigBlock {
 	signatures: [Option<CryptoString>; 4]
 }
 
+impl OrgSigBlock {
+
+	fn astype_to_index(astype: &AuthStrType) -> usize {
+
+		match astype {
+			// 0 is invalid for the OrgSigBlock type
+			User => 0,
+			Custody => 1,
+			PrevHash => 2,
+			Hash => 3,
+			Organization => 4,
+		}
+	}
+}
+
 impl SignatureBlock for OrgSigBlock {
 
 	fn has_authstr(&self, astype: &AuthStrType) -> bool {
-		
-		// TODO: Implement OrgSigBlock::has_authstr()
+	
+		let index = OrgSigBlock::astype_to_index(astype);
+		if index == 0 {
+			return false
+		}
 
-		false
+		match self.signatures[index] {
+			Some(_) => true,
+			None => false
+		}
 	}
 
 	fn get_authstr(&self, astype: &AuthStrType) -> Result<CryptoString, MensagoError> {
