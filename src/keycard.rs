@@ -80,7 +80,7 @@ impl SignatureBlock for OrgSigBlock {
 			return false
 		}
 
-		match self.signatures[index] {
+		match self.signatures[index-1] {
 			Some(_) => true,
 			None => false
 		}
@@ -93,7 +93,7 @@ impl SignatureBlock for OrgSigBlock {
 			return Err(MensagoError::ErrBadValue)
 		}
 
-		match self.signatures[index] {
+		match self.signatures[index-1] {
 			Some(v) => Ok(v),
 			None => Err(MensagoError::ErrNotFound)
 		}
@@ -107,7 +107,7 @@ impl SignatureBlock for OrgSigBlock {
 			return Err(MensagoError::ErrBadValue)
 		}
 
-		self.signatures[index] = Some(*astr);
+		self.signatures[index-1] = Some(*astr);
 		
 		Ok(())
 	}
