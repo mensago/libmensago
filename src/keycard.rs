@@ -73,6 +73,16 @@ impl OrgSigBlock {
 	}
 }
 
+/// The SignatureBlock implementation for OrgSigBlock. This provides the specific handling for
+/// organizational signatures, which require signatures and hashes in the following order:
+/// 
+/// - Custody Signature, required for all entries except a keycard's root entry
+/// - Previous Hash, required for all entries except an organization's root keycard entry
+/// - Hash, required for all entries
+/// - Organization Signature, required for all entries
+/// 
+/// Note that explicitly calling verify() with the Hash type isn't required because it is 
+/// automatically verified when the organizational signature is verified.
 impl SignatureBlock for OrgSigBlock {
 
 	fn has_authstr(&self, astype: &AuthStrType) -> bool {
@@ -204,14 +214,37 @@ impl SignatureBlock for OrgSigBlock {
 		
 		let totaldata = strings.join("\r\n");
 		
-		if *astype == AuthStrType::Hash {
-			let hash = get_hash(sig.prefix(), totaldata.as_bytes())?;
-			return if hash == sig {
-				Ok(())
-			} else {
-				Err(MensagoError::ErrInvalidKeycard)
-			}
+		// Verify the Hash field when verification of the Hash or Organization fields is requested
+		match *astype {
+			AuthStrType::Hash => {
+				let hash = get_hash(sig.prefix(), totaldata.as_bytes())?;
+				return if hash == sig {
+					Ok(())
+				} else {
+					Err(MensagoError::ErrInvalidKeycard)
+				}
+			}			
+			AuthStrType::Organization => {
+				let cardhash = match self.signatures[
+						OrgSigBlock::astype_to_index(&AuthStrType::Hash)] {
+					Some(v) => v,
+					None => { 
+						// It does matter if the hash hasn't yet been generated. Although we *could*
+						// just do it here, the caller may have requirements on which algorithm is
+						// used, e.g BLAKE2 is not FIPS140-3 compliant even if it is secure.
+						return Err(MensagoError::ErrNotFound)
+					},
+				};
+
+				let hash = get_hash(cardhash.prefix(), totaldata.as_bytes())?;
+				if hash == cardhash {
+					/* Continue on to signature verification */
+				} else {
+					return Err(MensagoError::ErrInvalidKeycard)
+				}
+			}			
 		}
+
 		if verify_key.verify(totaldata.as_bytes(), &sig)? {
 			Ok(())
 		} else {
