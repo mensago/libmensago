@@ -276,6 +276,8 @@ impl SignatureBlock for OrgSigBlock {
 	}
 }
 
+// TODO: Implement UserSigBlock
+
 // KeycardBase implements the prts of the Keycard interface common to both keycard types
 struct KeycardBase {
 	_type: EntryType,
@@ -284,6 +286,6 @@ struct KeycardBase {
 }
 
 impl KeycardBase {
-
+	// TODO: Implement KeycardBase methods
 }
 
