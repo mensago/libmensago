@@ -12,16 +12,16 @@ pub trait KeycardEntry {
 	
 	fn get_field(&self, field_name: &str) -> Result<String, MensagoError>;
 	fn set_field(&mut self, field_name: &str, field_value: &str) -> Result<(), MensagoError>;
-	fn set_fields(&mut self, fields: HashMap<String, String>) -> Result<(), MensagoError>;
-	fn set_expiration(&self, numdays: Option<u16>);
+	fn set_fields(&mut self, fields: &HashMap<String, String>) -> Result<(), MensagoError>;
+	fn set_expiration(&self, numdays: Option<&u16>);
 	
 	fn get_text(&self, signature_level: AuthStrType, include_auth: &bool)
 		-> Result<(), MensagoError>;
 	
 	fn has_authstr(&self, astype: &AuthStrType) -> bool;
-	fn get_authstr(&self, astype: AuthStrType) -> Result<(), MensagoError>;
-	fn sign(&mut self, signing_key: CryptoString, astype: AuthStrType) -> Result<(), MensagoError>;
-	fn verify(&mut self, verify_key: eznacl::CryptoString, astype: AuthStrType)
+	fn get_authstr(&self, astype: &AuthStrType) -> Result<(), MensagoError>;
+	fn sign(&mut self, astype: &AuthStrType, signing_pair: &SigningPair) -> Result<(), MensagoError>;
+	fn verify(&mut self, astype: &AuthStrType, verify_key: &CryptoString)
 		-> Result<(), MensagoError>;
 }
 
@@ -45,9 +45,9 @@ trait SignatureBlock {
 	fn has_authstr(&self, astype: &AuthStrType) -> bool;
 	fn get_authstr(&self, astype: &AuthStrType) -> Result<CryptoString, MensagoError>;
 	fn add_authstr(&mut self, astype: &AuthStrType, astr: &CryptoString) -> Result<(), MensagoError>;
-	fn sign(&mut self, entry: &str, astype: &AuthStrType, signing_key: CryptoString)
+	fn sign(&mut self, entry: &str, astype: &AuthStrType, signing_key: &SigningPair)
 		-> Result<(), MensagoError>;
-	fn verify(&mut self, entry: &str, astype: &AuthStrType, verify_key: CryptoString)
+	fn verify(&mut self, entry: &str, astype: &AuthStrType, verify_key: &CryptoString)
 		-> Result<(), MensagoError>;
 }
 
@@ -112,15 +112,16 @@ impl SignatureBlock for OrgSigBlock {
 		Ok(())
 	}
 
-	fn sign(&mut self, entry: &str, astype: &AuthStrType, signing_key: CryptoString)
+	fn sign(&mut self, entry: &str, astype: &AuthStrType, signing_pair: &SigningPair)
 		-> Result<(), MensagoError> {
 
 		// TODO: Implement OrgSigBlock::sign()
 
 		return Err(MensagoError::ErrUnimplemented)
 	}
+	// fn sign(&mut self, signing_pair: &SigningPair, astype: &AuthStrType) -> Result<(), MensagoError>;
 
-	fn verify(&mut self, entry: &str, astype: &AuthStrType, verify_key: CryptoString) 
+	fn verify(&mut self, entry: &str, astype: &AuthStrType, verify_key: &CryptoString) 
 		-> Result<(), MensagoError> {
 
 		// TODO: Implement OrgSigBlock::verify()
