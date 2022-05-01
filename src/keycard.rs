@@ -21,7 +21,7 @@ pub trait KeycardEntry {
 	fn has_authstr(&self, astype: &AuthStrType) -> bool;
 	fn get_authstr(&self, astype: &AuthStrType) -> Result<(), MensagoError>;
 	fn sign(&mut self, astype: &AuthStrType, signing_pair: &SigningPair) -> Result<(), MensagoError>;
-	fn verify(&mut self, astype: &AuthStrType, verify_key: &CryptoString)
+	fn verify(&mut self, astype: &AuthStrType, verify_key: &dyn VerifySignature)
 		-> Result<(), MensagoError>;
 }
 
@@ -47,7 +47,7 @@ trait SignatureBlock {
 	fn add_authstr(&mut self, astype: &AuthStrType, astr: &CryptoString) -> Result<(), MensagoError>;
 	fn sign(&mut self, entry: &str, astype: &AuthStrType, signing_key: &SigningPair)
 		-> Result<(), MensagoError>;
-	fn verify(&mut self, entry: &str, astype: &AuthStrType, verify_key: &CryptoString)
+	fn verify(&mut self, entry: &str, astype: &AuthStrType, verify_key: &dyn VerifySignature)
 		-> Result<(), MensagoError>;
 }
 
@@ -121,12 +121,27 @@ impl SignatureBlock for OrgSigBlock {
 	}
 	// fn sign(&mut self, signing_pair: &SigningPair, astype: &AuthStrType) -> Result<(), MensagoError>;
 
-	fn verify(&mut self, entry: &str, astype: &AuthStrType, verify_key: &CryptoString) 
+	fn verify(&mut self, entry: &str, astype: &AuthStrType, verify_key: &dyn VerifySignature) 
 		-> Result<(), MensagoError> {
+		
+		let strings = vec![entry];
 
-		// TODO: Implement OrgSigBlock::verify()
-
-		return Err(MensagoError::ErrUnimplemented)
+		let sig = match astype {
+			AuthStrType::Custody => {
+				match self.signatures[OrgSigBlock::astype_to_index(astype)] {
+					Some(v) => v,
+					None => return Err(MensagoError::ErrNotFound),
+				}
+			}
+		};
+		
+		let totaldata = strings.join("\r\n");
+		
+		if verify_key.verify(totaldata.as_bytes(), &sig)? {
+			Ok(())
+		} else {
+			Err(MensagoError::ErrInvalidKeycard)
+		}
 	}
 }
 
