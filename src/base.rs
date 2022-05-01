@@ -62,6 +62,9 @@ pub enum MensagoError {
 
 	#[error(transparent)]
     RusqliteError(#[from] rusqlite::Error),
+
+	#[error(transparent)]
+	EzNaclError(#[from] eznacl::EzNaclError),
 }
 
 /// Returns a string containing the current UTC with second precision in the format
