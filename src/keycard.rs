@@ -25,6 +25,7 @@ pub trait KeycardEntry {
 		-> Result<(), MensagoError>;
 }
 
+#[derive(Debug, PartialEq, PartialOrd)]
 pub enum EntryType {
 	Organization,
 	User
@@ -32,6 +33,7 @@ pub enum EntryType {
 
 /// The AuthStr type is used to specify authentication strings used in keycard entries. These can
 /// either be cryptographic hashes or digital signatures.
+#[derive(Debug, PartialEq, PartialOrd)]
 pub enum AuthStrType {
 	Custody,
 	PrevHash,
@@ -119,7 +121,6 @@ impl SignatureBlock for OrgSigBlock {
 
 		return Err(MensagoError::ErrUnimplemented)
 	}
-	// fn sign(&mut self, signing_pair: &SigningPair, astype: &AuthStrType) -> Result<(), MensagoError>;
 
 	fn verify(&mut self, entry: &str, astype: &AuthStrType, verify_key: &dyn VerifySignature) 
 		-> Result<(), MensagoError> {
@@ -128,15 +129,89 @@ impl SignatureBlock for OrgSigBlock {
 
 		let sig = match astype {
 			AuthStrType::Custody => {
+
 				match self.signatures[OrgSigBlock::astype_to_index(astype)] {
 					Some(v) => v,
 					None => return Err(MensagoError::ErrNotFound),
 				}
-			}
+			},
+			AuthStrType::PrevHash => {
+
+				// It's silly to try to verify the previous hash because there's nothing to verify,
+				// but if someone accidentally calls verify() with this type, it's not hurting
+				// anything, so we'll just return Ok.
+				return Ok(())
+			},
+			AuthStrType::Hash => {
+
+				// Calling verify() with the Hash type isn't necessary because the hash is also
+				// verified when the organizational signature is verified, but if someone really
+				// wants to do this, we'll humor them. ;)
+				
+				// The Hash field includes the Custody Signature and PrevHash fields if present
+				match self.signatures[OrgSigBlock::astype_to_index(&AuthStrType::Custody)] {
+					Some(v) => {
+						strings.push(&v.to_string())
+					},
+					None => { /* Do nothing if the custody signature doesn't exist */ },
+				};
+				match self.signatures[OrgSigBlock::astype_to_index(&AuthStrType::PrevHash)] {
+					Some(v) => {
+						strings.push(&v.to_string())
+					},
+					None => { /* Not a big deal if the previous hash field doesn't exist */ },
+				};
+
+				match self.signatures[OrgSigBlock::astype_to_index(astype)] {
+					Some(v) => v,
+					None => return Err(MensagoError::ErrNotFound),
+				}
+			},
+			AuthStrType::Organization => {
+				
+				// The org signature on org cards is the final field, so make sure that we have all
+				// other hashes and signatures included in the verification data if they exist
+				match self.signatures[OrgSigBlock::astype_to_index(&AuthStrType::Custody)] {
+					Some(v) => {
+						strings.push(&v.to_string())
+					},
+					None => { /* Do nothing if the custody signature doesn't exist */ },
+				};
+				match self.signatures[OrgSigBlock::astype_to_index(&AuthStrType::PrevHash)] {
+					Some(v) => {
+						strings.push(&v.to_string())
+					},
+					None => { /* Not a big deal if the previous hash field doesn't exist */ },
+				};
+				match self.signatures[OrgSigBlock::astype_to_index(&AuthStrType::Hash)] {
+					Some(v) => {
+						strings.push(&v.to_string())
+					},
+					None => { 
+						// It does matter if the hash hasn't yet been generated. Although we *could*
+						// just do it here, the caller may have requirements on which algorithm is
+						// used, e.g BLAKE2 is not FIPS140-3 compliant even if it is secure.
+						return Err(MensagoError::ErrNotFound)
+					},
+				};
+
+				match self.signatures[OrgSigBlock::astype_to_index(astype)] {
+					Some(v) => v,
+					None => return Err(MensagoError::ErrNotFound),
+				}
+			},
 		};
 		
 		let totaldata = strings.join("\r\n");
 		
+		if *astype == AuthStrType::Hash {
+			let hash = get_hash(sig.prefix(), totaldata.as_bytes())?;
+			return if hash == sig {
+				Ok(())
+			} else {
+				Err(MensagoError::ErrInvalidKeycard)
+			}
+		}
 		if verify_key.verify(totaldata.as_bytes(), &sig)? {
 			Ok(())
 		} else {
