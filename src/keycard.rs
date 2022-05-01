@@ -149,10 +149,61 @@ impl SignatureBlock for OrgSigBlock {
 
 	fn sign(&mut self, entry: &str, astype: &AuthStrType, signing_pair: &SigningPair)
 		-> Result<(), MensagoError> {
+		
+		let strings = vec![entry];
 
-		// TODO: Implement OrgSigBlock::sign()
+		match astype {
+			AuthStrType::User => {
+				// Calling the User signature type on an org card indicates a bug in the caller's
+				// code
+				return Err(MensagoError::ErrBadValue)
+			},
+			AuthStrType::Custody => {
+				/* For the custody signature, we don't need to do anything extra */
+			},
+			AuthStrType::PrevHash => {
+				// This method should never be called with the PrevHash type becuase it makes no
+				// sense. Instead, add_authstr() should be called to populate the PrevHash field
+				return Err(MensagoError::ErrOutOfOrderSignature)
+			},
+			AuthStrType::Hash => {
+				// This method should never be called with the Hash type because that's what the
+				// hash() method is for and is the sign of a bug in the caller's code.
+				return Err(MensagoError::ErrOutOfOrderSignature)
+			},
+			AuthStrType::Organization => {
+				// The org signature on org cards is the final field, so make sure that we have all
+				// other hashes and signatures included in the verification data if they exist
+				match self.signatures[OrgSigBlock::astype_to_index(&AuthStrType::Custody)] {
+					Some(v) => {
+						strings.push(&v.to_string())
+					},
+					None => { /* Do nothing if the custody signature doesn't exist */ },
+				};
+				match self.signatures[OrgSigBlock::astype_to_index(&AuthStrType::PrevHash)] {
+					Some(v) => {
+						strings.push(&v.to_string())
+					},
+					None => { /* Not a big deal if the previous hash field doesn't exist */ },
+				};
+				match self.signatures[OrgSigBlock::astype_to_index(&AuthStrType::Hash)] {
+					Some(v) => {
+						strings.push(&v.to_string())
+					},
+					None => { 
+						// It does matter if the hash hasn't yet been generated. Although we *could*
+						// just do it here, the caller may have requirements on which algorithm is
+						// used, e.g BLAKE2 is not FIPS140-3 compliant even if it is secure.
+						return Err(MensagoError::ErrOutOfOrderSignature)
+					},
+				};
+			}
+		};
 
-		return Err(MensagoError::ErrUnimplemented)
+		let totaldata = strings.join("\r\n");
+		let signature = signing_pair.sign(totaldata.as_bytes())?;
+
+		self.add_authstr(&AuthStrType::Organization, &signature)
 	}
 
 	fn verify(&mut self, entry: &str, astype: &AuthStrType, verify_key: &dyn VerifySignature) 
@@ -161,6 +212,11 @@ impl SignatureBlock for OrgSigBlock {
 		let strings = vec![entry];
 
 		let sig = match astype {
+			AuthStrType::User => {
+				// Calling the User signature type on an org card indicates a bug in the caller's
+				// code
+				return Err(MensagoError::ErrBadValue)
+			},
 			AuthStrType::Custody => {
 
 				match self.signatures[OrgSigBlock::astype_to_index(astype)] {
