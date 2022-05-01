@@ -47,6 +47,7 @@ trait SignatureBlock {
 	fn has_authstr(&self, astype: &AuthStrType) -> bool;
 	fn get_authstr(&self, astype: &AuthStrType) -> Result<CryptoString, MensagoError>;
 	fn add_authstr(&mut self, astype: &AuthStrType, astr: &CryptoString) -> Result<(), MensagoError>;
+	fn hash(&mut self, entry: &str, algorithm: &str) -> Result<(), MensagoError>;
 	fn sign(&mut self, entry: &str, astype: &AuthStrType, signing_key: &SigningPair)
 		-> Result<(), MensagoError>;
 	fn verify(&mut self, entry: &str, astype: &AuthStrType, verify_key: &dyn VerifySignature)
@@ -122,6 +123,28 @@ impl SignatureBlock for OrgSigBlock {
 		self.signatures[index-1] = Some(*astr);
 		
 		Ok(())
+	}
+	
+	fn hash(&mut self, entry: &str, algorithm: &str) -> Result<(), MensagoError> {
+
+		let strings = vec![entry];
+		match self.signatures[OrgSigBlock::astype_to_index(&AuthStrType::Custody)] {
+			Some(v) => {
+				strings.push(&v.to_string())
+			},
+			None => { /* Do nothing if the custody signature doesn't exist */ },
+		};
+		match self.signatures[OrgSigBlock::astype_to_index(&AuthStrType::PrevHash)] {
+			Some(v) => {
+				strings.push(&v.to_string())
+			},
+			None => { /* Not a big deal if the previous hash field doesn't exist */ },
+		};
+
+		let totaldata = strings.join("\r\n");
+		
+		let hash = get_hash(algorithm, totaldata.as_bytes())?;
+		self.add_authstr(&AuthStrType::Hash, &hash)
 	}
 
 	fn sign(&mut self, entry: &str, astype: &AuthStrType, signing_pair: &SigningPair)
