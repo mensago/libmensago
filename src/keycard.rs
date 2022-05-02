@@ -2,9 +2,8 @@ use std::collections::HashMap;
 use eznacl::*;
 use crate::base::*;
 
-/// The KeycardEntryBase trait provides methods common to all keycard types
-pub trait KeycardEntryBase {
-
+/// The KeycardEntry trait provides implementation-specific keycard methods
+pub trait KeycardEntry {
 	/// Returns the type of keycard
 	fn get_type(&self) -> EntryType;
 	
@@ -19,10 +18,6 @@ pub trait KeycardEntryBase {
 
 	/// Deletes a field from the entry
 	fn delete_field(&mut self, field_name: &str) -> Result<(), MensagoError>;
-}
-
-/// The KeycardEntry trait provides implementation-specific keycard methods
-pub trait KeycardEntry {
 
 	/// Returns false if the data in any of the regular fields is not compliant
 	fn is_data_compliant(&self) -> Result<bool, MensagoError>;
@@ -371,21 +366,21 @@ impl SignatureBlock for OrgSigBlock {
 
 // TODO: Implement UserSigBlock
 
-// KeycardBase implements the parts of the Keycard interface common to both keycard types
-struct KEntryBase {
+// OrgEntry is an entry for an organizational keycard
+struct OrgEntry {
 	_type: EntryType,
 	fields: HashMap<String, String>,
 }
 
-impl KEntryBase {
+impl OrgEntry {
 
-	pub fn init(&mut self, t: &EntryType) {
-		self._type = *t;
+	pub fn new(&mut self) {
+		self._type = EntryType::Organization;
 		self.fields = HashMap::<String, String>::new();
 	}
 }
 
-impl KeycardEntryBase for KEntryBase {
+impl KeycardEntry for OrgEntry {
 
 	fn get_type(&self) -> EntryType {
 		self._type
@@ -440,6 +435,44 @@ impl KeycardEntryBase for KEntryBase {
 
 		let _ = self.fields.remove(field_name);
 		Ok(())
+	}
+
+	fn is_data_compliant(&self) -> Result<bool, MensagoError> {
+
+		// TODO: Implement OrgEntry::is_data_compliant()
+
+		Err(MensagoError::ErrUnimplemented)
+	}
+
+	fn is_compliant(&self) -> Result<bool, MensagoError> {
+
+		// TODO: Implement OrgEntry::is_compliant()
+
+		Err(MensagoError::ErrUnimplemented)
+	}
+
+	fn set_expiration(&self, numdays: Option<&u16>) -> Result<(), MensagoError> {
+
+		// TODO: Implement OrgEntry::set_expiration()
+
+		Err(MensagoError::ErrUnimplemented)
+	}
+
+	/// Returns true if the entry has exceeded its expiration date
+	fn is_expired(&self) -> Result<bool, MensagoError> {
+
+		// TODO: Implement OrgEntry::is_expired()
+
+		Err(MensagoError::ErrUnimplemented)
+	}
+	
+	/// Returns the entire text of the entry minus any signatures or hashes
+	fn get_text(&self, signature_level: AuthStrType, include_auth: &bool)
+		-> Result<(), MensagoError> {
+
+		// TODO: Implement OrgEntry::get_text()
+
+		Err(MensagoError::ErrUnimplemented)
 	}
 }
 
