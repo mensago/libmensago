@@ -372,6 +372,31 @@ struct OrgEntry {
 	fields: HashMap<String, String>,
 }
 
+
+static org_field_names: [&str; 11] = [
+	"Index",
+	"Name",
+	"Contact-Admin",
+	"Contact-Abuse",
+	"Contact-Support",
+	"Language",
+	"Primary-Verification-Key",
+	"Secondary-Verification-Key",
+	"Time-To-Live",
+	"Expires",
+	"Timestamp",
+];
+
+static org_required_fields: [&str; 7] = [
+	"Index",
+	"Name",
+	"Contact-Admin",
+	"Primary-Verification-Key",
+	"Time-To-Live",
+	"Expires",
+	"Timestamp",
+];
+
 impl OrgEntry {
 
 	pub fn new(&mut self) {
@@ -476,3 +501,30 @@ impl KeycardEntry for OrgEntry {
 	}
 }
 
+static user_field_names: [&str; 12] = [
+	"Index",
+	"Name",
+	"Workspace-ID",
+	"User-ID",
+	"Domain",
+	"Contact-Request-Verification-Key",
+	"Contact-Request-Encryption-Key",
+	"Encryption-Key",
+	"Verification-Key",
+	"Time-To-Live",
+	"Expires",
+	"Timestamp",
+];
+
+static user_required_fields: [&str; 10] = [
+	"Index",
+	"Workspace-ID",
+	"Domain",
+	"Contact-Request-Verification-Key",
+	"Contact-Request-Encryption-Key",
+	"Encryption-Key",
+	"Verification-Key",
+	"Time-To-Live",
+	"Expires",
+	"Timestamp",
+];
