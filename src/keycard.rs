@@ -410,9 +410,17 @@ impl KeycardEntryBase for KEntryBase {
 
 	fn set_fields(&mut self, fields: &HashMap<String, String>) -> Result<(), MensagoError> {
 
-		// TODO: Implement KeycardBase::set_fields()
-
-		Err(MensagoError::ErrUnimplemented)
+		if fields.len() < 1 {
+			return Err(MensagoError::ErrEmptyData)
+		}
+		
+		// I'm sure there's a more compact way to do this, but I can't figure out what it would be.
+		// :(
+		for (k, v) in fields.iter() {
+			let _ = self.fields.insert(*k, *v);
+		}
+		
+		Ok(())
 	}
 
 	fn delete_field(&mut self, field_name: &str) -> Result<(), MensagoError> {
