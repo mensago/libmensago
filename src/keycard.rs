@@ -19,18 +19,27 @@ pub trait KeycardEntryBase {
 
 	/// Deletes a field from the entry
 	fn delete_field(&mut self, field_name: &str) -> Result<(), MensagoError>;
-	
-	/// Returns the entire text of the entry minus any signatures or hashes
-	fn get_text(&self, signature_level: AuthStrType, include_auth: &bool)
-		-> Result<(), MensagoError>;
 }
 
 /// The KeycardEntry trait provides implementation-specific keycard methods
 pub trait KeycardEntry {
-	fn is_data_compliant(&self) -> Result<(), MensagoError>;
-	fn is_compliant(&self) -> Result<(), MensagoError>;
+
+	/// Returns false if the data in any of the regular fields is not compliant
+	fn is_data_compliant(&self) -> Result<bool, MensagoError>;
+
+	/// Returns false if the entry has any compliance issues, including missing or bad hashes
+	/// and/or signatures.
+	fn is_compliant(&self) -> Result<bool, MensagoError>;
+
+	/// Sets the expiration date for the entry
 	fn set_expiration(&self, numdays: Option<&u16>) -> Result<(), MensagoError>;
-	fn is_expired(&self) -> Result<(), MensagoError>;
+
+	/// Returns true if the entry has exceeded its expiration date
+	fn is_expired(&self) -> Result<bool, MensagoError>;
+	
+	/// Returns the entire text of the entry minus any signatures or hashes
+	fn get_text(&self, signature_level: AuthStrType, include_auth: &bool)
+		-> Result<(), MensagoError>;
 }
 
 #[derive(Debug, PartialEq, PartialOrd)]
@@ -431,14 +440,6 @@ impl KeycardEntryBase for KEntryBase {
 
 		let _ = self.fields.remove(field_name);
 		Ok(())
-	}
-
-	fn get_text(&self, signature_level: AuthStrType, include_auth: &bool)
-		-> Result<(), MensagoError> {
-
-		// TODO: Implement KeycardBase::get_text()
-
-		Err(MensagoError::ErrUnimplemented)
 	}
 }
 
