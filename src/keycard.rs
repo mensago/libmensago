@@ -13,7 +13,7 @@ pub trait KeycardEntry {
 	fn get_field(&self, field_name: &str) -> Result<String, MensagoError>;
 	fn set_field(&mut self, field_name: &str, field_value: &str) -> Result<(), MensagoError>;
 	fn set_fields(&mut self, fields: &HashMap<String, String>) -> Result<(), MensagoError>;
-	fn set_expiration(&self, numdays: Option<&u16>);
+	fn set_expiration(&self, numdays: Option<&u16>) -> Result<(), MensagoError>;
 	
 	fn get_text(&self, signature_level: AuthStrType, include_auth: &bool)
 		-> Result<(), MensagoError>;
@@ -342,6 +342,95 @@ struct KeycardBase {
 }
 
 impl KeycardBase {
-	// TODO: Implement KeycardBase methods
+
+	fn get_type(&self) -> EntryType {
+		self._type
+	}
+	
+	fn is_data_compliant(&self) -> Result<(), MensagoError> {
+
+		// TODO: Implement KeycardBase::is_data_compliant()
+
+		Err(MensagoError::ErrUnimplemented)
+	}
+
+	fn is_compliant(&self) -> Result<(), MensagoError> {
+
+		// TODO: Implement KeycardBase::is_compliant()
+
+		Err(MensagoError::ErrUnimplemented)
+	}
+
+	fn is_expired(&self) -> Result<(), MensagoError> {
+
+		// TODO: Implement KeycardBase::is_expired()
+
+		Err(MensagoError::ErrUnimplemented)
+	}
+	
+	fn get_field(&self, field_name: &str) -> Result<String, MensagoError> {
+
+		// TODO: Implement KeycardBase::get_field()
+
+		Err(MensagoError::ErrUnimplemented)
+	}
+
+	fn set_field(&mut self, field_name: &str, field_value: &str) -> Result<(), MensagoError> {
+
+		// TODO: Implement KeycardBase::set_field
+
+		Err(MensagoError::ErrUnimplemented)
+	}
+
+	fn set_fields(&mut self, fields: &HashMap<String, String>) -> Result<(), MensagoError> {
+
+		// TODO: Implement KeycardBase::set_fields()
+
+		Err(MensagoError::ErrUnimplemented)
+	}
+
+	fn set_expiration(&self, numdays: Option<&u16>) -> Result<(), MensagoError> {
+
+		// TODO: Implement KeycardBase::set_expiration()
+
+		Err(MensagoError::ErrUnimplemented)
+	}
+	
+	fn get_text(&self, signature_level: AuthStrType, include_auth: &bool)
+		-> Result<(), MensagoError> {
+
+		// TODO: Implement KeycardBase::get_text()
+
+		Err(MensagoError::ErrUnimplemented)
+	}
+	
+	fn has_authstr(&self, astype: &AuthStrType) -> bool {
+
+		// TODO: Implement KeycardBase::has_authstr()
+
+		false
+	}
+	fn get_authstr(&self, astype: &AuthStrType) -> Result<(), MensagoError> {
+
+		// TODO: Implement KeycardBase::get_authstr()
+
+		Err(MensagoError::ErrUnimplemented)
+	}
+
+	fn sign(&mut self, astype: &AuthStrType, signing_pair: &SigningPair)
+		-> Result<(), MensagoError> {
+
+		// TODO: Implement KeycardBase::sign()
+
+		Err(MensagoError::ErrUnimplemented)
+	}
+
+	fn verify(&mut self, astype: &AuthStrType, verify_key: &dyn VerifySignature)
+		-> Result<(), MensagoError> {
+
+		// TODO: Implement KeycardBase::verify()
+
+		Err(MensagoError::ErrUnimplemented)
+	}
 }
 
