@@ -16,6 +16,9 @@ pub trait KeycardEntryBase {
 
 	/// Sets multiple entry fields
 	fn set_fields(&mut self, fields: &HashMap<String, String>) -> Result<(), MensagoError>;
+
+	/// Deletes a field from the entry
+	fn delete_field(&mut self, field_name: &str) -> Result<(), MensagoError>;
 	
 	/// Returns the entire text of the entry minus any signatures or hashes
 	fn get_text(&self, signature_level: AuthStrType, include_auth: &bool)
@@ -365,6 +368,14 @@ struct KEntryBase {
 	fields: HashMap<String, String>,
 }
 
+impl KEntryBase {
+
+	pub fn init(&mut self, t: &EntryType) {
+		self._type = *t;
+		self.fields = HashMap::<String, String>::new();
+	}
+}
+
 impl KeycardEntryBase for KEntryBase {
 
 	fn get_type(&self) -> EntryType {
@@ -373,16 +384,28 @@ impl KeycardEntryBase for KEntryBase {
 	
 	fn get_field(&self, field_name: &str) -> Result<String, MensagoError> {
 
-		// TODO: Implement KeycardBase::get_field()
+		if field_name.len() < 1 {
+			return Err(MensagoError::ErrEmptyData)
+		}
 
-		Err(MensagoError::ErrUnimplemented)
+		match self.fields.get(field_name) {
+			Some(v) => {
+				Ok(*v)
+			},
+			None => {
+				Err(MensagoError::ErrNotFound)
+			}
+		}
 	}
 
 	fn set_field(&mut self, field_name: &str, field_value: &str) -> Result<(), MensagoError> {
 
-		// TODO: Implement KeycardBase::set_field
+		if field_name.len() < 1 {
+			return Err(MensagoError::ErrEmptyData)
+		}
 
-		Err(MensagoError::ErrUnimplemented)
+		let _ = self.fields.insert(String::from(field_name), String::from(field_value));		
+		Ok(())
 	}
 
 	fn set_fields(&mut self, fields: &HashMap<String, String>) -> Result<(), MensagoError> {
@@ -390,6 +413,16 @@ impl KeycardEntryBase for KEntryBase {
 		// TODO: Implement KeycardBase::set_fields()
 
 		Err(MensagoError::ErrUnimplemented)
+	}
+
+	fn delete_field(&mut self, field_name: &str) -> Result<(), MensagoError> {
+
+		if field_name.len() < 1 {
+			return Err(MensagoError::ErrEmptyData)
+		}
+
+		let _ = self.fields.remove(field_name);
+		Ok(())
 	}
 
 	fn get_text(&self, signature_level: AuthStrType, include_auth: &bool)
