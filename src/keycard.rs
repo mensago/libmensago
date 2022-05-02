@@ -4,12 +4,20 @@ use crate::base::*;
 
 /// The KeycardEntryBase trait provides methods common to all keycard types
 pub trait KeycardEntryBase {
+
+	/// Returns the type of keycard
 	fn get_type(&self) -> EntryType;
 	
+	/// Gets the specified field for an entry
 	fn get_field(&self, field_name: &str) -> Result<String, MensagoError>;
+
+	/// Sets an entry field
 	fn set_field(&mut self, field_name: &str, field_value: &str) -> Result<(), MensagoError>;
+
+	/// Sets multiple entry fields
 	fn set_fields(&mut self, fields: &HashMap<String, String>) -> Result<(), MensagoError>;
 	
+	/// Returns the entire text of the entry minus any signatures or hashes
 	fn get_text(&self, signature_level: AuthStrType, include_auth: &bool)
 		-> Result<(), MensagoError>;
 }
@@ -41,12 +49,32 @@ pub enum AuthStrType {
 
 // SignatureBlock abstracts away the logic for handling signatures for keycard entries
 trait SignatureBlock {
+
+	/// Returns true if the block has the specified authentication string type
 	fn has_authstr(&self, astype: &AuthStrType) -> bool;
+
+	/// Returns the specified authentication string
 	fn get_authstr(&self, astype: &AuthStrType) -> Result<CryptoString, MensagoError>;
+
+	/// Sets the specified authentication string to the value passed. NOTE: no validation of the
+	/// authentication string is performed by this call. The primary use for this method is to set
+	/// the previous hash for the signature block
 	fn add_authstr(&mut self, astype: &AuthStrType, astr: &CryptoString) -> Result<(), MensagoError>;
+
+	/// Calculates the hash for the entry text using the specified algorithm. Requirements for this
+	/// call vary with the entry implementation. ErrOutOfOrderSignature is returned if a hash is
+	/// requested before another required authentication string has been set.
 	fn hash(&mut self, entry: &str, algorithm: &str) -> Result<(), MensagoError>;
+
+	/// Creates the requested signature. Requirements for this call vary with the entry
+	/// implementation. ErrOutOfOrderSignature is returned if a signature is requested before
+	/// another required authentication string has been set. ErrBadValue is returned for a
+	/// signature type not used by the specific implementation.
 	fn sign(&mut self, entry: &str, astype: &AuthStrType, signing_key: &SigningPair)
 		-> Result<(), MensagoError>;
+	
+	/// Verifies the requested signature. ErrBadValue is returned for a signature type not used by
+	/// the specific implementation.
 	fn verify(&mut self, entry: &str, astype: &AuthStrType, verify_key: &dyn VerifySignature)
 		-> Result<(), MensagoError>;
 }
