@@ -2,27 +2,24 @@ use std::collections::HashMap;
 use eznacl::*;
 use crate::base::*;
 
-/// The Keycard interface provides a general way for working with organization and user keycards
-pub trait KeycardEntry {
+/// The KeycardEntryBase trait provides methods common to all keycard types
+pub trait KeycardEntryBase {
 	fn get_type(&self) -> EntryType;
-	
-	fn is_data_compliant(&self) -> Result<(), MensagoError>;
-	fn is_compliant(&self) -> Result<(), MensagoError>;
-	fn is_expired(&self) -> Result<(), MensagoError>;
 	
 	fn get_field(&self, field_name: &str) -> Result<String, MensagoError>;
 	fn set_field(&mut self, field_name: &str, field_value: &str) -> Result<(), MensagoError>;
 	fn set_fields(&mut self, fields: &HashMap<String, String>) -> Result<(), MensagoError>;
-	fn set_expiration(&self, numdays: Option<&u16>) -> Result<(), MensagoError>;
 	
 	fn get_text(&self, signature_level: AuthStrType, include_auth: &bool)
 		-> Result<(), MensagoError>;
-	
-	fn has_authstr(&self, astype: &AuthStrType) -> bool;
-	fn get_authstr(&self, astype: &AuthStrType) -> Result<(), MensagoError>;
-	fn sign(&mut self, astype: &AuthStrType, signing_pair: &SigningPair) -> Result<(), MensagoError>;
-	fn verify(&mut self, astype: &AuthStrType, verify_key: &dyn VerifySignature)
-		-> Result<(), MensagoError>;
+}
+
+/// The KeycardEntry trait provides implementation-specific keycard methods
+pub trait KeycardEntry {
+	fn is_data_compliant(&self) -> Result<(), MensagoError>;
+	fn is_compliant(&self) -> Result<(), MensagoError>;
+	fn set_expiration(&self, numdays: Option<&u16>) -> Result<(), MensagoError>;
+	fn is_expired(&self) -> Result<(), MensagoError>;
 }
 
 #[derive(Debug, PartialEq, PartialOrd)]
@@ -334,38 +331,16 @@ impl SignatureBlock for OrgSigBlock {
 
 // TODO: Implement UserSigBlock
 
-// KeycardBase implements the prts of the Keycard interface common to both keycard types
-struct KeycardBase {
+// KeycardBase implements the parts of the Keycard interface common to both keycard types
+struct KEntryBase {
 	_type: EntryType,
 	fields: HashMap<String, String>,
-	sigs: dyn SignatureBlock,
 }
 
-impl KeycardBase {
+impl KeycardEntryBase for KEntryBase {
 
 	fn get_type(&self) -> EntryType {
 		self._type
-	}
-	
-	fn is_data_compliant(&self) -> Result<(), MensagoError> {
-
-		// TODO: Implement KeycardBase::is_data_compliant()
-
-		Err(MensagoError::ErrUnimplemented)
-	}
-
-	fn is_compliant(&self) -> Result<(), MensagoError> {
-
-		// TODO: Implement KeycardBase::is_compliant()
-
-		Err(MensagoError::ErrUnimplemented)
-	}
-
-	fn is_expired(&self) -> Result<(), MensagoError> {
-
-		// TODO: Implement KeycardBase::is_expired()
-
-		Err(MensagoError::ErrUnimplemented)
 	}
 	
 	fn get_field(&self, field_name: &str) -> Result<String, MensagoError> {
@@ -389,46 +364,10 @@ impl KeycardBase {
 		Err(MensagoError::ErrUnimplemented)
 	}
 
-	fn set_expiration(&self, numdays: Option<&u16>) -> Result<(), MensagoError> {
-
-		// TODO: Implement KeycardBase::set_expiration()
-
-		Err(MensagoError::ErrUnimplemented)
-	}
-	
 	fn get_text(&self, signature_level: AuthStrType, include_auth: &bool)
 		-> Result<(), MensagoError> {
 
 		// TODO: Implement KeycardBase::get_text()
-
-		Err(MensagoError::ErrUnimplemented)
-	}
-	
-	fn has_authstr(&self, astype: &AuthStrType) -> bool {
-
-		// TODO: Implement KeycardBase::has_authstr()
-
-		false
-	}
-	fn get_authstr(&self, astype: &AuthStrType) -> Result<(), MensagoError> {
-
-		// TODO: Implement KeycardBase::get_authstr()
-
-		Err(MensagoError::ErrUnimplemented)
-	}
-
-	fn sign(&mut self, astype: &AuthStrType, signing_pair: &SigningPair)
-		-> Result<(), MensagoError> {
-
-		// TODO: Implement KeycardBase::sign()
-
-		Err(MensagoError::ErrUnimplemented)
-	}
-
-	fn verify(&mut self, astype: &AuthStrType, verify_key: &dyn VerifySignature)
-		-> Result<(), MensagoError> {
-
-		// TODO: Implement KeycardBase::verify()
 
 		Err(MensagoError::ErrUnimplemented)
 	}
