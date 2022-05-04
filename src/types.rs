@@ -388,6 +388,29 @@ impl ArgonHash {
 	}
 }
 
+/// A verified type for handling keycard entry indexes
+#[derive(Debug, PartialEq, PartialOrd, Clone)]
+pub struct IndexField {
+	data: String
+}
+
+impl fmt::Display for IndexField {
+
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		write!(f, "{}", self.data)
+	}
+}
+
+impl IndexField {
+	pub fn from(s: &str) -> Option<IndexField> {
+
+		// TODO: Implement IndexField::from()
+		
+		None
+	}
+}
+
+
 #[cfg(test)]
 mod tests {
 	use crate::*;
