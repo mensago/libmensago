@@ -455,6 +455,38 @@ impl NameField {
 	}
 }
 
+/// A verified type for handling keycard name fields
+#[derive(Debug, PartialEq, PartialOrd, Clone)]
+pub struct WIDField {
+	data: String
+}
+
+impl fmt::Display for WIDField {
+
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		write!(f, "{}", self.data)
+	}
+}
+
+impl WIDField {
+	pub fn from(s: &str) -> Option<WIDField> {
+
+		// A workspace ID is literally just a RandomID + / + domain, so we'll just
+		// split the field and check the parts individually
+		let trimmed = s.trim();
+		let parts: Vec<&str> = trimmed.split('/').collect();
+		if parts.len() != 2 {
+			return None
+		}
+
+		if !RANDOMID_PATTERN.is_match(parts[0]) || !DOMAIN_PATTERN.is_match(parts[1]) {
+			None
+		} else {
+			Some(WIDField{ data: String::from(trimmed) })
+		}
+	}
+}
+
 
 #[cfg(test)]
 mod tests {
