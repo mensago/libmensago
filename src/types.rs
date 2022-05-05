@@ -5,24 +5,16 @@ use regex::Regex;
 use std::fmt;
 
 lazy_static! {
-	static ref RANDOMID_PATTERN: regex::Regex = 
+	pub static ref RANDOMID_PATTERN: regex::Regex = 
 		Regex::new(r"^[\da-fA-F]{8}-[\da-fA-F]{4}-[\da-fA-F]{4}-[\da-fA-F]{4}-[\da-fA-F]{12}$")
 		.unwrap();
 	
-	static ref USERID_PATTERN: regex::Regex = 
+	pub static ref USERID_PATTERN: regex::Regex = 
 		Regex::new(r"^([a-zA-Z0-9_-]|\.[^.])+$")
 		.unwrap();
 	
-	static ref DOMAIN_PATTERN: regex::Regex = 
+	pub static ref DOMAIN_PATTERN: regex::Regex = 
 		Regex::new(r"^([a-zA-Z0-9\-]+\.)+[a-zA-Z0-9\-]+$")
-		.unwrap();
-
-	static ref INDEX_PATTERN: regex::Regex = 
-		Regex::new(r"^\d+$")
-		.unwrap();
-	
-	static ref NAME_PATTERN: regex::Regex = 
-		Regex::new(r"\w+")
 		.unwrap();
 }
 
@@ -395,98 +387,6 @@ impl ArgonHash {
 		&self.hashtype
 	}
 }
-
-/// A verified type for handling keycard entry indexes
-#[derive(Debug, PartialEq, PartialOrd, Clone)]
-pub struct IndexField {
-	data: String
-}
-
-impl fmt::Display for IndexField {
-
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		write!(f, "{}", self.data)
-	}
-}
-
-impl IndexField {
-	pub fn from(s: &str) -> Option<IndexField> {
-
-		if !INDEX_PATTERN.is_match(s) {
-			return None
-		}
-
-		Some(IndexField{ data:String::from(s) })
-	}
-}
-
-/// A verified type for handling keycard name fields
-#[derive(Debug, PartialEq, PartialOrd, Clone)]
-pub struct NameField {
-	data: String
-}
-
-impl fmt::Display for NameField {
-
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		write!(f, "{}", self.data)
-	}
-}
-
-impl NameField {
-	pub fn from(s: &str) -> Option<NameField> {
-
-		// Names must meet 3 conditions:
-		// 1-64 Unicode codepoints
-		// At least 1 printable character
-		// no leading or trailing whitespace
-
-		let trimmed = s.trim();
-
-		if !NAME_PATTERN.is_match(trimmed) {
-			return None
-		}
-
-		if trimmed.len() > 0 && trimmed.len() < 65 {
-			Some(NameField{ data:String::from(trimmed) })
-		} else {
-			None
-		}
-	}
-}
-
-/// A verified type for handling keycard name fields
-#[derive(Debug, PartialEq, PartialOrd, Clone)]
-pub struct WIDField {
-	data: String
-}
-
-impl fmt::Display for WIDField {
-
-	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-		write!(f, "{}", self.data)
-	}
-}
-
-impl WIDField {
-	pub fn from(s: &str) -> Option<WIDField> {
-
-		// A workspace ID is literally just a RandomID + / + domain, so we'll just
-		// split the field and check the parts individually
-		let trimmed = s.trim();
-		let parts: Vec<&str> = trimmed.split('/').collect();
-		if parts.len() != 2 {
-			return None
-		}
-
-		if !RANDOMID_PATTERN.is_match(parts[0]) || !DOMAIN_PATTERN.is_match(parts[1]) {
-			None
-		} else {
-			Some(WIDField{ data: String::from(trimmed) })
-		}
-	}
-}
-
 
 #[cfg(test)]
 mod tests {

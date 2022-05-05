@@ -1,6 +1,20 @@
 use std::collections::HashMap;
+use std::fmt;
+use regex::Regex;
+use lazy_static::lazy_static;
 use eznacl::*;
 use crate::base::*;
+use crate::types::*;
+
+lazy_static! {
+	static ref INDEX_PATTERN: regex::Regex = 
+		Regex::new(r"^\d+$")
+		.unwrap();
+	
+	static ref NAME_PATTERN: regex::Regex = 
+		Regex::new(r"\w+")
+		.unwrap();
+}
 
 /// The KeycardEntry trait provides implementation-specific keycard methods
 pub trait KeycardEntry {
@@ -528,3 +542,97 @@ static user_required_fields: [&str; 10] = [
 	"Expires",
 	"Timestamp",
 ];
+
+
+/// A verified type for handling keycard entry indexes
+#[derive(Debug, PartialEq, PartialOrd, Clone)]
+pub struct IndexField {
+	data: String
+}
+
+impl fmt::Display for IndexField {
+
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		write!(f, "{}", self.data)
+	}
+}
+
+impl IndexField {
+	pub fn from(s: &str) -> Option<IndexField> {
+
+		if !INDEX_PATTERN.is_match(s) {
+			return None
+		}
+
+		Some(IndexField{ data:String::from(s) })
+	}
+}
+
+/// A verified type for handling keycard name fields
+#[derive(Debug, PartialEq, PartialOrd, Clone)]
+pub struct NameField {
+	data: String
+}
+
+impl fmt::Display for NameField {
+
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		write!(f, "{}", self.data)
+	}
+}
+
+impl NameField {
+	pub fn from(s: &str) -> Option<NameField> {
+
+		// Names must meet 3 conditions:
+		// 1-64 Unicode codepoints
+		// At least 1 printable character
+		// no leading or trailing whitespace
+
+		let trimmed = s.trim();
+
+		if !NAME_PATTERN.is_match(trimmed) {
+			return None
+		}
+
+		if trimmed.len() > 0 && trimmed.len() < 65 {
+			Some(NameField{ data:String::from(trimmed) })
+		} else {
+			None
+		}
+	}
+}
+
+/// A verified type for handling keycard name fields
+#[derive(Debug, PartialEq, PartialOrd, Clone)]
+pub struct WIDField {
+	data: String
+}
+
+impl fmt::Display for WIDField {
+
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		write!(f, "{}", self.data)
+	}
+}
+
+impl WIDField {
+	pub fn from(s: &str) -> Option<WIDField> {
+
+		// A workspace ID is literally just a RandomID + / + domain, so we'll just
+		// split the field and check the parts individually
+		let trimmed = s.trim();
+		let parts: Vec<&str> = trimmed.split('/').collect();
+		if parts.len() != 2 {
+			return None
+		}
+
+		if !RANDOMID_PATTERN.is_match(parts[0]) || !DOMAIN_PATTERN.is_match(parts[1]) {
+			None
+		} else {
+			Some(WIDField{ data: String::from(trimmed) })
+		}
+	}
+}
+
+
