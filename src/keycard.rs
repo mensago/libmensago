@@ -603,7 +603,7 @@ impl NameField {
 	}
 }
 
-/// A verified type for handling keycard name fields
+/// A verified type for handling keycard workspace ID fields
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub struct WIDField {
 	data: String
@@ -635,4 +635,38 @@ impl WIDField {
 	}
 }
 
+/// A verified type for handling keycard Time-To-Live fields
+#[derive(Debug, PartialEq, PartialOrd, Clone)]
+pub struct TTLField {
+	data: String
+}
 
+impl fmt::Display for TTLField {
+
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		write!(f, "{}", self.data)
+	}
+}
+
+impl TTLField {
+	pub fn from(s: &str) -> Option<TTLField> {
+
+		let trimmed = s.trim();
+		
+		// The TTL is just a number from 1-30, so the Index field's regex will do nicely here. :)
+		if !INDEX_PATTERN.is_match(s) {
+			return None
+		}
+
+		match trimmed.parse::<u8>() {
+			Err(e) => None,
+			Ok(v) => {
+				if v < 1 || v > 30 {
+					None
+				} else {
+					Some(TTLField{ data: String::from(trimmed) })
+				}
+			}
+		}
+	}
+}
