@@ -16,6 +16,10 @@ lazy_static! {
 	static ref DOMAIN_PATTERN: regex::Regex = 
 		Regex::new(r"^([a-zA-Z0-9\-]+\.)+[a-zA-Z0-9\-]+$")
 		.unwrap();
+
+	static ref INDEX_PATTERN: regex::Regex = 
+		Regex::new(r"^\d+$")
+		.unwrap();
 }
 
 #[derive(Debug, PartialEq, PartialOrd, Clone, Copy)]
@@ -404,9 +408,11 @@ impl fmt::Display for IndexField {
 impl IndexField {
 	pub fn from(s: &str) -> Option<IndexField> {
 
-		// TODO: Implement IndexField::from()
-		
-		None
+		if !INDEX_PATTERN.is_match(s) {
+			return None
+		}
+
+		Some(IndexField{ data:String::from(s) })
 	}
 }
 
