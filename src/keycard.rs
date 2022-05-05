@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::fmt;
+use chrono::prelude::*;
 use regex::Regex;
 use lazy_static::lazy_static;
 use eznacl::*;
@@ -667,6 +668,82 @@ impl TTLField {
 					Some(TTLField{ data: String::from(trimmed) })
 				}
 			}
+		}
+	}
+}
+
+/// A verified type for handling date fields in keycards
+#[derive(Debug, PartialEq, PartialOrd, Clone)]
+pub struct DateField {
+	data: String
+}
+
+impl fmt::Display for DateField {
+
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		write!(f, "{}", self.data)
+	}
+}
+
+impl DateField {
+
+	pub fn generate() -> DateField {
+
+		let utc: DateTime<Utc> = Utc::now();
+		let formatted = utc.format("%Y%m%d");
+
+		DateField{ data: String::from(formatted.to_string()) }
+	}
+	
+	pub fn from(s: &str) -> Option<DateField> {
+
+		let trimmed = s.trim();
+
+		match chrono::NaiveDate::parse_from_str(trimmed, "%Y%m%d") {
+			Ok(v) => {
+				Some(DateField{ data: String::from(trimmed) })
+			},
+			Err(_) => {
+				 None
+			},
+		}
+	}
+}
+
+/// A verified type for handling date fields in keycards
+#[derive(Debug, PartialEq, PartialOrd, Clone)]
+pub struct DateTimeField {
+	data: String
+}
+
+impl fmt::Display for DateTimeField {
+
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		write!(f, "{}", self.data)
+	}
+}
+
+impl DateTimeField {
+
+	pub fn generate() -> DateTimeField {
+
+		let utc: DateTime<Utc> = Utc::now();
+		let formatted = utc.format("%Y%m%dT%H%M%SZ");
+
+		DateTimeField{ data: String::from(formatted.to_string()) }
+	}
+	
+	pub fn from(s: &str) -> Option<DateTimeField> {
+
+		let trimmed = s.trim();
+
+		match chrono::NaiveDateTime::parse_from_str(trimmed, "%Y%m%dT%H%M%SZ") {
+			Ok(v) => {
+				Some(DateTimeField{ data: String::from(trimmed) })
+			},
+			Err(_) => {
+				 None
+			},
 		}
 	}
 }
