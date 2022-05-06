@@ -551,6 +551,17 @@ pub struct IndexField {
 	data: String
 }
 
+impl VerifiedString for IndexField {
+
+	fn get(&self) -> &str {
+		&self.data
+	}
+
+	fn _type() -> &'static str {
+		return "IndexField"
+	}
+}
+
 impl fmt::Display for IndexField {
 
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -573,6 +584,17 @@ impl IndexField {
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub struct NameField {
 	data: String
+}
+
+impl VerifiedString for NameField {
+
+	fn get(&self) -> &str {
+		&self.data
+	}
+
+	fn _type() -> &'static str {
+		return "NameField"
+	}
 }
 
 impl fmt::Display for NameField {
@@ -610,6 +632,17 @@ pub struct WIDField {
 	data: String
 }
 
+impl VerifiedString for WIDField {
+
+	fn get(&self) -> &str {
+		&self.data
+	}
+
+	fn _type() -> &'static str {
+		return "WIDField"
+	}
+}
+
 impl fmt::Display for WIDField {
 
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -640,6 +673,17 @@ impl WIDField {
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub struct TTLField {
 	data: String
+}
+
+impl VerifiedString for TTLField {
+
+	fn get(&self) -> &str {
+		&self.data
+	}
+
+	fn _type() -> &'static str {
+		return "TTLField"
+	}
 }
 
 impl fmt::Display for TTLField {
@@ -678,6 +722,17 @@ pub struct DateField {
 	data: String
 }
 
+impl VerifiedString for DateField {
+
+	fn get(&self) -> &str {
+		&self.data
+	}
+
+	fn _type() -> &'static str {
+		return "DateField"
+	}
+}
+
 impl fmt::Display for DateField {
 
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -714,6 +769,17 @@ impl DateField {
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub struct DateTimeField {
 	data: String
+}
+
+impl VerifiedString for DateTimeField {
+
+	fn get(&self) -> &str {
+		&self.data
+	}
+
+	fn _type() -> &'static str {
+		return "DateTimeField"
+	}
 }
 
 impl fmt::Display for DateTimeField {
