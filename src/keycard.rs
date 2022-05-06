@@ -861,6 +861,10 @@ impl DateField {
 			},
 		}
 	}
+
+	fn value(&self) -> &NaiveDate {
+		&self.value
+	}
 }
 
 /// A verified type for handling timestamp fields in keycards
@@ -916,6 +920,10 @@ impl DateTimeField {
 				 None
 			},
 		}
+	}
+
+	fn value(&self) -> &NaiveDateTime {
+		&self.value
 	}
 }
 
