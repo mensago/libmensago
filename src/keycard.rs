@@ -21,22 +21,102 @@ lazy_static! {
 		.unwrap();
 }
 
+/// Enumerated type for all keycard entry fields
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
+pub enum EntryFieldType {
+	Index,
+	Name,
+	WorkspaceID,
+	UserID,
+	Domain,
+	ContactRequestVerificationKey,
+	ContactRequestEncryptionKey,
+	EncryptionKey,
+	VerificationKey,
+	TimeToLive,
+	Expires,
+	Timestamp,
+	Language,
+	PrimaryVerificationKey,
+	SecondaryVerificationKey,
+	ContactAdmin,
+	ContactAbuse,
+	ContactSupport,
+}
+
+impl EntryFieldType {
+
+	pub fn from(s: &str) -> Option<EntryFieldType> {
+
+		match s {
+			"Index" => Some(EntryFieldType::Index),
+			"Name" => Some(EntryFieldType::Name),
+			"WorkspaceID" => Some(EntryFieldType::WorkspaceID),
+			"UserID" => Some(EntryFieldType::UserID),
+			"Domain" => Some(EntryFieldType::Domain),
+			"ContactRequestVerificationKey" => Some(EntryFieldType::ContactRequestVerificationKey),
+			"ContactRequestEncryptionKey" => Some(EntryFieldType::ContactRequestEncryptionKey),
+			"EncryptionKey" => Some(EntryFieldType::EncryptionKey),
+			"VerificationKey" => Some(EntryFieldType::VerificationKey),
+			"TimeToLive" => Some(EntryFieldType::TimeToLive),
+			"Expires" => Some(EntryFieldType::Expires),
+			"Timestamp" => Some(EntryFieldType::Timestamp),
+			"Language" => Some(EntryFieldType::Language),
+			"PrimaryVerificationKey" => Some(EntryFieldType::PrimaryVerificationKey),
+			"SecondaryVerificationKey" => Some(EntryFieldType::SecondaryVerificationKey),
+			"ContactAdmin" => Some(EntryFieldType::ContactAdmin),
+			"ContactAbuse" => Some(EntryFieldType::ContactAbuse),
+			"ContactSupport" => Some(EntryFieldType::ContactSupport),
+
+			_ => None,
+		}
+	}
+}
+
+impl fmt::Display for EntryFieldType {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			EntryFieldType::Index => write!(f, "Index"),
+			EntryFieldType::Name => write!(f, "Name"),
+			EntryFieldType::WorkspaceID => write!(f, "WorkspaceID"),
+			EntryFieldType::UserID => write!(f, "UserID"),
+			EntryFieldType::Domain => write!(f, "Domain"),
+			EntryFieldType::ContactRequestVerificationKey => write!(f, "ContactRequestVerificationKey"),
+			EntryFieldType::ContactRequestEncryptionKey => write!(f, "ContactRequestEncryptionKey"),
+			EntryFieldType::EncryptionKey => write!(f, "EncryptionKey"),
+			EntryFieldType::VerificationKey => write!(f, "VerificationKey"),
+			EntryFieldType::TimeToLive => write!(f, "TimeToLive"),
+			EntryFieldType::Expires => write!(f, "Expires"),
+			EntryFieldType::Timestamp => write!(f, "Timestamp"),
+			EntryFieldType::Language => write!(f, "Language"),
+			EntryFieldType::PrimaryVerificationKey => write!(f, "PrimaryVerificationKey"),
+			EntryFieldType::SecondaryVerificationKey => write!(f, "SecondaryVerificationKey"),
+			EntryFieldType::ContactAdmin => write!(f, "ContactAdmin"),
+			EntryFieldType::ContactAbuse => write!(f, "ContactAbuse"),
+			EntryFieldType::ContactSupport => write!(f, "ContactSupport"),
+		}
+	}
+}
+
 /// The KeycardEntry trait provides implementation-specific keycard methods
 pub trait KeycardEntry {
 	/// Returns the type of keycard
 	fn get_type(&self) -> EntryType;
 	
 	/// Gets the specified field for an entry
-	fn get_field(&self, field_name: &str) -> Result<String, MensagoError>;
+	fn get_field(&self, field: &EntryFieldType) -> Result<String, MensagoError>;
 
 	/// Sets an entry field
-	fn set_field(&mut self, field_name: &str, field_value: &str) -> Result<(), MensagoError>;
+	fn set_field(&mut self, field: &EntryFieldType, value: &str) -> Result<(), MensagoError>;
 
-	/// Sets multiple entry fields
-	fn set_fields(&mut self, fields: &HashMap<String, String>) -> Result<(), MensagoError>;
+	/// Sets multiple entry fields from a list of type-value mappings
+	fn set_fields(&mut self, fields: &Vec<(EntryFieldType, String)>) -> Result<(), MensagoError>;
+
+	/// Sets multiple entry fields from a list of string-string mappings
+	fn set_fields_str(&mut self, fields: &Vec<(String, String)>) -> Result<(), MensagoError>;
 
 	/// Deletes a field from the entry
-	fn delete_field(&mut self, field_name: &str) -> Result<(), MensagoError>;
+	fn delete_field(&mut self, field: &EntryFieldType) -> Result<(), MensagoError>;
 
 	/// Returns false if the data in any of the regular fields is not compliant
 	fn is_data_compliant(&self) -> Result<bool, MensagoError>;
@@ -388,7 +468,7 @@ impl SignatureBlock for OrgSigBlock {
 // OrgEntry is an entry for an organizational keycard
 struct OrgEntry {
 	_type: EntryType,
-	fields: HashMap<String, String>,
+	fields: HashMap<EntryFieldType, String>,
 }
 
 
@@ -420,7 +500,7 @@ impl OrgEntry {
 
 	pub fn new(&mut self) {
 		self._type = EntryType::Organization;
-		self.fields = HashMap::<String, String>::new();
+		self.fields = HashMap::<EntryFieldType, String>::new();
 	}
 }
 
@@ -430,13 +510,9 @@ impl KeycardEntry for OrgEntry {
 		self._type
 	}
 	
-	fn get_field(&self, field_name: &str) -> Result<String, MensagoError> {
+	fn get_field(&self, field: &EntryFieldType) -> Result<String, MensagoError> {
 
-		if field_name.len() < 1 {
-			return Err(MensagoError::ErrEmptyData)
-		}
-
-		match self.fields.get(field_name) {
+		match self.fields.get(field) {
 			Some(v) => {
 				Ok(*v)
 			},
@@ -446,17 +522,13 @@ impl KeycardEntry for OrgEntry {
 		}
 	}
 
-	fn set_field(&mut self, field_name: &str, field_value: &str) -> Result<(), MensagoError> {
+	fn set_field(&mut self, field: &EntryFieldType, value: &str) -> Result<(), MensagoError> {
 
-		if field_name.len() < 1 {
-			return Err(MensagoError::ErrEmptyData)
-		}
-
-		let _ = self.fields.insert(String::from(field_name), String::from(field_value));		
+		let _ = self.fields.insert(*field, String::from(value));
 		Ok(())
 	}
 
-	fn set_fields(&mut self, fields: &HashMap<String, String>) -> Result<(), MensagoError> {
+	fn set_fields(&mut self, fields: &Vec<(EntryFieldType, String)>) -> Result<(), MensagoError> {
 
 		if fields.len() < 1 {
 			return Err(MensagoError::ErrEmptyData)
@@ -471,13 +543,28 @@ impl KeycardEntry for OrgEntry {
 		Ok(())
 	}
 
-	fn delete_field(&mut self, field_name: &str) -> Result<(), MensagoError> {
+	fn set_fields_str(&mut self, fields: &Vec<(String, String)>) -> Result<(), MensagoError> {
 
-		if field_name.len() < 1 {
+		if fields.len() < 1 {
 			return Err(MensagoError::ErrEmptyData)
 		}
+		
+		for (k, v) in fields.iter() {
+			let field = match EntryFieldType::from(k) {
+				Some(v) => v,
+				None => {
+					return Err(MensagoError::ErrBadValue)
+				}
+			};
+			let _ = self.fields.insert(field, *v);
+		}
+		
+		Ok(())
+	}
 
-		let _ = self.fields.remove(field_name);
+	fn delete_field(&mut self, field: &EntryFieldType) -> Result<(), MensagoError> {
+
+		let _ = self.fields.remove(field);
 		Ok(())
 	}
 
