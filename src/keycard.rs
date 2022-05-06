@@ -584,10 +584,26 @@ impl KeycardEntry for OrgEntry {
 
 	fn set_expiration(&self, numdays: Option<&u16>) -> Result<(), MensagoError> {
 
-		// TODO: Implement OrgEntry::set_expiration()
+		let count = match numdays {
+			Some(v) => {
+				// The expiration date may be no longer than 3 years
+				if *v > 1095 {
+					return Err(MensagoError::ErrBadValue)
+				}
+				*v
+			},
+			None => {
+				if self._type == EntryType::Organization {
+					365
+				} else {
+					90
+				}
+			}
+		};
 
+		self.set_field(&EntryFieldType::Expires, &count.to_string())?;
 
-		Err(MensagoError::ErrUnimplemented)
+		Ok(())
 	}
 
 	/// Returns true if the entry has exceeded its expiration date
