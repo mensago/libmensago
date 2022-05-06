@@ -810,7 +810,8 @@ impl TTLField {
 /// A verified type for handling date fields in keycards
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub struct DateField {
-	data: String
+	data: String,
+	value: NaiveDate,
 }
 
 impl VerifiedString for DateField {
@@ -835,10 +836,13 @@ impl DateField {
 
 	pub fn generate() -> DateField {
 
-		let utc: DateTime<Utc> = Utc::now();
+		let utc: Date<Utc> = Utc::now().date();
 		let formatted = utc.format("%Y%m%d");
 
-		DateField{ data: String::from(formatted.to_string()) }
+		DateField{
+			data: String::from(formatted.to_string()),
+			value: utc.naive_utc(),
+		}
 	}
 	
 	pub fn from(s: &str) -> Option<DateField> {
@@ -847,7 +851,10 @@ impl DateField {
 
 		match chrono::NaiveDate::parse_from_str(trimmed, "%Y%m%d") {
 			Ok(v) => {
-				Some(DateField{ data: String::from(trimmed) })
+				Some(DateField {
+					data: String::from(trimmed),
+					value: v,
+				})
 			},
 			Err(_) => {
 				 None
@@ -859,7 +866,8 @@ impl DateField {
 /// A verified type for handling timestamp fields in keycards
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub struct DateTimeField {
-	data: String
+	data: String,
+	value: NaiveDateTime,
 }
 
 impl VerifiedString for DateTimeField {
@@ -887,7 +895,10 @@ impl DateTimeField {
 		let utc: DateTime<Utc> = Utc::now();
 		let formatted = utc.format("%Y%m%dT%H%M%SZ");
 
-		DateTimeField{ data: String::from(formatted.to_string()) }
+		DateTimeField {
+			data: String::from(formatted.to_string()),
+			value: utc.naive_utc(),
+		}
 	}
 	
 	pub fn from(s: &str) -> Option<DateTimeField> {
@@ -896,7 +907,10 @@ impl DateTimeField {
 
 		match chrono::NaiveDateTime::parse_from_str(trimmed, "%Y%m%dT%H%M%SZ") {
 			Ok(v) => {
-				Some(DateTimeField{ data: String::from(trimmed) })
+				Some(DateTimeField {
+					data: String::from(trimmed),
+					value: v,
+				})
 			},
 			Err(_) => {
 				 None
