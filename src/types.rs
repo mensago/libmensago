@@ -86,6 +86,19 @@ impl KeyCategory {
 	}
 }
 
+/// The VerifiedString trait is for read-only string data types. These types are intended to
+/// reduce the need for error-checking code by ensuring that the data carried is valid and is
+/// validated at time of instantiation. Because these data types are immutable and verified as
+/// valid upon creation, they can be freely passed around without concern
+pub trait VerifiedString {
+
+	/// Returns the string value of the object
+	fn get(&self) -> &str;
+
+	/// Returns a string version of the object's type
+	fn _type() -> &'static str;
+}
+
 /// The RandomID class is similar to v4 UUIDs. To obtain the maximum amount of entropy, all bits
 /// are random and no version information is stored in them. The only null value for the RandomID
 /// is all zeroes. Lastly, the only permissible format for the string version of the RandomID
@@ -133,6 +146,17 @@ impl RandomID {
 		&self.data
 	}
 
+}
+
+impl VerifiedString for RandomID {
+
+	fn get(&self) -> &str {
+		self.as_string()
+	}
+
+	fn _type() -> &'static str {
+		return "RandomID"
+	}
 }
 
 impl fmt::Display for RandomID {
@@ -196,6 +220,17 @@ impl UserID {
 	}
 }
 
+impl VerifiedString for UserID {
+
+	fn get(&self) -> &str {
+		self.as_string()
+	}
+
+	fn _type() -> &'static str {
+		return "UserID"
+	}
+}
+
 impl fmt::Display for UserID {
 
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -229,6 +264,17 @@ impl Domain {
 	/// Returns the Domain as a string
 	pub fn as_string(&self) -> &str {
 		&self.data
+	}
+}
+
+impl VerifiedString for Domain {
+
+	fn get(&self) -> &str {
+		self.as_string()
+	}
+
+	fn _type() -> &'static str {
+		return "Domain"
 	}
 }
 
