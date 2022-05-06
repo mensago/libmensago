@@ -142,6 +142,15 @@ pub enum EntryType {
 	User
 }
 
+impl fmt::Display for EntryType {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			EntryType::Organization => write!(f, "Organization"),
+			EntryType::User => write!(f, "User"),
+		}
+	}
+}
+
 /// The AuthStr type is used to specify authentication strings used in keycard entries. These can
 /// either be cryptographic hashes or digital signatures.
 #[derive(Debug, PartialEq, PartialOrd)]
@@ -472,28 +481,28 @@ struct OrgEntry {
 }
 
 
-static org_field_names: [&str; 11] = [
-	"Index",
-	"Name",
-	"Contact-Admin",
-	"Contact-Abuse",
-	"Contact-Support",
-	"Language",
-	"Primary-Verification-Key",
-	"Secondary-Verification-Key",
-	"Time-To-Live",
-	"Expires",
-	"Timestamp",
+static org_fields: [&EntryFieldType; 11] = [
+	&EntryFieldType::Index,
+	&EntryFieldType::Name,
+	&EntryFieldType::ContactAdmin,
+	&EntryFieldType::ContactAbuse,
+	&EntryFieldType::ContactSupport,
+	&EntryFieldType::Language,
+	&EntryFieldType::PrimaryVerificationKey,
+	&EntryFieldType::SecondaryVerificationKey,
+	&EntryFieldType::TimeToLive,
+	&EntryFieldType::Expires,
+	&EntryFieldType::Timestamp,
 ];
 
-static org_required_fields: [&str; 7] = [
-	"Index",
-	"Name",
-	"Contact-Admin",
-	"Primary-Verification-Key",
-	"Time-To-Live",
-	"Expires",
-	"Timestamp",
+static org_required_fields: [&EntryFieldType; 7] = [
+	&EntryFieldType::Index,
+	&EntryFieldType::Name,
+	&EntryFieldType::ContactAdmin,
+	&EntryFieldType::PrimaryVerificationKey,
+	&EntryFieldType::TimeToLive,
+	&EntryFieldType::Expires,
+	&EntryFieldType::Timestamp,
 ];
 
 impl OrgEntry {
@@ -640,8 +649,18 @@ impl KeycardEntry for OrgEntry {
 	/// Returns the entire text of the entry minus any signatures or hashes
 	fn get_text(&self, signature_level: AuthStrType, include_auth: &bool)
 		-> Result<(), MensagoError> {
+		
+		let lines = Vec::<String>::new();
+		
+		// First line of an entry must be the type
+		lines.push(String::from("Type:")+&self._type.to_string());
 
-		// TODO: Implement OrgEntry::get_text()
+		for (k,v) in self.fields.iter() {
+			let parts = [k.to_string(), *v];
+			lines.push(parts.join(":"));
+		}
+
+		// TODO: Finish implementing OrgEntry::get_text()
 
 		Err(MensagoError::ErrUnimplemented)
 	}
