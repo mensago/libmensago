@@ -769,7 +769,7 @@ impl DateField {
 	}
 }
 
-/// A verified type for handling date fields in keycards
+/// A verified type for handling timestamp fields in keycards
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub struct DateTimeField {
 	data: String
@@ -818,6 +818,7 @@ impl DateTimeField {
 	}
 }
 
+/// A verified type for handling the language field in org keycards
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub struct LanguageField {
 	data: String
