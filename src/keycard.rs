@@ -586,15 +586,39 @@ impl KeycardEntry for OrgEntry {
 
 		// TODO: Implement OrgEntry::set_expiration()
 
+
 		Err(MensagoError::ErrUnimplemented)
 	}
 
 	/// Returns true if the entry has exceeded its expiration date
 	fn is_expired(&self) -> Result<bool, MensagoError> {
 
-		// TODO: Implement OrgEntry::is_expired()
+		// Yes, it would make more sense to simply have a stored value which was already parsed,
+		// but the necessary code to do the dynamic dispatch to handle this would probably increase
+		// complexity by an order of magnitude. We'll sacrifice a tiny bit of performance for 
+		// simplicity.
+		let expdate = match self.fields.get(&EntryFieldType::Expires) {
+			Some(v) => {
+				match NaiveDate::parse_from_str(v, "%Y%m%d") {
+					Ok(d) => d,
+					Err(e) => {
+						// We should never be here
+						return Err(MensagoError::ErrProgramException(e.to_string()))
+					}
+				}
+			},
+			None => {
+				return Err(MensagoError::ErrNotFound)
+			}
+		};
 
-		Err(MensagoError::ErrUnimplemented)
+		let now = Utc::now().date().naive_utc();
+
+		if now > expdate {
+			Ok(true)
+		} else {
+			Ok(false)
+		}
 	}
 	
 	/// Returns the entire text of the entry minus any signatures or hashes
@@ -810,8 +834,7 @@ impl TTLField {
 /// A verified type for handling date fields in keycards
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub struct DateField {
-	data: String,
-	value: NaiveDate,
+	data: String
 }
 
 impl VerifiedString for DateField {
@@ -839,10 +862,7 @@ impl DateField {
 		let utc: Date<Utc> = Utc::now().date();
 		let formatted = utc.format("%Y%m%d");
 
-		DateField{
-			data: String::from(formatted.to_string()),
-			value: utc.naive_utc(),
-		}
+		DateField{ data: String::from(formatted.to_string()) }
 	}
 	
 	pub fn from(s: &str) -> Option<DateField> {
@@ -851,19 +871,12 @@ impl DateField {
 
 		match chrono::NaiveDate::parse_from_str(trimmed, "%Y%m%d") {
 			Ok(v) => {
-				Some(DateField {
-					data: String::from(trimmed),
-					value: v,
-				})
+				Some(DateField { data: String::from(trimmed) })
 			},
 			Err(_) => {
 				 None
 			},
 		}
-	}
-
-	fn value(&self) -> &NaiveDate {
-		&self.value
 	}
 }
 
@@ -871,7 +884,6 @@ impl DateField {
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub struct DateTimeField {
 	data: String,
-	value: NaiveDateTime,
 }
 
 impl VerifiedString for DateTimeField {
@@ -899,10 +911,7 @@ impl DateTimeField {
 		let utc: DateTime<Utc> = Utc::now();
 		let formatted = utc.format("%Y%m%dT%H%M%SZ");
 
-		DateTimeField {
-			data: String::from(formatted.to_string()),
-			value: utc.naive_utc(),
-		}
+		DateTimeField { data: String::from(formatted.to_string()) }
 	}
 	
 	pub fn from(s: &str) -> Option<DateTimeField> {
@@ -911,19 +920,12 @@ impl DateTimeField {
 
 		match chrono::NaiveDateTime::parse_from_str(trimmed, "%Y%m%dT%H%M%SZ") {
 			Ok(v) => {
-				Some(DateTimeField {
-					data: String::from(trimmed),
-					value: v,
-				})
+				Some(DateTimeField { data: String::from(trimmed) })
 			},
 			Err(_) => {
 				 None
 			},
 		}
-	}
-
-	fn value(&self) -> &NaiveDateTime {
-		&self.value
 	}
 }
 
