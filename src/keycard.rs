@@ -15,6 +15,10 @@ lazy_static! {
 	static ref NAME_PATTERN: regex::Regex = 
 		Regex::new(r"\w+")
 		.unwrap();
+	
+	static ref LANGUAGE_PATTERN: regex::Regex = 
+		Regex::new(r"^[a-zA-Z]{2,3}(,[a-zA-Z]{2,3})*?$")
+		.unwrap();
 }
 
 /// The KeycardEntry trait provides implementation-specific keycard methods
@@ -810,6 +814,52 @@ impl DateTimeField {
 			Err(_) => {
 				 None
 			},
+		}
+	}
+}
+
+#[derive(Debug, PartialEq, PartialOrd, Clone)]
+pub struct LanguageField {
+	data: String
+}
+
+impl VerifiedString for LanguageField {
+
+	fn get(&self) -> &str {
+		&self.data
+	}
+
+	fn _type() -> &'static str {
+		return "LanguageField"
+	}
+}
+
+impl fmt::Display for LanguageField {
+
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		write!(f, "{}", self.data)
+	}
+}
+
+impl LanguageField {
+
+	pub fn from(s: &str) -> Option<LanguageField> {
+
+		let trimmed = s.trim();
+		
+		if !LANGUAGE_PATTERN.is_match(s) {
+			return None
+		}
+
+		match trimmed.parse::<u8>() {
+			Err(e) => None,
+			Ok(v) => {
+				if v < 1 || v > 30 {
+					None
+				} else {
+					Some(LanguageField{ data: String::from(trimmed) })
+				}
+			}
 		}
 	}
 }
