@@ -334,6 +334,17 @@ impl MAddress {
 	}
 }
 
+impl VerifiedString for MAddress {
+
+	fn get(&self) -> &str {
+		&self.as_string()
+	}
+
+	fn _type() -> &'static str {
+		return "MAddress"
+	}
+}
+
 impl fmt::Display for MAddress {
 
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -390,6 +401,17 @@ impl WAddress {
 	}
 }
 
+impl VerifiedString for WAddress {
+
+	fn get(&self) -> &str {
+		&self.as_string()
+	}
+
+	fn _type() -> &'static str {
+		return "WAddress"
+	}
+}
+
 impl fmt::Display for WAddress {
 
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -433,6 +455,18 @@ impl ArgonHash {
 		&self.hashtype
 	}
 }
+
+impl VerifiedString for ArgonHash {
+
+	fn get(&self) -> &str {
+		&self.hash
+	}
+
+	fn _type() -> &'static str {
+		return "ArgonHash"
+	}
+}
+
 
 #[cfg(test)]
 mod tests {
