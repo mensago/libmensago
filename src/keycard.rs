@@ -166,7 +166,7 @@ pub enum AuthStrType {
 trait SignatureBlock {
 
 	/// Returns true if the block has the specified authentication string type
-	fn has_authstr(&self, astype: &AuthStrType) -> bool;
+	fn has_authstr(&self, astype: &AuthStrType) -> Result<bool, MensagoError>;
 
 	/// Returns the specified authentication string
 	fn get_authstr(&self, astype: &AuthStrType) -> Result<CryptoString, MensagoError>;
@@ -204,17 +204,28 @@ struct OrgSigBlock {
 
 impl OrgSigBlock {
 
-	fn astype_to_index(astype: &AuthStrType) -> usize {
+	fn astype_to_index(astype: &AuthStrType) -> Result<usize,MensagoError> {
 
 		match astype {
-			// 0 is invalid for the OrgSigBlock type
-			User => 0,
-			Custody => 1,
-			PrevHash => 2,
-			Hash => 3,
-			Organization => 4,
+			User => Err(MensagoError::ErrBadValue),
+			Custody => Ok(0),
+			PrevHash => Ok(1),
+			Hash => Ok(2),
+			Organization => Ok(3),
 		}
 	}
+
+	fn index_to_astype(index: &usize) -> Result<AuthStrType,MensagoError> {
+
+		match index {
+			0 => Ok(AuthStrType::Custody),
+			1 => Ok(AuthStrType::PrevHash),
+			2 => Ok(AuthStrType::Hash),
+			3 => Ok(AuthStrType::Organization),
+			_ => Err(MensagoError::ErrBadValue),
+		}
+	}
+
 }
 
 /// The SignatureBlock implementation for OrgSigBlock. This provides the specific handling for
@@ -229,27 +240,21 @@ impl OrgSigBlock {
 /// automatically verified when the organizational signature is verified.
 impl SignatureBlock for OrgSigBlock {
 
-	fn has_authstr(&self, astype: &AuthStrType) -> bool {
+	fn has_authstr(&self, astype: &AuthStrType) -> Result<bool,MensagoError> {
 	
-		let index = OrgSigBlock::astype_to_index(astype);
-		if index == 0 {
-			return false
-		}
+		let index = OrgSigBlock::astype_to_index(astype)?;
 
-		match self.signatures[index-1] {
-			Some(_) => true,
-			None => false
+		match self.signatures[index] {
+			Some(_) => Ok(true),
+			None => Ok(false)
 		}
 	}
 
 	fn get_authstr(&self, astype: &AuthStrType) -> Result<CryptoString, MensagoError> {
 
-		let index = OrgSigBlock::astype_to_index(astype);
-		if index == 0 {
-			return Err(MensagoError::ErrBadValue)
-		}
+		let index = OrgSigBlock::astype_to_index(astype)?;
 
-		match self.signatures[index-1] {
+		match self.signatures[index] {
 			Some(v) => Ok(v),
 			None => Err(MensagoError::ErrNotFound)
 		}
@@ -265,12 +270,9 @@ impl SignatureBlock for OrgSigBlock {
 	fn add_authstr(&mut self, astype: &AuthStrType, astr: &CryptoString)
 		-> Result<(), MensagoError> {
 
-		let index = OrgSigBlock::astype_to_index(astype);
-		if index == 0 {
-			return Err(MensagoError::ErrBadValue)
-		}
+		let index = OrgSigBlock::astype_to_index(astype)?;
 
-		self.signatures[index-1] = Some(*astr);
+		self.signatures[index] = Some(*astr);
 		
 		Ok(())
 	}
@@ -278,13 +280,15 @@ impl SignatureBlock for OrgSigBlock {
 	fn hash(&mut self, entry: &str, algorithm: &str) -> Result<(), MensagoError> {
 
 		let strings = vec![entry];
-		match self.signatures[OrgSigBlock::astype_to_index(&AuthStrType::Custody)] {
+		let mut index = OrgSigBlock::astype_to_index(&AuthStrType::Custody)?;
+		match self.signatures[index] {
 			Some(v) => {
 				strings.push(&v.to_string())
 			},
 			None => { /* Do nothing if the custody signature doesn't exist */ },
 		};
-		match self.signatures[OrgSigBlock::astype_to_index(&AuthStrType::PrevHash)] {
+		index = OrgSigBlock::astype_to_index(&AuthStrType::PrevHash)?;
+		match self.signatures[index] {
 			Some(v) => {
 				strings.push(&v.to_string())
 			},
@@ -324,19 +328,22 @@ impl SignatureBlock for OrgSigBlock {
 			AuthStrType::Organization => {
 				// The org signature on org cards is the final field, so make sure that we have all
 				// other hashes and signatures included in the verification data if they exist
-				match self.signatures[OrgSigBlock::astype_to_index(&AuthStrType::Custody)] {
+				let mut index = OrgSigBlock::astype_to_index(&AuthStrType::Custody).unwrap();
+				match self.signatures[index] {
 					Some(v) => {
 						strings.push(&v.to_string())
 					},
 					None => { /* Do nothing if the custody signature doesn't exist */ },
 				};
-				match self.signatures[OrgSigBlock::astype_to_index(&AuthStrType::PrevHash)] {
+				index = OrgSigBlock::astype_to_index(&AuthStrType::PrevHash).unwrap();
+				match self.signatures[index] {
 					Some(v) => {
 						strings.push(&v.to_string())
 					},
 					None => { /* Not a big deal if the previous hash field doesn't exist */ },
 				};
-				match self.signatures[OrgSigBlock::astype_to_index(&AuthStrType::Hash)] {
+				index = OrgSigBlock::astype_to_index(&AuthStrType::Hash).unwrap();
+				match self.signatures[index] {
 					Some(v) => {
 						strings.push(&v.to_string())
 					},
@@ -369,7 +376,8 @@ impl SignatureBlock for OrgSigBlock {
 			},
 			AuthStrType::Custody => {
 
-				match self.signatures[OrgSigBlock::astype_to_index(astype)] {
+				let mut index = OrgSigBlock::astype_to_index(&AuthStrType::Custody).unwrap();
+				match self.signatures[index] {
 					Some(v) => v,
 					None => return Err(MensagoError::ErrNotFound),
 				}
@@ -388,20 +396,22 @@ impl SignatureBlock for OrgSigBlock {
 				// wants to do this, we'll humor them. ;)
 				
 				// The Hash field includes the Custody Signature and PrevHash fields if present
-				match self.signatures[OrgSigBlock::astype_to_index(&AuthStrType::Custody)] {
+				let mut index = OrgSigBlock::astype_to_index(&AuthStrType::Custody).unwrap();
+				match self.signatures[index] {
 					Some(v) => {
 						strings.push(&v.to_string())
 					},
 					None => { /* Do nothing if the custody signature doesn't exist */ },
 				};
-				match self.signatures[OrgSigBlock::astype_to_index(&AuthStrType::PrevHash)] {
+				index = OrgSigBlock::astype_to_index(&AuthStrType::PrevHash).unwrap();
+				match self.signatures[index] {
 					Some(v) => {
 						strings.push(&v.to_string())
 					},
 					None => { /* Not a big deal if the previous hash field doesn't exist */ },
 				};
-
-				match self.signatures[OrgSigBlock::astype_to_index(astype)] {
+				index = OrgSigBlock::astype_to_index(&AuthStrType::Hash).unwrap();
+				match self.signatures[index] {
 					Some(v) => v,
 					None => return Err(MensagoError::ErrNotFound),
 				}
@@ -410,19 +420,22 @@ impl SignatureBlock for OrgSigBlock {
 				
 				// The org signature on org cards is the final field, so make sure that we have all
 				// other hashes and signatures included in the verification data if they exist
-				match self.signatures[OrgSigBlock::astype_to_index(&AuthStrType::Custody)] {
+				let mut index = OrgSigBlock::astype_to_index(&AuthStrType::Custody).unwrap();
+				match self.signatures[index] {
 					Some(v) => {
 						strings.push(&v.to_string())
 					},
 					None => { /* Do nothing if the custody signature doesn't exist */ },
 				};
-				match self.signatures[OrgSigBlock::astype_to_index(&AuthStrType::PrevHash)] {
+				index = OrgSigBlock::astype_to_index(&AuthStrType::PrevHash).unwrap();
+				match self.signatures[index] {
 					Some(v) => {
 						strings.push(&v.to_string())
 					},
 					None => { /* Not a big deal if the previous hash field doesn't exist */ },
 				};
-				match self.signatures[OrgSigBlock::astype_to_index(&AuthStrType::Hash)] {
+				index = OrgSigBlock::astype_to_index(&AuthStrType::Hash).unwrap();
+				match self.signatures[index] {
 					Some(v) => {
 						strings.push(&v.to_string())
 					},
@@ -434,7 +447,8 @@ impl SignatureBlock for OrgSigBlock {
 					},
 				};
 
-				match self.signatures[OrgSigBlock::astype_to_index(astype)] {
+				index = OrgSigBlock::astype_to_index(astype)?;
+				match self.signatures[index] {
 					Some(v) => v,
 					None => return Err(MensagoError::ErrNotFound),
 				}
@@ -454,8 +468,8 @@ impl SignatureBlock for OrgSigBlock {
 				}
 			}			
 			AuthStrType::Organization => {
-				let cardhash = match self.signatures[
-						OrgSigBlock::astype_to_index(&AuthStrType::Hash)] {
+				let index = OrgSigBlock::astype_to_index(&AuthStrType::Hash).unwrap();
+				let cardhash = match self.signatures[index] {
 					Some(v) => v,
 					None => { 
 						// It does matter if the hash hasn't yet been generated. Although we *could*
