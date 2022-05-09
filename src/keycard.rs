@@ -171,6 +171,9 @@ trait SignatureBlock {
 	/// Returns the specified authentication string
 	fn get_authstr(&self, astype: &AuthStrType) -> Result<CryptoString, MensagoError>;
 
+	/// Returns a list of authentication strings in order of their need to appear in a keycard entry
+	fn get_text(&self, aslevel: &AuthStrType) -> Result<Vec::<CryptoString>, MensagoError>;
+
 	/// Sets the specified authentication string to the value passed. NOTE: no validation of the
 	/// authentication string is performed by this call. The primary use for this method is to set
 	/// the previous hash for the signature block
@@ -250,6 +253,13 @@ impl SignatureBlock for OrgSigBlock {
 			Some(v) => Ok(v),
 			None => Err(MensagoError::ErrNotFound)
 		}
+	}
+
+	fn get_text(&self, aslevel: &AuthStrType) -> Result<Vec::<CryptoString>, MensagoError> {
+
+		// TODO: Implement OrgSigBlock::get_text()
+		
+		Err(MensagoError::ErrUnimplemented)
 	}
 
 	fn add_authstr(&mut self, astype: &AuthStrType, astr: &CryptoString)
