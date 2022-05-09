@@ -261,8 +261,13 @@ impl SignatureBlock for OrgSigBlock {
 	}
 
 	fn get_text(&self, aslevel: &AuthStrType) -> Result<Vec::<CryptoString>, MensagoError> {
-
-		// TODO: Implement OrgSigBlock::get_text()
+		
+		let lastindex = OrgSigBlock::astype_to_index(aslevel)?;
+		for i in [0..=lastindex] {
+			
+		}
+		
+		// TODO: Finish implementing OrgSigBlock::get_text()
 		
 		Err(MensagoError::ErrUnimplemented)
 	}
