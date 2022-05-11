@@ -226,6 +226,9 @@ impl OrgSigBlock {
 		}
 	}
 
+	pub fn new() -> OrgSigBlock {
+		OrgSigBlock { signatures: [None; 4].clone() }
+	}
 }
 
 /// The SignatureBlock implementation for OrgSigBlock. This provides the specific handling for
@@ -549,9 +552,12 @@ static ORG_REQUIRED_FIELDS: [&EntryFieldType; 7] = [
 
 impl OrgEntry {
 
-	pub fn new(&mut self) {
-		self._type = EntryType::Organization;
-		self.fields = HashMap::<EntryFieldType, String>::new();
+	pub fn new() -> OrgEntry {
+		OrgEntry {
+			_type: EntryType::Organization,
+			fields: HashMap::<EntryFieldType, String>::new(),
+			sigs: OrgSigBlock::new(),
+		}
 	}
 }
 
@@ -1135,7 +1141,22 @@ mod tests {
 
 	fn orgentry_set_field() -> Result<(), String> {
 		
-		// TODO: Implement orgentry_set_field()
+		let entry = crate::keycard::OrgEntry::new();
+		assert_eq!(entry.set_field(&EntryFieldType::Name, "Corbin Simons"), Ok(()),
+			"orgentry_set_field failed");
+
+		Ok(())
+	}
+
+	fn orgentry_set_fields() -> Result<(), String> {
+		
+		let testdata = vec![
+			(EntryFieldType::Name, String::from("Example, Inc.")),
+			(EntryFieldType::ContactAdmin, String::from("11111111-1111-1111-1111-111111111111/example.com")),
+		];
+		let entry = crate::keycard::OrgEntry::new();
+		assert_eq!(entry.set_fields(&testdata), Ok(()),
+			"orgentry_set_field failed");
 
 		Ok(())
 	}
