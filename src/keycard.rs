@@ -227,7 +227,7 @@ impl OrgSigBlock {
 	}
 
 	pub fn new() -> OrgSigBlock {
-		OrgSigBlock { signatures: [None; 4].clone() }
+		OrgSigBlock { signatures: [None, None, None, None].clone() }
 	}
 }
 
