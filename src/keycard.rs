@@ -523,7 +523,7 @@ struct OrgEntry {
 }
 
 
-static org_fields: [&EntryFieldType; 11] = [
+static ORG_FIELDS: [&EntryFieldType; 11] = [
 	&EntryFieldType::Index,
 	&EntryFieldType::Name,
 	&EntryFieldType::ContactAdmin,
@@ -537,7 +537,7 @@ static org_fields: [&EntryFieldType; 11] = [
 	&EntryFieldType::Timestamp,
 ];
 
-static org_required_fields: [&EntryFieldType; 7] = [
+static ORG_REQUIRED_FIELDS: [&EntryFieldType; 7] = [
 	&EntryFieldType::Index,
 	&EntryFieldType::Name,
 	&EntryFieldType::ContactAdmin,
@@ -623,7 +623,7 @@ impl KeycardEntry for OrgEntry {
 
 		// Ensure that all required fields are present. Because each field is a ValidatedString, we
 		// already know that if the field is present, it's valid, too. :)
-		for f in org_required_fields {
+		for f in ORG_REQUIRED_FIELDS {
 			match self.fields.get(f) {
 				Some(_) => { /* do nothing */ },
 				None => {
@@ -760,7 +760,7 @@ impl KeycardEntry for OrgEntry {
 	}
 }
 
-static user_field_names: [&str; 12] = [
+static USER_FIELDS: [&str; 12] = [
 	"Index",
 	"Name",
 	"Workspace-ID",
@@ -775,7 +775,7 @@ static user_field_names: [&str; 12] = [
 	"Timestamp",
 ];
 
-static user_required_fields: [&str; 10] = [
+static USER_REQUIRED_FIELDS: [&str; 10] = [
 	"Index",
 	"Workspace-ID",
 	"Domain",
