@@ -126,17 +126,17 @@ pub trait KeycardEntry {
 	fn is_compliant(&self) -> Result<bool, MensagoError>;
 
 	/// Sets the expiration date for the entry
-	fn set_expiration(&self, numdays: Option<&u16>) -> Result<(), MensagoError>;
+	fn set_expiration(&mut self, numdays: Option<&u16>) -> Result<(), MensagoError>;
 
 	/// Returns true if the entry has exceeded its expiration date
 	fn is_expired(&self) -> Result<bool, MensagoError>;
 	
 	/// Returns the entire text of the entry minus any signatures or hashes
-	fn get_text(&self, signature_level: AuthStrType, include_auth: &bool)
-		-> Result<(), MensagoError>;
+	fn get_text(&self, signature_level: &AuthStrType, include_auth: bool)
+		-> Result<String, MensagoError>;
 }
 
-#[derive(Debug, PartialEq, PartialOrd)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
 pub enum EntryType {
 	Organization,
 	User
@@ -207,11 +207,11 @@ impl OrgSigBlock {
 	fn astype_to_index(astype: &AuthStrType) -> Result<usize,MensagoError> {
 
 		match astype {
-			User => Err(MensagoError::ErrBadValue),
-			Custody => Ok(0),
-			PrevHash => Ok(1),
-			Hash => Ok(2),
-			Organization => Ok(3),
+			AuthStrType::User => Err(MensagoError::ErrBadValue),
+			AuthStrType::Custody => Ok(0),
+			AuthStrType::PrevHash => Ok(1),
+			AuthStrType::Hash => Ok(2),
+			AuthStrType::Organization => Ok(3),
 		}
 	}
 
@@ -254,24 +254,24 @@ impl SignatureBlock for OrgSigBlock {
 
 		let index = OrgSigBlock::astype_to_index(astype)?;
 
-		match self.signatures[index] {
-			Some(v) => Ok(v),
+		match &self.signatures[index] {
+			Some(v) => Ok(v.clone()),
 			None => Err(MensagoError::ErrNotFound)
 		}
 	}
 
 	fn get_text(&self, aslevel: &AuthStrType) -> Result<Vec::<CryptoString>, MensagoError> {
 		
-		let out = Vec::<CryptoString>::new();
+		let mut out = Vec::<CryptoString>::new();
 		let lastindex = OrgSigBlock::astype_to_index(aslevel)?;
-		for item in self.signatures.into_iter().enumerate() {
+		for item in self.signatures.iter().enumerate() {
 			
 			if item.0 > lastindex {
 				break
 			}
 			
 			match item.1 {
-				Some(v) => out.push(v),
+				Some(v) => out.push(v.clone()),
 				None => { /* Do nothing */ },
 			};
 		}
@@ -284,25 +284,27 @@ impl SignatureBlock for OrgSigBlock {
 
 		let index = OrgSigBlock::astype_to_index(astype)?;
 
-		self.signatures[index] = Some(*astr);
+		self.signatures[index] = Some(astr.clone());
 		
 		Ok(())
 	}
 	
 	fn hash(&mut self, entry: &str, algorithm: &str) -> Result<(), MensagoError> {
 
-		let strings = vec![entry];
+		let mut strings = Vec::<String>::new();
+		strings.push(String::from(entry));
+
 		let mut index = OrgSigBlock::astype_to_index(&AuthStrType::Custody)?;
-		match self.signatures[index] {
+		match &self.signatures[index] {
 			Some(v) => {
-				strings.push(&v.to_string())
+				strings.push(v.to_string())
 			},
 			None => { /* Do nothing if the custody signature doesn't exist */ },
 		};
 		index = OrgSigBlock::astype_to_index(&AuthStrType::PrevHash)?;
-		match self.signatures[index] {
+		match &self.signatures[index] {
 			Some(v) => {
-				strings.push(&v.to_string())
+				strings.push(v.to_string())
 			},
 			None => { /* Not a big deal if the previous hash field doesn't exist */ },
 		};
@@ -316,7 +318,8 @@ impl SignatureBlock for OrgSigBlock {
 	fn sign(&mut self, entry: &str, astype: &AuthStrType, signing_pair: &SigningPair)
 		-> Result<(), MensagoError> {
 		
-		let strings = vec![entry];
+		let mut strings = Vec::<String>::new();
+		strings.push(String::from(entry));
 
 		match astype {
 			AuthStrType::User => {
@@ -341,23 +344,23 @@ impl SignatureBlock for OrgSigBlock {
 				// The org signature on org cards is the final field, so make sure that we have all
 				// other hashes and signatures included in the verification data if they exist
 				let mut index = OrgSigBlock::astype_to_index(&AuthStrType::Custody).unwrap();
-				match self.signatures[index] {
+				match &self.signatures[index] {
 					Some(v) => {
-						strings.push(&v.to_string())
+						strings.push(v.to_string())
 					},
 					None => { /* Do nothing if the custody signature doesn't exist */ },
 				};
 				index = OrgSigBlock::astype_to_index(&AuthStrType::PrevHash).unwrap();
-				match self.signatures[index] {
+				match &self.signatures[index] {
 					Some(v) => {
-						strings.push(&v.to_string())
+						strings.push(v.to_string())
 					},
 					None => { /* Not a big deal if the previous hash field doesn't exist */ },
 				};
 				index = OrgSigBlock::astype_to_index(&AuthStrType::Hash).unwrap();
-				match self.signatures[index] {
+				match &self.signatures[index] {
 					Some(v) => {
-						strings.push(&v.to_string())
+						strings.push(v.to_string())
 					},
 					None => { 
 						// It does matter if the hash hasn't yet been generated. Although we *could*
@@ -378,8 +381,9 @@ impl SignatureBlock for OrgSigBlock {
 	fn verify(&mut self, entry: &str, astype: &AuthStrType, verify_key: &dyn VerifySignature) 
 		-> Result<(), MensagoError> {
 		
-		let strings = vec![entry];
-
+		let mut strings = Vec::<String>::new();
+		strings.push(String::from(entry));
+	
 		let sig = match astype {
 			AuthStrType::User => {
 				// Calling the User signature type on an org card indicates a bug in the caller's
@@ -388,8 +392,8 @@ impl SignatureBlock for OrgSigBlock {
 			},
 			AuthStrType::Custody => {
 
-				let mut index = OrgSigBlock::astype_to_index(&AuthStrType::Custody).unwrap();
-				match self.signatures[index] {
+				let index = OrgSigBlock::astype_to_index(&AuthStrType::Custody).unwrap();
+				match &self.signatures[index] {
 					Some(v) => v,
 					None => return Err(MensagoError::ErrNotFound),
 				}
@@ -409,21 +413,21 @@ impl SignatureBlock for OrgSigBlock {
 				
 				// The Hash field includes the Custody Signature and PrevHash fields if present
 				let mut index = OrgSigBlock::astype_to_index(&AuthStrType::Custody).unwrap();
-				match self.signatures[index] {
+				match &self.signatures[index] {
 					Some(v) => {
-						strings.push(&v.to_string())
+						strings.push(v.to_string())
 					},
 					None => { /* Do nothing if the custody signature doesn't exist */ },
 				};
 				index = OrgSigBlock::astype_to_index(&AuthStrType::PrevHash).unwrap();
-				match self.signatures[index] {
+				match &self.signatures[index] {
 					Some(v) => {
-						strings.push(&v.to_string())
+						strings.push(v.to_string())
 					},
 					None => { /* Not a big deal if the previous hash field doesn't exist */ },
 				};
 				index = OrgSigBlock::astype_to_index(&AuthStrType::Hash).unwrap();
-				match self.signatures[index] {
+				match &self.signatures[index] {
 					Some(v) => v,
 					None => return Err(MensagoError::ErrNotFound),
 				}
@@ -433,23 +437,23 @@ impl SignatureBlock for OrgSigBlock {
 				// The org signature on org cards is the final field, so make sure that we have all
 				// other hashes and signatures included in the verification data if they exist
 				let mut index = OrgSigBlock::astype_to_index(&AuthStrType::Custody).unwrap();
-				match self.signatures[index] {
+				match &self.signatures[index] {
 					Some(v) => {
-						strings.push(&v.to_string())
+						strings.push(v.to_string())
 					},
 					None => { /* Do nothing if the custody signature doesn't exist */ },
 				};
 				index = OrgSigBlock::astype_to_index(&AuthStrType::PrevHash).unwrap();
-				match self.signatures[index] {
+				match &self.signatures[index] {
 					Some(v) => {
-						strings.push(&v.to_string())
+						strings.push(v.to_string())
 					},
 					None => { /* Not a big deal if the previous hash field doesn't exist */ },
 				};
 				index = OrgSigBlock::astype_to_index(&AuthStrType::Hash).unwrap();
-				match self.signatures[index] {
+				match &self.signatures[index] {
 					Some(v) => {
-						strings.push(&v.to_string())
+						strings.push(v.to_string())
 					},
 					None => { 
 						// It does matter if the hash hasn't yet been generated. Although we *could*
@@ -460,7 +464,7 @@ impl SignatureBlock for OrgSigBlock {
 				};
 
 				index = OrgSigBlock::astype_to_index(astype)?;
-				match self.signatures[index] {
+				match &self.signatures[index] {
 					Some(v) => v,
 					None => return Err(MensagoError::ErrNotFound),
 				}
@@ -473,7 +477,7 @@ impl SignatureBlock for OrgSigBlock {
 		match *astype {
 			AuthStrType::Hash => {
 				let hash = get_hash(sig.prefix(), totaldata.as_bytes())?;
-				return if hash == sig {
+				return if hash == *sig {
 					Ok(())
 				} else {
 					Err(MensagoError::ErrInvalidKeycard)
@@ -481,7 +485,7 @@ impl SignatureBlock for OrgSigBlock {
 			}			
 			AuthStrType::Organization => {
 				let index = OrgSigBlock::astype_to_index(&AuthStrType::Hash).unwrap();
-				let cardhash = match self.signatures[index] {
+				let cardhash = match &self.signatures[index] {
 					Some(v) => v,
 					None => { 
 						// It does matter if the hash hasn't yet been generated. Although we *could*
@@ -492,12 +496,13 @@ impl SignatureBlock for OrgSigBlock {
 				};
 
 				let hash = get_hash(cardhash.prefix(), totaldata.as_bytes())?;
-				if hash == cardhash {
+				if hash == *cardhash {
 					/* Continue on to signature verification */
 				} else {
 					return Err(MensagoError::ErrInvalidKeycard)
 				}
-			}			
+			},
+			_ => { /* Do nothing for the other types */},
 		}
 
 		if verify_key.verify(totaldata.as_bytes(), &sig)? {
@@ -514,6 +519,7 @@ impl SignatureBlock for OrgSigBlock {
 struct OrgEntry {
 	_type: EntryType,
 	fields: HashMap<EntryFieldType, String>,
+	sigs: OrgSigBlock,
 }
 
 
@@ -559,7 +565,7 @@ impl KeycardEntry for OrgEntry {
 
 		match self.fields.get(field) {
 			Some(v) => {
-				Ok(*v)
+				Ok(v.clone())
 			},
 			None => {
 				Err(MensagoError::ErrNotFound)
@@ -582,7 +588,7 @@ impl KeycardEntry for OrgEntry {
 		// I'm sure there's a more compact way to do this, but I can't figure out what it would be.
 		// :(
 		for (k, v) in fields.iter() {
-			let _ = self.fields.insert(*k, *v);
+			let _ = self.fields.insert(*k, v.clone());
 		}
 		
 		Ok(())
@@ -601,7 +607,7 @@ impl KeycardEntry for OrgEntry {
 					return Err(MensagoError::ErrBadValue)
 				}
 			};
-			let _ = self.fields.insert(field, *v);
+			let _ = self.fields.insert(field, v.clone());
 		}
 		
 		Ok(())
@@ -627,7 +633,7 @@ impl KeycardEntry for OrgEntry {
 		Err(MensagoError::ErrUnimplemented)
 	}
 
-	fn set_expiration(&self, numdays: Option<&u16>) -> Result<(), MensagoError> {
+	fn set_expiration(&mut self, numdays: Option<&u16>) -> Result<(), MensagoError> {
 
 		let count = match numdays {
 			Some(v) => {
@@ -683,22 +689,26 @@ impl KeycardEntry for OrgEntry {
 	}
 	
 	/// Returns the entire text of the entry minus any signatures or hashes
-	fn get_text(&self, signature_level: AuthStrType, include_auth: &bool)
-		-> Result<(), MensagoError> {
+	fn get_text(&self, signature_level: &AuthStrType, include_auth: bool)
+		-> Result<String, MensagoError> {
 		
-		let lines = Vec::<String>::new();
+		let mut lines = Vec::<String>::new();
 		
 		// First line of an entry must be the type
 		lines.push(String::from("Type:")+&self._type.to_string());
 
 		for (k,v) in self.fields.iter() {
-			let parts = [k.to_string(), *v];
+			let parts = [k.to_string(), v.clone()];
 			lines.push(parts.join(":"));
 		}
 
-		// TODO: Finish implementing OrgEntry::get_text()
+		if include_auth {
+			lines.extend(self.sigs.get_text(signature_level)?
+				.iter()
+				.map(|x| x.to_string()));
+		}
 
-		Err(MensagoError::ErrUnimplemented)
+		Ok(lines.join("\r\n"))
 	}
 }
 

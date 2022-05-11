@@ -291,6 +291,7 @@ impl fmt::Display for Domain {
 pub struct MAddress {
 	pub uid: UserID,
 	pub domain: Domain,
+	address: String,
 }
 
 impl MAddress {
@@ -305,7 +306,11 @@ impl MAddress {
 			return None
 		}
 		
-		let out = MAddress { uid: UserID::from_str(parts[0])?, domain: Domain::from_str(parts[1])? };
+		let out = MAddress {
+			uid: UserID::from_str(parts[0])?,
+			domain: Domain::from_str(parts[1])?,
+			address: String::from(format!("{}/{}", parts[0], parts[1])),
+		};
 
 		Some(out)
 	}
@@ -315,6 +320,7 @@ impl MAddress {
 		MAddress {
 			uid: uid.clone(),
 			domain: domain.clone(),
+			address: String::from(format!("{}/{}", uid, domain)),
 		}
 	}
 
@@ -337,7 +343,7 @@ impl MAddress {
 impl VerifiedString for MAddress {
 
 	fn get(&self) -> &str {
-		&self.as_string()
+		&self.address
 	}
 
 	fn _type() -> &'static str {
@@ -358,6 +364,10 @@ impl fmt::Display for MAddress {
 pub struct WAddress {
 	wid: RandomID,
 	domain: Domain,
+
+	// We keep this extra copy around because converting the item to a full string is a very
+	// common operation
+	address: String,
 }
 
 impl WAddress {
@@ -372,7 +382,11 @@ impl WAddress {
 			return None
 		}
 		
-		let out = WAddress { wid: RandomID::from_str(parts[0])?, domain: Domain::from_str(parts[1])? };
+		let out = WAddress { 
+			wid: RandomID::from_str(parts[0])?,
+			domain: Domain::from_str(parts[1])?,
+			address: String::from(format!("{}/{}", parts[0], parts[1])),
+		};
 
 		Some(out)
 	}
@@ -382,6 +396,7 @@ impl WAddress {
 		WAddress {
 			wid: wid.clone(),
 			domain: domain.clone(),
+			address: String::from(format!("{}/{}", wid, domain)),
 		}
 	}
 
@@ -404,7 +419,7 @@ impl WAddress {
 impl VerifiedString for WAddress {
 
 	fn get(&self) -> &str {
-		&self.as_string()
+		&self.address
 	}
 
 	fn _type() -> &'static str {
