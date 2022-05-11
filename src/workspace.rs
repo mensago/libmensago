@@ -261,7 +261,7 @@ impl Workspace {
 		
 		for table_name in ["folders", "sessions", "keys", "messages", "notes"] {
 
-			match conn.execute(format!("DELETE FROM {} WHERE address=?1)", table_name),
+			match conn.execute(&format!("DELETE FROM {} WHERE address=?1)", table_name),
 				[address.as_string()]) {
 				Ok(_) => { /*  */ },
 				Err(e) => {
