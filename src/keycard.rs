@@ -262,14 +262,21 @@ impl SignatureBlock for OrgSigBlock {
 
 	fn get_text(&self, aslevel: &AuthStrType) -> Result<Vec::<CryptoString>, MensagoError> {
 		
+		let out = Vec::<CryptoString>::new();
 		let lastindex = OrgSigBlock::astype_to_index(aslevel)?;
-		for i in [0..=lastindex] {
+		for item in self.signatures.into_iter().enumerate() {
 			
+			if item.0 > lastindex {
+				break
+			}
+			
+			match item.1 {
+				Some(v) => out.push(v),
+				None => { /* Do nothing */ },
+			};
 		}
 		
-		// TODO: Finish implementing OrgSigBlock::get_text()
-		
-		Err(MensagoError::ErrUnimplemented)
+		Ok(out)
 	}
 
 	fn add_authstr(&mut self, astype: &AuthStrType, astr: &CryptoString)
