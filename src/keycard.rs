@@ -621,9 +621,18 @@ impl KeycardEntry for OrgEntry {
 
 	fn is_data_compliant(&self) -> Result<bool, MensagoError> {
 
-		// TODO: Implement OrgEntry::is_data_compliant()
+		// Ensure that all required fields are present. Because each field is a ValidatedString, we
+		// already know that if the field is present, it's valid, too. :)
+		for f in org_required_fields {
+			match self.fields.get(f) {
+				Some(_) => { /* do nothing */ },
+				None => {
+					return Ok(false)
+				}
+			}
+		}
 
-		Err(MensagoError::ErrUnimplemented)
+		Ok(true)
 	}
 
 	fn is_compliant(&self) -> Result<bool, MensagoError> {
