@@ -637,9 +637,48 @@ impl KeycardEntry for OrgEntry {
 
 	fn is_compliant(&self) -> Result<bool, MensagoError> {
 
-		// TODO: Implement OrgEntry::is_compliant()
+		let status = self.is_data_compliant()?;
+		if !status {
+			return Ok(status);
+		}
 
-		Err(MensagoError::ErrUnimplemented)
+		// The Custody signature and the PrevHash field are both required if the entry is not the
+		// root entry of the org's keycard.
+		let entry_index = match self.fields.get(&EntryFieldType::Index) {
+			Some(v) => {
+				match v.parse::<u32>() {
+					Ok(i) => i,
+					Err(e) => {
+						// We should never be here
+						return Err(MensagoError::ErrProgramException(e.to_string()))
+					},
+				}
+			},
+			None => {
+				return Ok(false)
+			}
+		};
+
+		if entry_index > 0 {
+			match OrgSigBlock::astype_to_index(&AuthStrType::Custody) {
+				Ok(_) => { /* Do nothing*/ },
+				Err(_) => return Ok(false)
+			}
+			match OrgSigBlock::astype_to_index(&AuthStrType::PrevHash) {
+				Ok(_) => { /* Do nothing*/ },
+				Err(_) => return Ok(false)
+			}
+		}
+
+		match OrgSigBlock::astype_to_index(&AuthStrType::Hash) {
+			Ok(_) => { /* Do nothing*/ },
+			Err(_) => return Ok(false)
+		}
+
+		match OrgSigBlock::astype_to_index(&AuthStrType::Custody) {
+			Ok(_) => Ok(true),
+			Err(_) => Ok(false)
+		}
 	}
 
 	fn set_expiration(&mut self, numdays: Option<&u16>) -> Result<(), MensagoError> {
