@@ -95,8 +95,6 @@ impl EntryFieldType {
 			EntryFieldType::ContactAdmin => WAddress::new(s),
 			EntryFieldType::ContactAbuse => WAddress::new(s),
 			EntryFieldType::ContactSupport => WAddress::new(s),
-
-			_ => None
 		}
 	}
 }
