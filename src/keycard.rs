@@ -79,11 +79,23 @@ impl EntryFieldType {
 		match t {
 			EntryFieldType::Index => IndexField::new(s),
 			EntryFieldType::Name => NameField::new(s),
-			EntryFieldType::WorkspaceID => WAddress::new(s),
+			EntryFieldType::WorkspaceID => RandomID::new(s),
 			EntryFieldType::UserID => MAddress::new(s),
 			EntryFieldType::Domain => Domain::new(s),
+			EntryFieldType::ContactRequestEncryptionKey => CryptoStringField::new(s),
+			EntryFieldType::ContactRequestVerificationKey => CryptoStringField::new(s),
+			EntryFieldType::EncryptionKey => CryptoStringField::new(s),
+			EntryFieldType::VerificationKey => CryptoStringField::new(s),
+			EntryFieldType::TimeToLive => TTLField::new(s),
+			EntryFieldType::Expires => DateField::new(s),
+			EntryFieldType::Timestamp => DateTimeField::new(s),
+			EntryFieldType::Language => LanguageField::new(s),
+			EntryFieldType::PrimaryVerificationKey => CryptoStringField::new(s),
+			EntryFieldType::SecondaryVerificationKey => CryptoStringField::new(s),
+			EntryFieldType::ContactAdmin => WAddress::new(s),
+			EntryFieldType::ContactAbuse => WAddress::new(s),
+			EntryFieldType::ContactSupport => WAddress::new(s),
 
-			// TODO: finish implementing EntryFieldType::new_field
 			_ => None
 		}
 	}
