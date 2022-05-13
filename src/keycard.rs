@@ -1431,4 +1431,52 @@ mod tests {
 			}
 		}
 	}
+
+	#[test]
+	fn orgentry_delete_field() -> Result<(), MensagoError> {
+		
+		let mut entry = crate::keycard::OrgEntry::new();
+
+		// Setup
+		match entry.set_field(&EntryFieldType::Name, "Corbin Simons") {
+			Ok(_) => { /* Test condition passes. Do nothing. */ },
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("orgentry_delete_field failed: {}", e.to_string())))
+			}
+		}
+
+		// Make sure we can get the field
+		match entry.get_field(&EntryFieldType::Name) {
+			Ok(_) => { /* Test condition passes. Do nothing. */ },
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("orgentry_delete_field failed to get field: {}", e.to_string())))
+			}
+		}
+
+		// Remove it
+		match entry.delete_field(&EntryFieldType::Name) {
+			Ok(_) => {
+				/* Test condition passes. Do nothing. */
+			},
+			Err(_) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("orgentry_delete_field failed to delete a field")))
+			}
+		}
+		
+		// Make sure the field doesn't exist anymore
+		match entry.get_field(&EntryFieldType::Name) {
+			Ok(_) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("orgentry_delete_field didn't actually delete the test field")))
+			},
+			Err(_) => {
+				/* Test condition passes. Do nothing. */
+			}
+		}
+
+		Ok(())
+	}
 }
