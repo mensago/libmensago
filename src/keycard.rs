@@ -1139,25 +1139,33 @@ mod tests {
 		test_path
 	}
 
-	fn orgentry_set_field() -> Result<(), String> {
+	#[test]
+	fn orgentry_set_field() -> Result<(), MensagoError> {
 		
-		let entry = crate::keycard::OrgEntry::new();
-		assert_eq!(entry.set_field(&EntryFieldType::Name, "Corbin Simons"), Ok(()),
-			"orgentry_set_field failed");
-
-		Ok(())
+		let mut entry = crate::keycard::OrgEntry::new();
+		match entry.set_field(&EntryFieldType::Name, "Corbin Simons") {
+			Ok(_) => Ok(()),
+			Err(e) => {
+				Err(MensagoError::ErrProgramException(
+					format!("orgentry_set_field failed: {}", e.to_string())))
+			}
+		}
 	}
 
-	fn orgentry_set_fields() -> Result<(), String> {
+	#[test]
+	fn orgentry_set_fields() -> Result<(), MensagoError> {
 		
 		let testdata = vec![
 			(EntryFieldType::Name, String::from("Example, Inc.")),
 			(EntryFieldType::ContactAdmin, String::from("11111111-1111-1111-1111-111111111111/example.com")),
 		];
-		let entry = crate::keycard::OrgEntry::new();
-		assert_eq!(entry.set_fields(&testdata), Ok(()),
-			"orgentry_set_field failed");
-
-		Ok(())
+		let mut entry = crate::keycard::OrgEntry::new();
+		match entry.set_fields(&testdata) {
+			Ok(_) => Ok(()),
+			Err(e) => {
+				Err(MensagoError::ErrProgramException(
+					format!("orgentry_set_fields failed: {}", e.to_string())))
+			}
+		}
 	}
 }
