@@ -133,7 +133,7 @@ impl Workspace {
 		// Query unwrapping complete. Start extracting the data
 		let row = option_row.unwrap();
 
-		self.wid = match RandomID::from_str(&widstr.to_string()) {
+		self.wid = match RandomID::from(&widstr.to_string()) {
 			Some(v) => Some(v),
 			None => {
 				return Err(MensagoError::ErrProgramException(String::from(
@@ -143,7 +143,7 @@ impl Workspace {
 
 		self.domain = match &row.get::<usize,String>(0) {
 			Ok(v) => {
-				match Domain::from_str(v) {
+				match Domain::from(v) {
 					Some(d) => Some(d),
 					None => {
 						return Err(MensagoError::ErrDatabaseException(
@@ -161,7 +161,7 @@ impl Workspace {
 
 		self.uid = match &row.get::<usize,String>(0) {
 			Ok(v) => {
-				match UserID::from_str(v) {
+				match UserID::from(v) {
 					Some(d) => Some(d),
 					None => {
 						return Err(MensagoError::ErrDatabaseException(
@@ -231,7 +231,7 @@ impl Workspace {
 	/// evidence that a particular workspace ever existed.
 	pub fn remove_from_db(&self) -> Result<(), MensagoError> {
 
-		let conn = match rusqlite::Connection::open_with_flags(&self.dbpath,
+		let mut conn = match rusqlite::Connection::open_with_flags(&self.dbpath,
 			rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE) {
 				Ok(v) => v,
 				Err(e) => {
@@ -277,7 +277,7 @@ impl Workspace {
 	/// itself. It does not remove keys, sessions, or other associated data.
 	pub fn remove_workspace_entry(&self) -> Result<(), MensagoError> {
 
-		let conn = match rusqlite::Connection::open_with_flags(&self.dbpath,
+		let mut conn = match rusqlite::Connection::open_with_flags(&self.dbpath,
 			rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE) {
 				Ok(v) => v,
 				Err(e) => {
@@ -333,7 +333,7 @@ impl Workspace {
 	/// Sets the human-friendly name for the workspace
 	pub fn set_userid(&mut self, uid: &UserID) -> Result<(), MensagoError> {
 
-		let conn = match rusqlite::Connection::open_with_flags(&self.dbpath,
+		let mut conn = match rusqlite::Connection::open_with_flags(&self.dbpath,
 			rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE) {
 				Ok(v) => v,
 				Err(e) => {

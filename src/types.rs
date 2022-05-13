@@ -130,7 +130,7 @@ impl RandomID {
 	}
 
 	/// Creates a RandomID from an existing string and ensures that formatting is correct.
-	pub fn from_str(data: &str) -> Option<RandomID> {
+	pub fn from(data: &str) -> Option<RandomID> {
 		if !RANDOMID_PATTERN.is_match(data) {
 			return None
 		}
@@ -179,7 +179,7 @@ impl UserID {
 
 	/// Creates a UserID from an existing string. If it contains illegal characters, it will
 	/// return None. All capital letters will have their case squashed for compliance.
-	pub fn from_str(data: &str) -> Option<UserID> {
+	pub fn from(data: &str) -> Option<UserID> {
 
 		if data.len() > 64 || data.len() == 0 {
 			return None
@@ -250,7 +250,7 @@ impl Domain {
 	/// Creates a Domain from an existing string. If it contains illegal characters, it will
 	/// return None. All capital letters will have their case squashed. This type exists to ensure
 	/// that valid domains are used across the library
-	pub fn from_str(data: &str) -> Option<Domain> {
+	pub fn from(data: &str) -> Option<Domain> {
 		if !DOMAIN_PATTERN.is_match(data) {
 			return None
 		}
@@ -307,8 +307,8 @@ impl MAddress {
 		}
 		
 		let out = MAddress {
-			uid: UserID::from_str(parts[0])?,
-			domain: Domain::from_str(parts[1])?,
+			uid: UserID::from(parts[0])?,
+			domain: Domain::from(parts[1])?,
 			address: String::from(format!("{}/{}", parts[0], parts[1])),
 		};
 
@@ -383,8 +383,8 @@ impl WAddress {
 		}
 		
 		let out = WAddress { 
-			wid: RandomID::from_str(parts[0])?,
-			domain: Domain::from_str(parts[1])?,
+			wid: RandomID::from(parts[0])?,
+			domain: Domain::from(parts[1])?,
 			address: String::from(format!("{}/{}", parts[0], parts[1])),
 		};
 
@@ -492,16 +492,16 @@ mod tests {
 
 		let testid = RandomID::generate();
 		
-		let strid = RandomID::from_str(testid.as_string());
+		let strid = RandomID::from(testid.as_string());
 		assert_ne!(strid, None);
 	}
 	
 	#[test]
 	fn test_userid() {
 
-		assert_ne!(UserID::from_str("valid_e-mail.123"), None);
+		assert_ne!(UserID::from("valid_e-mail.123"), None);
 		
-		match UserID::from_str("11111111-1111-1111-1111-111111111111") {
+		match UserID::from("11111111-1111-1111-1111-111111111111") {
 			Some(v) => {
 				assert!(v.get_type() == IDType::WorkspaceID)
 			},
@@ -510,7 +510,7 @@ mod tests {
 			}
 		}
 
-		match UserID::from_str("Valid.but.needs_case-squashed") {
+		match UserID::from("Valid.but.needs_case-squashed") {
 			Some(v) => {
 				assert_eq!(v.as_string(), "valid.but.needs_case-squashed")
 			},
@@ -519,16 +519,16 @@ mod tests {
 			}
 		}
 		
-		assert_eq!(UserID::from_str("invalid..number1"), None);
-		assert_eq!(UserID::from_str("invalid#2"), None);
+		assert_eq!(UserID::from("invalid..number1"), None);
+		assert_eq!(UserID::from("invalid#2"), None);
 	}
 
 	#[test]
 	fn test_domain() {
 
-		assert_ne!(Domain::from_str("foo-bar.baz.com"), None);
+		assert_ne!(Domain::from("foo-bar.baz.com"), None);
 
-		match Domain::from_str("FOO.bar.com") {
+		match Domain::from("FOO.bar.com") {
 			Some(v) => {
 				assert_eq!(v.as_string(), "foo.bar.com")
 			},
@@ -537,8 +537,8 @@ mod tests {
 			}
 		}
 		
-		assert_eq!(Domain::from_str("a bad-id.com"), None);
-		assert_eq!(Domain::from_str("also_bad.org"), None);
+		assert_eq!(Domain::from("a bad-id.com"), None);
+		assert_eq!(Domain::from("also_bad.org"), None);
 	}
 
 	#[test]

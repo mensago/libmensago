@@ -302,13 +302,13 @@ impl Profile {
 
 			let row = option_row.unwrap();
 			if self.wid.is_none() {
-				self.wid = RandomID::from_str(&row.get::<usize,String>(0).unwrap());
+				self.wid = RandomID::from(&row.get::<usize,String>(0).unwrap());
 			}
 			if self.domain.is_none() {
-				self.domain = Domain::from_str(&row.get::<usize,String>(1).unwrap());
+				self.domain = Domain::from(&row.get::<usize,String>(1).unwrap());
 			}
 			if self.uid.is_none() {
-				self.uid = UserID::from_str(&row.get::<usize,String>(3).unwrap());
+				self.uid = UserID::from(&row.get::<usize,String>(3).unwrap());
 			}
 
 			// Connection to the database will be closed when the connection object is dropped
