@@ -96,7 +96,7 @@ pub trait VerifiedString {
 	fn get(&self) -> &str;
 
 	/// Returns a string version of the object's type
-	fn _type() -> &'static str;
+	fn _type(&self) -> &'static str;
 }
 
 /// The RandomID class is similar to v4 UUIDs. To obtain the maximum amount of entropy, all bits
@@ -154,7 +154,7 @@ impl VerifiedString for RandomID {
 		self.as_string()
 	}
 
-	fn _type() -> &'static str {
+	fn _type(&self) -> &'static str {
 		return "RandomID"
 	}
 }
@@ -226,7 +226,7 @@ impl VerifiedString for UserID {
 		self.as_string()
 	}
 
-	fn _type() -> &'static str {
+	fn _type(&self) -> &'static str {
 		return "UserID"
 	}
 }
@@ -273,7 +273,7 @@ impl VerifiedString for Domain {
 		self.as_string()
 	}
 
-	fn _type() -> &'static str {
+	fn _type(&self) -> &'static str {
 		return "Domain"
 	}
 }
@@ -346,7 +346,7 @@ impl VerifiedString for MAddress {
 		&self.address
 	}
 
-	fn _type() -> &'static str {
+	fn _type(&self) -> &'static str {
 		return "MAddress"
 	}
 }
@@ -422,7 +422,7 @@ impl VerifiedString for WAddress {
 		&self.address
 	}
 
-	fn _type() -> &'static str {
+	fn _type(&self) -> &'static str {
 		return "WAddress"
 	}
 }
@@ -477,7 +477,7 @@ impl VerifiedString for ArgonHash {
 		&self.hash
 	}
 
-	fn _type() -> &'static str {
+	fn _type(&self) -> &'static str {
 		return "ArgonHash"
 	}
 }

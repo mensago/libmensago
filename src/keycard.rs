@@ -807,7 +807,7 @@ impl VerifiedString for IndexField {
 		&self.data
 	}
 
-	fn _type() -> &'static str {
+	fn _type(&self) -> &'static str {
 		return "IndexField"
 	}
 }
@@ -842,7 +842,7 @@ impl VerifiedString for NameField {
 		&self.data
 	}
 
-	fn _type() -> &'static str {
+	fn _type(&self) -> &'static str {
 		return "NameField"
 	}
 }
@@ -888,7 +888,7 @@ impl VerifiedString for WIDField {
 		&self.data
 	}
 
-	fn _type() -> &'static str {
+	fn _type(&self) -> &'static str {
 		return "WIDField"
 	}
 }
@@ -931,7 +931,7 @@ impl VerifiedString for TTLField {
 		&self.data
 	}
 
-	fn _type() -> &'static str {
+	fn _type(&self) -> &'static str {
 		return "TTLField"
 	}
 }
@@ -978,7 +978,7 @@ impl VerifiedString for DateField {
 		&self.data
 	}
 
-	fn _type() -> &'static str {
+	fn _type(&self) -> &'static str {
 		return "DateField"
 	}
 }
@@ -1027,7 +1027,7 @@ impl VerifiedString for DateTimeField {
 		&self.data
 	}
 
-	fn _type() -> &'static str {
+	fn _type(&self) -> &'static str {
 		return "DateTimeField"
 	}
 }
@@ -1076,7 +1076,7 @@ impl VerifiedString for LanguageField {
 		&self.data
 	}
 
-	fn _type() -> &'static str {
+	fn _type(&self) -> &'static str {
 		return "LanguageField"
 	}
 }
