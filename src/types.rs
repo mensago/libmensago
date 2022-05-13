@@ -110,12 +110,6 @@ pub struct RandomID {
 
 impl RandomID {
 
-	/// Creates a new, empty RandomID. Useful on the rare occasion where you need an empty RandomID
-	/// but not generally used. You probably want from_str() or generate().
-	pub fn new() -> RandomID {
-		return RandomID{ data: String::from("00000000-0000-0000-0000-000000000000")};
-	}
-
 	/// Creates a new populated RandomID
 	pub fn generate() -> RandomID {
 		
@@ -135,7 +129,7 @@ impl RandomID {
 			return None
 		}
 
-		let mut out = RandomID::new();
+		let mut out = RandomID{ data: String::from("00000000-0000-0000-0000-000000000000")};
 		out.data = data.to_lowercase();
 
 		Some(out)
@@ -146,6 +140,14 @@ impl RandomID {
 		&self.data
 	}
 
+	/// Creates a heap-allocated version of the field from a string or None if not valid
+	pub fn new(s: &str) -> Option<Box<dyn VerifiedString>> {
+
+		match Self::from(s) {
+			Some(v) => Some(Box::<Self>::new(v)),
+			None => None
+		}
+	}
 }
 
 impl VerifiedString for RandomID {
