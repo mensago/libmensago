@@ -1359,4 +1359,39 @@ mod tests {
 			}
 		}
 	}
+
+	#[test]
+	fn orgentry_set_fields_str() -> Result<(), MensagoError> {
+		
+		let mut entry = crate::keycard::OrgEntry::new();
+
+		let mut testdata = vec![
+			(String::from("Name"), String::from("Example, Inc.")),
+			(String::from("contactAdmin"),
+				String::from("11111111-1111-1111-1111-111111111111/example.com")),
+		];
+		
+		match entry.set_fields_str(&testdata) {
+			Ok(_) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("orgentry_set_fields_str passed an invalid key")))
+			},
+			Err(_) => {
+				/* Test condition passes. Do nothing. */
+			}
+		}
+
+		testdata = vec![
+			(String::from("Name"), String::from("Example, Inc.")),
+			(String::from("Contact-Admin"),
+				String::from("11111111-1111-1111-1111-111111111111/example.com")),
+		];
+		match entry.set_fields_str(&testdata) {
+			Ok(_) => Ok(()),
+			Err(e) => {
+				Err(MensagoError::ErrProgramException(
+					format!("orgentry_set_fields_str failed: {}", e.to_string())))
+			}
+		}
+	}
 }
