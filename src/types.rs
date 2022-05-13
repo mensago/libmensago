@@ -298,7 +298,7 @@ impl MAddress {
 
 	/// Creates a new MAddress from a string. If the string does not contain a valid Mensago
 	/// address, None will be returned.
-	pub fn from_str(data: &str) -> Option<MAddress> {
+	pub fn from(data: &str) -> Option<MAddress> {
 
 		let parts = data.split("/").collect::<Vec<&str>>();
 
@@ -338,6 +338,15 @@ impl MAddress {
 	pub fn get_domain(&self) -> &Domain {
 		&self.domain
 	}
+
+	/// Creates a heap-allocated version of the field from a string or None if not valid
+	pub fn new(s: &str) -> Option<Box<Self>> {
+
+		match Self::from(s) {
+			Some(v) => Some(Box::<Self>::new(v)),
+			None => None
+		}
+	}
 }
 
 impl VerifiedString for MAddress {
@@ -374,7 +383,7 @@ impl WAddress {
 
 	/// Creates a new WAddress from a string. If the string does not contain a valid workspace
 	/// address, None will be returned.
-	pub fn from_str(data: &str) -> Option<WAddress> {
+	pub fn from(data: &str) -> Option<WAddress> {
 
 		let parts = data.split("/").collect::<Vec<&str>>();
 
@@ -414,6 +423,15 @@ impl WAddress {
 	pub fn get_domain(&self) -> &Domain {
 		&self.domain
 	}
+
+	/// Creates a heap-allocated version of the field from a string or None if not valid
+	pub fn new(s: &str) -> Option<Box<Self>> {
+
+		match Self::from(s) {
+			Some(v) => Some(Box::<Self>::new(v)),
+			None => None
+		}
+	}
 }
 
 impl VerifiedString for WAddress {
@@ -445,7 +463,7 @@ pub struct ArgonHash {
 impl ArgonHash {
 
 	/// Creates a new ArgonHash from the provided password
-	pub fn new(password: &str) -> ArgonHash {
+	pub fn from(password: &str) -> ArgonHash {
 		ArgonHash {
 			hash: eznacl::hash_password(password, eznacl::HashStrength::Basic),
 			hashtype: String::from("argon2id"),
@@ -453,7 +471,7 @@ impl ArgonHash {
 	}
 
 	/// Creates an ArgonHash object from a verified string
-	pub fn from_str(passhash: &str) -> ArgonHash {
+	pub fn from_hashstr(passhash: &str) -> ArgonHash {
 		ArgonHash {
 			hash: String::from(passhash),
 			hashtype: String::from("argon2id"),
@@ -468,6 +486,22 @@ impl ArgonHash {
 	/// Returns the object's hash type
 	pub fn get_hashtype(&self) -> &str {
 		&self.hashtype
+	}
+
+	/// Creates a heap-allocated version of the field from a string or None if not valid
+	pub fn new(s: &str) -> Option<Box<Self>> {
+		if s.len() > 0 {
+			Some(Box::<Self>::new(Self::from(s)))
+		} else {
+			None
+		}
+	}
+}
+
+impl fmt::Display for ArgonHash {
+
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		write!(f, "{}", self.hash)
 	}
 }
 
@@ -544,22 +578,22 @@ mod tests {
 	#[test]
 	fn test_maddress() {
 		
-		assert_ne!(MAddress::from_str("cats4life/example.com"), None);
-		assert_ne!(MAddress::from_str("5a56260b-aa5c-4013-9217-a78f094432c3/example.com"), None);
+		assert_ne!(MAddress::from("cats4life/example.com"), None);
+		assert_ne!(MAddress::from("5a56260b-aa5c-4013-9217-a78f094432c3/example.com"), None);
 
-		assert_eq!(MAddress::from_str("has spaces/example.com"), None);
-		assert_eq!(MAddress::from_str(r#"has_a_"/example.com"#), None);
-		assert_eq!(MAddress::from_str("\\not_allowed/example.com"), None);
-		assert_eq!(MAddress::from_str("/example.com"), None);
-		assert_eq!(MAddress::from_str(
+		assert_eq!(MAddress::from("has spaces/example.com"), None);
+		assert_eq!(MAddress::from(r#"has_a_"/example.com"#), None);
+		assert_eq!(MAddress::from("\\not_allowed/example.com"), None);
+		assert_eq!(MAddress::from("/example.com"), None);
+		assert_eq!(MAddress::from(
 			"5a56260b-aa5c-4013-9217-a78f094432c3/example.com/example.com"), None);
-		assert_eq!(MAddress::from_str("5a56260b-aa5c-4013-9217-a78f094432c3"), None);
+		assert_eq!(MAddress::from("5a56260b-aa5c-4013-9217-a78f094432c3"), None);
 	}
 
 	#[test]
 	fn test_waddress() {
 		
-		assert_ne!(WAddress::from_str("5a56260b-aa5c-4013-9217-a78f094432c3/example.com"), None);
-		assert_eq!(WAddress::from_str("cats4life/example.com"), None);
+		assert_ne!(WAddress::from("5a56260b-aa5c-4013-9217-a78f094432c3/example.com"), None);
+		assert_eq!(WAddress::from("cats4life/example.com"), None);
 	}
 }

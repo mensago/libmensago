@@ -34,7 +34,7 @@ pub fn get_credentials(conn: &rusqlite::Connection, waddr: &WAddress)
 
 	// Query unwrapping complete. Start extracting the data
 	let row = option_row.unwrap();
-	let passhash = ArgonHash::from_str(&row.get::<usize,String>(0).unwrap());
+	let passhash = ArgonHash::from_hashstr(&row.get::<usize,String>(0).unwrap());
 	
 	Ok(passhash)
 }

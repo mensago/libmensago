@@ -71,6 +71,14 @@ impl EntryFieldType {
 			_ => None,
 		}
 	}
+
+	/// Creates a new field instance based on the field type and value given to it. If the data
+	/// isn't valid, None is returned.
+	pub fn new_field(t: Self, s: &str) -> Option<Box<dyn VerifiedString>> {
+		
+		// TODO: implement EntryFieldType::new_field
+		None
+	}
 }
 
 impl fmt::Display for EntryFieldType {
@@ -820,6 +828,8 @@ impl fmt::Display for IndexField {
 }
 
 impl IndexField {
+
+	/// Creates a new IndexField from a string or None if not valid
 	pub fn from(s: &str) -> Option<IndexField> {
 
 		if !INDEX_PATTERN.is_match(s) {
@@ -827,6 +837,15 @@ impl IndexField {
 		}
 
 		Some(IndexField{ data:String::from(s) })
+	}
+
+	/// Creates a heap-allocated version of the field from a string or None if not valid
+	pub fn new(s: &str) -> Option<Box<Self>> {
+
+		match Self::from(s) {
+			Some(v) => Some(Box::<Self>::new(v)),
+			None => None
+		}
 	}
 }
 
@@ -855,6 +874,7 @@ impl fmt::Display for NameField {
 }
 
 impl NameField {
+
 	pub fn from(s: &str) -> Option<NameField> {
 
 		// Names must meet 3 conditions:
@@ -872,6 +892,15 @@ impl NameField {
 			Some(NameField{ data:String::from(trimmed) })
 		} else {
 			None
+		}
+	}
+
+	/// Creates a heap-allocated version of the field from a string or None if not valid
+	pub fn new(s: &str) -> Option<Box<Self>> {
+
+		match Self::from(s) {
+			Some(v) => Some(Box::<Self>::new(v)),
+			None => None
 		}
 	}
 }
@@ -901,6 +930,7 @@ impl fmt::Display for WIDField {
 }
 
 impl WIDField {
+
 	pub fn from(s: &str) -> Option<WIDField> {
 
 		// A workspace ID is literally just a RandomID + / + domain, so we'll just
@@ -915,6 +945,15 @@ impl WIDField {
 			None
 		} else {
 			Some(WIDField{ data: String::from(trimmed) })
+		}
+	}
+
+	/// Creates a heap-allocated version of the field from a string or None if not valid
+	pub fn new(s: &str) -> Option<Box<Self>> {
+
+		match Self::from(s) {
+			Some(v) => Some(Box::<Self>::new(v)),
+			None => None
 		}
 	}
 }
@@ -944,6 +983,7 @@ impl fmt::Display for TTLField {
 }
 
 impl TTLField {
+
 	pub fn from(s: &str) -> Option<TTLField> {
 
 		let trimmed = s.trim();
@@ -962,6 +1002,15 @@ impl TTLField {
 					Some(TTLField{ data: String::from(trimmed) })
 				}
 			}
+		}
+	}
+
+	/// Creates a heap-allocated version of the field from a string or None if not valid
+	pub fn new(s: &str) -> Option<Box<Self>> {
+
+		match Self::from(s) {
+			Some(v) => Some(Box::<Self>::new(v)),
+			None => None
 		}
 	}
 }
@@ -1013,6 +1062,15 @@ impl DateField {
 			},
 		}
 	}
+
+	/// Creates a heap-allocated version of the field from a string or None if not valid
+	pub fn new(s: &str) -> Option<Box<Self>> {
+
+		match Self::from(s) {
+			Some(v) => Some(Box::<Self>::new(v)),
+			None => None
+		}
+	}
 }
 
 /// A verified type for handling timestamp fields in keycards
@@ -1062,6 +1120,15 @@ impl DateTimeField {
 			},
 		}
 	}
+
+	/// Creates a heap-allocated version of the field from a string or None if not valid
+	pub fn new(s: &str) -> Option<Box<Self>> {
+
+		match Self::from(s) {
+			Some(v) => Some(Box::<Self>::new(v)),
+			None => None
+		}
+	}
 }
 
 /// A verified type for handling the language field in org keycards
@@ -1107,6 +1174,15 @@ impl LanguageField {
 					Some(LanguageField{ data: String::from(trimmed) })
 				}
 			}
+		}
+	}
+
+	/// Creates a heap-allocated version of the field from a string or None if not valid
+	pub fn new(s: &str) -> Option<Box<Self>> {
+
+		match Self::from(s) {
+			Some(v) => Some(Box::<Self>::new(v)),
+			None => None
 		}
 	}
 }
