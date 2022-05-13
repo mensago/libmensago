@@ -1304,7 +1304,7 @@ mod tests {
 	}
 
 	#[test]
-	fn orgentry_set_field() -> Result<(), MensagoError> {
+	fn orgentry_set_get_field() -> Result<(), MensagoError> {
 		
 		let mut entry = crate::keycard::OrgEntry::new();
 
@@ -1319,12 +1319,32 @@ mod tests {
 		}
 
 		match entry.set_field(&EntryFieldType::Name, "Corbin Simons") {
-			Ok(_) => Ok(()),
+			Ok(_) => { /* Test condition passes. Do nothing. */ },
 			Err(e) => {
-				Err(MensagoError::ErrProgramException(
+				return Err(MensagoError::ErrProgramException(
 					format!("orgentry_set_field failed: {}", e.to_string())))
 			}
 		}
+
+		match entry.get_field(&EntryFieldType::Domain) {
+			Ok(_) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("orgentry_get_field passed a nonexistent field")))
+			},
+			Err(_) => {
+				/* Test condition passes. Do nothing. */
+			}
+		}
+
+		match entry.get_field(&EntryFieldType::Name) {
+			Ok(_) => { /* Test condition passes. Do nothing. */ },
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("orgentry_get_field failed: {}", e.to_string())))
+			}
+		}
+
+		Ok(())
 	}
 
 	#[test]
