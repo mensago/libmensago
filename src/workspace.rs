@@ -231,7 +231,7 @@ impl Workspace {
 	/// evidence that a particular workspace ever existed.
 	pub fn remove_from_db(&self) -> Result<(), MensagoError> {
 
-		let mut conn = match rusqlite::Connection::open_with_flags(&self.dbpath,
+		let conn = match rusqlite::Connection::open_with_flags(&self.dbpath,
 			rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE) {
 				Ok(v) => v,
 				Err(e) => {
@@ -277,7 +277,7 @@ impl Workspace {
 	/// itself. It does not remove keys, sessions, or other associated data.
 	pub fn remove_workspace_entry(&self) -> Result<(), MensagoError> {
 
-		let mut conn = match rusqlite::Connection::open_with_flags(&self.dbpath,
+		let conn = match rusqlite::Connection::open_with_flags(&self.dbpath,
 			rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE) {
 				Ok(v) => v,
 				Err(e) => {
@@ -333,7 +333,7 @@ impl Workspace {
 	/// Sets the human-friendly name for the workspace
 	pub fn set_userid(&mut self, uid: &UserID) -> Result<(), MensagoError> {
 
-		let mut conn = match rusqlite::Connection::open_with_flags(&self.dbpath,
+		let conn = match rusqlite::Connection::open_with_flags(&self.dbpath,
 			rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE) {
 				Ok(v) => v,
 				Err(e) => {
