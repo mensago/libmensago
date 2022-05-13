@@ -552,20 +552,6 @@ struct OrgEntry {
 }
 
 
-static ORG_FIELDS: [&EntryFieldType; 11] = [
-	&EntryFieldType::Index,
-	&EntryFieldType::Name,
-	&EntryFieldType::ContactAdmin,
-	&EntryFieldType::ContactAbuse,
-	&EntryFieldType::ContactSupport,
-	&EntryFieldType::Language,
-	&EntryFieldType::PrimaryVerificationKey,
-	&EntryFieldType::SecondaryVerificationKey,
-	&EntryFieldType::TimeToLive,
-	&EntryFieldType::Expires,
-	&EntryFieldType::Timestamp,
-];
-
 static ORG_REQUIRED_FIELDS: [&EntryFieldType; 7] = [
 	&EntryFieldType::Index,
 	&EntryFieldType::Name,
@@ -607,7 +593,22 @@ impl KeycardEntry for OrgEntry {
 
 	fn set_field(&mut self, field: &EntryFieldType, value: &str) -> Result<(), MensagoError> {
 
-		// TODO: OrgEntry::set_field(): check for invalid field values (i.e. User-ID) and throw an error for those
+		match field {
+			EntryFieldType::Index => { /* Field is OK. Do nothing. */ },
+			EntryFieldType::Name => { /* Field is OK. Do nothing. */ },
+			EntryFieldType::ContactAdmin => { /* Field is OK. Do nothing. */ },
+			EntryFieldType::ContactAbuse => { /* Field is OK. Do nothing. */ },
+			EntryFieldType::ContactSupport => { /* Field is OK. Do nothing. */ },
+			EntryFieldType::Language => { /* Field is OK. Do nothing. */ },
+			EntryFieldType::PrimaryVerificationKey => { /* Field is OK. Do nothing. */ },
+			EntryFieldType::SecondaryVerificationKey => { /* Field is OK. Do nothing. */ },
+			EntryFieldType::TimeToLive => { /* Field is OK. Do nothing. */ },
+			EntryFieldType::Expires => { /* Field is OK. Do nothing. */ },
+			EntryFieldType::Timestamp => { /* Field is OK. Do nothing. */ },
+			_ => {
+				return Err(MensagoError::ErrBadValue)
+			}
+		}
 
 		match EntryFieldType::new_field(field, value) {
 			Some(v) => {
@@ -1309,6 +1310,7 @@ mod tests {
 		
 		let mut entry = crate::keycard::OrgEntry::new();
 
+		// Try setting a bad field value
 		match entry.set_field(&EntryFieldType::Domain, "/123*") {
 			Ok(_) => {
 				return Err(MensagoError::ErrProgramException(
@@ -1319,6 +1321,18 @@ mod tests {
 			}
 		}
 
+		// Try setting a field which isn't used for organizations
+		match entry.set_field(&EntryFieldType::UserID, "csimons") {
+			Ok(_) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("orgentry_set_field allowed an invalid entry type")))
+			},
+			Err(_) => {
+				/* Test condition passes. Do nothing. */
+			}
+		}
+
+		// Try setting a good field value
 		match entry.set_field(&EntryFieldType::Name, "Corbin Simons") {
 			Ok(_) => { /* Test condition passes. Do nothing. */ },
 			Err(e) => {
@@ -1327,6 +1341,7 @@ mod tests {
 			}
 		}
 
+		// Try getting a field which doesn't exist
 		match entry.get_field(&EntryFieldType::Domain) {
 			Ok(_) => {
 				return Err(MensagoError::ErrProgramException(
@@ -1337,6 +1352,7 @@ mod tests {
 			}
 		}
 
+		// Try getting a field, expecting success here
 		match entry.get_field(&EntryFieldType::Name) {
 			Ok(_) => { /* Test condition passes. Do nothing. */ },
 			Err(e) => {
