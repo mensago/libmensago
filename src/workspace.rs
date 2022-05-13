@@ -40,7 +40,8 @@ impl Workspace {
 		self.domain = Some(server.clone());
 		self.pw = String::from(pw);
 
-		let address = MAddress::from_parts(&UserID::from_wid(wid), server);
+		// This variable will be needed by the unimplemented section of generate()
+		//let address = MAddress::from_parts(&UserID::from_wid(wid), server);
 		let waddr = WAddress::from_parts(&wid, &server);
 		
 		let conn = match rusqlite::Connection::open_with_flags(&self.dbpath,

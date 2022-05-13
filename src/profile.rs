@@ -331,8 +331,9 @@ impl Profile {
 	}
 
 	/// Assigns an identity workspace to the profile
-	pub fn set_identity(&self, w: Workspace) -> Result<(),MensagoError> {
+	pub fn set_identity(&self, _w: Workspace) -> Result<(),MensagoError> {
 
+		// TODO: Implement Workspace::set_identity
 		return Err(MensagoError::ErrUnimplemented)
 	}
 
@@ -366,8 +367,9 @@ impl Profile {
 	}
 	
 	/// Resolves a Mensago address to its corresponding workspace ID
-	pub fn resolve_address(&self, a: MAddress) -> Result<RandomID,MensagoError> {
+	pub fn resolve_address(&self, _a: MAddress) -> Result<RandomID,MensagoError> {
 
+		// TODO: Implement Workspace::resolve_address
 		return Err(MensagoError::ErrUnimplemented)
 	}
 
