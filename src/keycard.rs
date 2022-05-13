@@ -74,7 +74,7 @@ impl EntryFieldType {
 
 	/// Creates a new field instance based on the field type and value given to it. If the data
 	/// isn't valid, None is returned.
-	pub fn new_field(t: Self, s: &str) -> Option<Box<dyn VerifiedString>> {
+	pub fn new_field(t: &Self, s: &str) -> Option<Box<dyn VerifiedString>> {
 
 		match t {
 			EntryFieldType::Index => IndexField::new(s),
@@ -547,7 +547,7 @@ impl SignatureBlock for OrgSigBlock {
 // OrgEntry is an entry for an organizational keycard
 struct OrgEntry {
 	_type: EntryType,
-	fields: HashMap<EntryFieldType, String>,
+	fields: HashMap<EntryFieldType, Box<dyn VerifiedString>>,
 	sigs: OrgSigBlock,
 }
 
@@ -581,7 +581,7 @@ impl OrgEntry {
 	pub fn new() -> OrgEntry {
 		OrgEntry {
 			_type: EntryType::Organization,
-			fields: HashMap::<EntryFieldType, String>::new(),
+			fields: HashMap::<EntryFieldType, Box<dyn VerifiedString>>::new(),
 			sigs: OrgSigBlock::new(),
 		}
 	}
@@ -597,7 +597,7 @@ impl KeycardEntry for OrgEntry {
 
 		match self.fields.get(field) {
 			Some(v) => {
-				Ok(v.clone())
+				Ok(String::from(v.get()))
 			},
 			None => {
 				Err(MensagoError::ErrNotFound)
@@ -607,7 +607,14 @@ impl KeycardEntry for OrgEntry {
 
 	fn set_field(&mut self, field: &EntryFieldType, value: &str) -> Result<(), MensagoError> {
 
-		let _ = self.fields.insert(*field, String::from(value));
+		match EntryFieldType::new_field(field, value) {
+			Some(v) => {
+				let _ = self.fields.insert(*field, v);
+			},
+			None => {
+				return Err(MensagoError::ErrBadValue)
+			}
+		}
 		Ok(())
 	}
 
@@ -620,7 +627,14 @@ impl KeycardEntry for OrgEntry {
 		// I'm sure there's a more compact way to do this, but I can't figure out what it would be.
 		// :(
 		for (k, v) in fields.iter() {
-			let _ = self.fields.insert(*k, v.clone());
+			match EntryFieldType::new_field(k, v) {
+				Some(v) => {
+					let _ = self.fields.insert(*k, v);
+				},
+				None => {
+					return Err(MensagoError::ErrBadValue)
+				}
+			}
 		}
 		
 		Ok(())
@@ -633,13 +647,22 @@ impl KeycardEntry for OrgEntry {
 		}
 		
 		for (k, v) in fields.iter() {
-			let field = match EntryFieldType::from(k) {
-				Some(v) => v,
+			match EntryFieldType::from(k) {
+				Some(ft) => {
+					match EntryFieldType::new_field(&ft, v) {
+						Some(fieldval) => {
+							let _ = self.fields.insert(ft, fieldval);
+						},
+						None => {
+							return Err(MensagoError::ErrBadValue)
+						}
+					}
+			
+				},
 				None => {
 					return Err(MensagoError::ErrBadValue)
 				}
 			};
-			let _ = self.fields.insert(field, v.clone());
 		}
 		
 		Ok(())
@@ -678,7 +701,7 @@ impl KeycardEntry for OrgEntry {
 		// root entry of the org's keycard.
 		let entry_index = match self.fields.get(&EntryFieldType::Index) {
 			Some(v) => {
-				match v.parse::<u32>() {
+				match v.get().parse::<u32>() {
 					Ok(i) => i,
 					Err(e) => {
 						// We should never be here
@@ -746,7 +769,7 @@ impl KeycardEntry for OrgEntry {
 		// simplicity.
 		let expdate = match self.fields.get(&EntryFieldType::Expires) {
 			Some(v) => {
-				match NaiveDate::parse_from_str(v, "%Y%m%d") {
+				match NaiveDate::parse_from_str(v.get(), "%Y%m%d") {
 					Ok(d) => d,
 					Err(e) => {
 						// We should never be here
@@ -778,7 +801,7 @@ impl KeycardEntry for OrgEntry {
 		lines.push(String::from("Type:")+&self._type.to_string());
 
 		for (k,v) in self.fields.iter() {
-			let parts = [k.to_string(), v.clone()];
+			let parts = [k.to_string(), v.get().to_string()];
 			lines.push(parts.join(":"));
 		}
 
@@ -1284,6 +1307,17 @@ mod tests {
 	fn orgentry_set_field() -> Result<(), MensagoError> {
 		
 		let mut entry = crate::keycard::OrgEntry::new();
+
+		match entry.set_field(&EntryFieldType::Domain, "/123*") {
+			Ok(_) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("orgentry_set_field passed an invalid value")))
+			},
+			Err(_) => {
+				/* Test condition passes. Do nothing. */
+			}
+		}
+
 		match entry.set_field(&EntryFieldType::Name, "Corbin Simons") {
 			Ok(_) => Ok(()),
 			Err(e) => {
@@ -1296,11 +1330,27 @@ mod tests {
 	#[test]
 	fn orgentry_set_fields() -> Result<(), MensagoError> {
 		
-		let testdata = vec![
+		let mut entry = crate::keycard::OrgEntry::new();
+
+		let mut testdata = vec![
+			(EntryFieldType::Name, String::from("Example, Inc.")),
+			(EntryFieldType::ContactAdmin, String::from("example.com")),
+		];
+		
+		match entry.set_fields(&testdata) {
+			Ok(_) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("orgentry_set_fields passed an invalid value")))
+			},
+			Err(_) => {
+				/* Test condition passes. Do nothing. */
+			}
+		}
+
+		testdata = vec![
 			(EntryFieldType::Name, String::from("Example, Inc.")),
 			(EntryFieldType::ContactAdmin, String::from("11111111-1111-1111-1111-111111111111/example.com")),
 		];
-		let mut entry = crate::keycard::OrgEntry::new();
 		match entry.set_fields(&testdata) {
 			Ok(_) => Ok(()),
 			Err(e) => {
