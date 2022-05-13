@@ -607,6 +607,8 @@ impl KeycardEntry for OrgEntry {
 
 	fn set_field(&mut self, field: &EntryFieldType, value: &str) -> Result<(), MensagoError> {
 
+		// TODO: OrgEntry::set_field(): check for invalid field values (i.e. User-ID) and throw an error for those
+
 		match EntryFieldType::new_field(field, value) {
 			Some(v) => {
 				let _ = self.fields.insert(*field, v);
