@@ -188,6 +188,18 @@ pub enum AuthStrType {
 	User
 }
 
+impl fmt::Display for AuthStrType {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			AuthStrType::Custody => write!(f, "Custody-Signature"),
+			AuthStrType::PrevHash => write!(f, "Previous-Hash"),
+			AuthStrType::Hash => write!(f, "Hash"),
+			AuthStrType::Organization => write!(f, "Organization-Signature"),
+			AuthStrType::User => write!(f, "User-Signature"),
+		}
+	}
+}
+
 // SignatureBlock abstracts away the logic for handling signatures for keycard entries
 trait SignatureBlock {
 
@@ -564,12 +576,48 @@ static ORG_REQUIRED_FIELDS: [&EntryFieldType; 7] = [
 
 impl OrgEntry {
 
+	/// Creates a new, empty OrgEntry
 	pub fn new() -> OrgEntry {
 		OrgEntry {
 			_type: EntryType::Organization,
 			fields: HashMap::<EntryFieldType, Box<dyn VerifiedString>>::new(),
 			sigs: OrgSigBlock::new(),
 		}
+	}
+
+	/// Creates a new OrgEntry from string data. If None is returned, it is because the string data
+	/// is somehow invalid. Note that compliance of the keycard is not guaranteed if this function
+	/// returns success; it only ensures that all fields are valid and have data which conforms to
+	/// the expected formats.
+	pub fn from(s: &str) -> Option<OrgEntry> {
+
+		// 160 is a close approximation. It includes the names of all required fields and the
+		// minimum length for any variable-length fields, including keys. It's a good quick way of
+		// ruling out obviously bad data.
+		if s.len() < 160 {
+			return None
+		}
+
+		for line in s.split("\r\n") {
+
+			if line.len() == 0 {
+				continue
+			}
+
+			let trimmed = line.trim();
+			if trimmed.len() == 0 {
+				continue
+			}
+
+			let parts = trimmed.split(":").collect::<Vec<&str>>();
+			if parts[0] == "Type" && parts[1] != "Organization" {
+				return None
+			}
+
+			// TODO: Finish OrgEntry::from
+		}
+
+		None
 	}
 }
 
