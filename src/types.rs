@@ -265,6 +265,15 @@ impl Domain {
 	pub fn as_string(&self) -> &str {
 		&self.data
 	}
+
+	/// Creates a heap-allocated version of the field from a string or None if not valid
+	pub fn new(s: &str) -> Option<Box<dyn VerifiedString>> {
+
+		match Self::from(s) {
+			Some(v) => Some(Box::<Self>::new(v)),
+			None => None
+		}
+	}
 }
 
 impl VerifiedString for Domain {
@@ -340,7 +349,7 @@ impl MAddress {
 	}
 
 	/// Creates a heap-allocated version of the field from a string or None if not valid
-	pub fn new(s: &str) -> Option<Box<Self>> {
+	pub fn new(s: &str) -> Option<Box<dyn VerifiedString>> {
 
 		match Self::from(s) {
 			Some(v) => Some(Box::<Self>::new(v)),
@@ -425,7 +434,7 @@ impl WAddress {
 	}
 
 	/// Creates a heap-allocated version of the field from a string or None if not valid
-	pub fn new(s: &str) -> Option<Box<Self>> {
+	pub fn new(s: &str) -> Option<Box<dyn VerifiedString>> {
 
 		match Self::from(s) {
 			Some(v) => Some(Box::<Self>::new(v)),
@@ -489,7 +498,7 @@ impl ArgonHash {
 	}
 
 	/// Creates a heap-allocated version of the field from a string or None if not valid
-	pub fn new(s: &str) -> Option<Box<Self>> {
+	pub fn new(s: &str) -> Option<Box<dyn VerifiedString>> {
 		if s.len() > 0 {
 			Some(Box::<Self>::new(Self::from(s)))
 		} else {

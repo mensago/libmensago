@@ -75,9 +75,17 @@ impl EntryFieldType {
 	/// Creates a new field instance based on the field type and value given to it. If the data
 	/// isn't valid, None is returned.
 	pub fn new_field(t: Self, s: &str) -> Option<Box<dyn VerifiedString>> {
-		
-		// TODO: implement EntryFieldType::new_field
-		None
+
+		match t {
+			EntryFieldType::Index => IndexField::new(s),
+			EntryFieldType::Name => NameField::new(s),
+			EntryFieldType::WorkspaceID => WAddress::new(s),
+			EntryFieldType::UserID => MAddress::new(s),
+			EntryFieldType::Domain => Domain::new(s),
+
+			// TODO: finish implementing EntryFieldType::new_field
+			_ => None
+		}
 	}
 }
 
@@ -840,7 +848,7 @@ impl IndexField {
 	}
 
 	/// Creates a heap-allocated version of the field from a string or None if not valid
-	pub fn new(s: &str) -> Option<Box<Self>> {
+	pub fn new(s: &str) -> Option<Box<dyn VerifiedString>> {
 
 		match Self::from(s) {
 			Some(v) => Some(Box::<Self>::new(v)),
@@ -896,7 +904,7 @@ impl NameField {
 	}
 
 	/// Creates a heap-allocated version of the field from a string or None if not valid
-	pub fn new(s: &str) -> Option<Box<Self>> {
+	pub fn new(s: &str) -> Option<Box<dyn VerifiedString>> {
 
 		match Self::from(s) {
 			Some(v) => Some(Box::<Self>::new(v)),
@@ -949,7 +957,7 @@ impl WIDField {
 	}
 
 	/// Creates a heap-allocated version of the field from a string or None if not valid
-	pub fn new(s: &str) -> Option<Box<Self>> {
+	pub fn new(s: &str) -> Option<Box<dyn VerifiedString>> {
 
 		match Self::from(s) {
 			Some(v) => Some(Box::<Self>::new(v)),
@@ -1006,7 +1014,7 @@ impl TTLField {
 	}
 
 	/// Creates a heap-allocated version of the field from a string or None if not valid
-	pub fn new(s: &str) -> Option<Box<Self>> {
+	pub fn new(s: &str) -> Option<Box<dyn VerifiedString>> {
 
 		match Self::from(s) {
 			Some(v) => Some(Box::<Self>::new(v)),
@@ -1064,7 +1072,7 @@ impl DateField {
 	}
 
 	/// Creates a heap-allocated version of the field from a string or None if not valid
-	pub fn new(s: &str) -> Option<Box<Self>> {
+	pub fn new(s: &str) -> Option<Box<dyn VerifiedString>> {
 
 		match Self::from(s) {
 			Some(v) => Some(Box::<Self>::new(v)),
@@ -1122,7 +1130,7 @@ impl DateTimeField {
 	}
 
 	/// Creates a heap-allocated version of the field from a string or None if not valid
-	pub fn new(s: &str) -> Option<Box<Self>> {
+	pub fn new(s: &str) -> Option<Box<dyn VerifiedString>> {
 
 		match Self::from(s) {
 			Some(v) => Some(Box::<Self>::new(v)),
@@ -1178,7 +1186,54 @@ impl LanguageField {
 	}
 
 	/// Creates a heap-allocated version of the field from a string or None if not valid
-	pub fn new(s: &str) -> Option<Box<Self>> {
+	pub fn new(s: &str) -> Option<Box<dyn VerifiedString>> {
+
+		match Self::from(s) {
+			Some(v) => Some(Box::<Self>::new(v)),
+			None => None
+		}
+	}
+}
+
+
+/// A verified type for handling the language field in org keycards
+#[derive(Debug, PartialEq, PartialOrd, Clone)]
+pub struct CryptoStringField {
+	data: String
+}
+
+impl VerifiedString for CryptoStringField {
+
+	fn get(&self) -> &str {
+		&self.data
+	}
+
+	fn _type(&self) -> &'static str {
+		return "CryptoStringField"
+	}
+}
+
+impl fmt::Display for CryptoStringField {
+
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		write!(f, "{}", self.data)
+	}
+}
+
+impl CryptoStringField {
+
+	pub fn from(s: &str) -> Option<CryptoStringField> {
+
+		match CryptoString::from(s) {
+			Some(v) => {
+				Some(CryptoStringField { data: v.to_string() })
+			},
+			None => return None
+		}
+	}
+
+	/// Creates a heap-allocated version of the field from a string or None if not valid
+	pub fn new(s: &str) -> Option<Box<dyn VerifiedString>> {
 
 		match Self::from(s) {
 			Some(v) => Some(Box::<Self>::new(v)),
