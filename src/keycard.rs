@@ -585,19 +585,22 @@ impl OrgEntry {
 		}
 	}
 
-	/// Creates a new OrgEntry from string data. If None is returned, it is because the string data
-	/// is somehow invalid. Note that compliance of the keycard is not guaranteed if this function
-	/// returns success; it only ensures that all fields are valid and have data which conforms to
-	/// the expected formats.
-	pub fn from(s: &str) -> Option<OrgEntry> {
+	/// Creates a new OrgEntry from string data. Note that unlike most libmensago from() calls, 
+	/// this version returns a Result, not an option. This is to provide a better experience for the
+	/// caller -- a keycard's data can be invalid for a lot of different reasons and returning an
+	/// error will aid debugging. Note that compliance of the keycard is not guaranteed if this 
+	/// function returns success; it only ensures that all fields are valid and have data which
+	/// conforms to the expected formats.
+	pub fn from(s: &str) -> Result<OrgEntry, MensagoError> {
 
 		// 160 is a close approximation. It includes the names of all required fields and the
 		// minimum length for any variable-length fields, including keys. It's a good quick way of
 		// ruling out obviously bad data.
 		if s.len() < 160 {
-			return None
+			return Err(MensagoError::ErrBadValue)
 		}
 
+		let mut out = OrgEntry::new();
 		for line in s.split("\r\n") {
 
 			if line.len() == 0 {
@@ -609,15 +612,31 @@ impl OrgEntry {
 				continue
 			}
 
-			let parts = trimmed.split(":").collect::<Vec<&str>>();
+
+			let parts = trimmed.splitn(1, ":").collect::<Vec<&str>>();
 			if parts[0] == "Type" && parts[1] != "Organization" {
-				return None
+				return Err(MensagoError::ErrUnsupportedKeycardType)
+			} else if parts[0].ends_with("Signature") {
+				let sigparts = parts[0].splitn(1, "-").collect::<Vec<&str>>();
+				match sigparts[0] {
+					"Custody" => { /* Acceptable value. Do nothing. */ },
+					"User" => { /* Acceptable value. Do nothing. */ },
+					"Organization" => { /* Acceptable value. Do nothing. */ },
+					_ => {
+						return Err(MensagoError::ErrUnsupportedSignatureType)
+					}
+				}
 			}
 
-			// TODO: Finish OrgEntry::from
+			let field_type = match EntryFieldType::from(parts[0]) {
+				Some(v) => v,
+				None => return Err(MensagoError::ErrUnsupportedField)
+			};
+			
+			out.set_field(&field_type, parts[1])?;
 		}
 
-		None
+		Ok(out)
 	}
 }
 
