@@ -1104,7 +1104,7 @@ impl TTLField {
 		}
 
 		match trimmed.parse::<u8>() {
-			Err(e) => None,
+			Err(_) => None,
 			Ok(v) => {
 				if v < 1 || v > 30 {
 					None
@@ -1164,7 +1164,7 @@ impl DateField {
 		let trimmed = s.trim();
 
 		match chrono::NaiveDate::parse_from_str(trimmed, "%Y%m%d") {
-			Ok(v) => {
+			Ok(_) => {
 				Some(DateField { data: String::from(trimmed) })
 			},
 			Err(_) => {
@@ -1222,7 +1222,7 @@ impl DateTimeField {
 		let trimmed = s.trim();
 
 		match chrono::NaiveDateTime::parse_from_str(trimmed, "%Y%m%dT%H%M%SZ") {
-			Ok(v) => {
+			Ok(_) => {
 				Some(DateTimeField { data: String::from(trimmed) })
 			},
 			Err(_) => {
@@ -1276,7 +1276,7 @@ impl LanguageField {
 		}
 
 		match trimmed.parse::<u8>() {
-			Err(e) => None,
+			Err(_) => None,
 			Ok(v) => {
 				if v < 1 || v > 30 {
 					None
