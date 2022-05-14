@@ -39,6 +39,10 @@ pub enum MensagoError {
 	ErrFeatureNotAvailable,
 	#[error("Unsupported keycard type")]
 	ErrUnsupportedKeycardType,
+	#[error("Unsupported signature type")]
+	ErrUnsupportedSignatureType,
+	#[error("Unsupported field")]
+	ErrUnsupportedField,
 	#[error("Unsupported hash type")]
 	ErrUnsupportedHashType,
 	#[error("Unsupported encryption type")]
