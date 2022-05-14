@@ -24,6 +24,7 @@ lazy_static! {
 /// Enumerated type for all keycard entry fields
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
 pub enum EntryFieldType {
+	Type,
 	Index,
 	Name,
 	WorkspaceID,
@@ -49,6 +50,7 @@ impl EntryFieldType {
 	pub fn from(s: &str) -> Option<EntryFieldType> {
 
 		match s {
+			"Type" => Some(EntryFieldType::Type),
 			"Index" => Some(EntryFieldType::Index),
 			"Name" => Some(EntryFieldType::Name),
 			"Workspace-ID" => Some(EntryFieldType::WorkspaceID),
@@ -77,6 +79,7 @@ impl EntryFieldType {
 	pub fn new_field(t: &Self, s: &str) -> Option<Box<dyn VerifiedString>> {
 
 		match t {
+			EntryFieldType::Type => TypeField::new(s),
 			EntryFieldType::Index => IndexField::new(s),
 			EntryFieldType::Name => NameField::new(s),
 			EntryFieldType::WorkspaceID => RandomID::new(s),
@@ -102,6 +105,7 @@ impl EntryFieldType {
 impl fmt::Display for EntryFieldType {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match self {
+			EntryFieldType::Type => write!(f, "Type"),
 			EntryFieldType::Index => write!(f, "Index"),
 			EntryFieldType::Name => write!(f, "Name"),
 			EntryFieldType::WorkspaceID => write!(f, "Workspace-ID"),
@@ -196,6 +200,19 @@ impl fmt::Display for AuthStrType {
 			AuthStrType::Hash => write!(f, "Hash"),
 			AuthStrType::Organization => write!(f, "Organization-Signature"),
 			AuthStrType::User => write!(f, "User-Signature"),
+		}
+	}
+}
+
+impl AuthStrType {
+	pub fn from(s: &str) -> Option<AuthStrType> {
+		match s {
+			"Custody-Signature" => Some(AuthStrType::Custody),
+			"Previous-Hash" => Some(AuthStrType::PrevHash),
+			"Hash" => Some(AuthStrType::Hash),
+			"Organization-Signature" => Some(AuthStrType::Organization),
+			"User-Signature" => Some(AuthStrType::User),
+			&_ => None,
 		}
 	}
 }
@@ -613,19 +630,30 @@ impl OrgEntry {
 			}
 
 
-			let parts = trimmed.splitn(1, ":").collect::<Vec<&str>>();
-			if parts[0] == "Type" && parts[1] != "Organization" {
-				return Err(MensagoError::ErrUnsupportedKeycardType)
-			} else if parts[0].ends_with("Signature") {
-				let sigparts = parts[0].splitn(1, "-").collect::<Vec<&str>>();
-				match sigparts[0] {
-					"Custody" => { /* Acceptable value. Do nothing. */ },
-					"User" => { /* Acceptable value. Do nothing. */ },
-					"Organization" => { /* Acceptable value. Do nothing. */ },
-					_ => {
-						return Err(MensagoError::ErrUnsupportedSignatureType)
+			let parts = trimmed.splitn(2, ":").collect::<Vec<&str>>();
+			if parts.len() != 2 {
+				return Err(MensagoError::ErrBadFieldValue(String::from(trimmed)))
+			}
+
+			let field_value = match parts.get(1) {
+				Some(v) => v.clone(),
+				None => { return Err(MensagoError::ErrBadFieldValue(String::from(parts[0]))) },
+			};
+
+			match AuthStrType::from(parts[0]) {
+				Some(ast) => {
+					
+					match CryptoString::from(field_value) {
+						Some(cs) => {
+							out.sigs.add_authstr(&ast, &cs)?;
+							continue
+						},
+						None => {
+							return Err(MensagoError::ErrBadFieldValue(String::from(parts[0])))
+						}
 					}
-				}
+				},
+				None => { /* A different field type. Just move on. */ },
 			}
 
 			let field_type = match EntryFieldType::from(parts[0]) {
@@ -633,7 +661,19 @@ impl OrgEntry {
 				None => return Err(MensagoError::ErrUnsupportedField)
 			};
 			
-			out.set_field(&field_type, parts[1])?;
+			if field_type == EntryFieldType::Type {
+				if field_value != "Organization" {
+					return Err(MensagoError::ErrUnsupportedKeycardType)
+				}
+				continue
+			}
+
+			match out.set_field(&field_type, field_value) {
+				Ok(_) => { /* */ },
+				Err(e) => {
+					return Err(e)	
+				}
+			}
 		}
 
 		Ok(out)
@@ -661,6 +701,10 @@ impl KeycardEntry for OrgEntry {
 	fn set_field(&mut self, field: &EntryFieldType, value: &str) -> Result<(), MensagoError> {
 
 		match field {
+			EntryFieldType::Type => { 
+				// The Type field doesn't get put into the field index, so just return OK.
+				return Ok(())
+			},
 			EntryFieldType::Index => { /* Field is OK. Do nothing. */ },
 			EntryFieldType::Name => { /* Field is OK. Do nothing. */ },
 			EntryFieldType::ContactAdmin => { /* Field is OK. Do nothing. */ },
@@ -669,11 +713,12 @@ impl KeycardEntry for OrgEntry {
 			EntryFieldType::Language => { /* Field is OK. Do nothing. */ },
 			EntryFieldType::PrimaryVerificationKey => { /* Field is OK. Do nothing. */ },
 			EntryFieldType::SecondaryVerificationKey => { /* Field is OK. Do nothing. */ },
+			EntryFieldType::EncryptionKey => { /* Field is OK. Do nothing. */ },
 			EntryFieldType::TimeToLive => { /* Field is OK. Do nothing. */ },
 			EntryFieldType::Expires => { /* Field is OK. Do nothing. */ },
 			EntryFieldType::Timestamp => { /* Field is OK. Do nothing. */ },
 			_ => {
-				return Err(MensagoError::ErrBadValue)
+				return Err(MensagoError::ErrBadFieldValue(field.to_string()))
 			}
 		}
 
@@ -682,7 +727,7 @@ impl KeycardEntry for OrgEntry {
 				let _ = self.fields.insert(*field, v);
 			},
 			None => {
-				return Err(MensagoError::ErrBadValue)
+				return Err(MensagoError::ErrBadFieldValue(String::from(field.to_string())))
 			}
 		}
 		Ok(())
@@ -912,6 +957,53 @@ static USER_REQUIRED_FIELDS: [&EntryFieldType; 10] = [
 	&EntryFieldType::Expires,
 	&EntryFieldType::Timestamp,
 ];
+
+/// A verified type for handling keycard type fields
+#[derive(Debug, PartialEq, PartialOrd, Clone)]
+pub struct TypeField {
+	data: String
+}
+
+impl VerifiedString for TypeField {
+
+	fn get(&self) -> &str {
+		&self.data
+	}
+
+	fn _type(&self) -> &'static str {
+		return "TypeField"
+	}
+}
+
+impl fmt::Display for TypeField {
+
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		write!(f, "{}", self.data)
+	}
+}
+
+impl TypeField {
+
+	pub fn from(s: &str) -> Option<TypeField> {
+
+		let trimmed = s.trim();
+
+		match trimmed {
+			"User" => Some(TypeField{ data:String::from(trimmed) }),
+			"Organization" => Some(TypeField{ data:String::from(trimmed) }),
+			_ => None,
+		}
+	}
+
+	/// Creates a heap-allocated version of the field from a string or None if not valid
+	pub fn new(s: &str) -> Option<Box<dyn VerifiedString>> {
+
+		match Self::from(s) {
+			Some(v) => Some(Box::<Self>::new(v)),
+			None => None
+		}
+	}
+}
 
 /// A verified type for handling keycard entry indexes
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
@@ -1271,19 +1363,10 @@ impl LanguageField {
 
 		let trimmed = s.trim();
 		
-		if !LANGUAGE_PATTERN.is_match(s) {
-			return None
-		}
-
-		match trimmed.parse::<u8>() {
-			Err(_) => None,
-			Ok(v) => {
-				if v < 1 || v > 30 {
-					None
-				} else {
-					Some(LanguageField{ data: String::from(trimmed) })
-				}
-			}
+		if LANGUAGE_PATTERN.is_match(s) {
+			Some(LanguageField{ data: String::from(trimmed) })	
+		} else {
+			None
 		}
 	}
 
@@ -1370,6 +1453,31 @@ mod tests {
 		fs::create_dir_all(&test_path).unwrap();
 
 		test_path
+	}
+
+	#[test]
+	fn orgentry_from() -> Result<(), MensagoError> {
+
+		let good_carddata = concat!(
+			"Type:Organization\r\n",
+			"Name:Acme, Inc.\r\n",
+			"Contact-Admin:11111111-2222-2222-2222-333333333333/acme.com\r\n",
+			"Language:en\r\n",
+			"Primary-Verification-Key:ED25519:&JEq)5Ktu@jfM+Sa@+1GU6E&Ct2*<2ZYXh#l0FxP\r\n",
+			"Encryption-Key:CURVE25519:^fI7bdC(IEwC#(nG8Em-;nx98TcH<TnfvajjjDV@\r\n",
+			"Time-To-Live:14\r\n",
+			"Expires:20231231\r\n",
+			"Organization-Signature:ED25519:x3)dYq@S0rd1Rfbie*J7kF{fkxQ=J=A)OoO1WGx97o-utWtfbwr\n");
+
+		match crate::keycard::OrgEntry::from(good_carddata) {
+			Ok(_) => { /* Test case passes. Do nothing. */ },
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("orgentry_set failed on good data: {}", e.to_string())))
+			}
+		}
+
+		Ok(())
 	}
 
 	#[test]

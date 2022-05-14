@@ -43,6 +43,8 @@ pub enum MensagoError {
 	ErrUnsupportedSignatureType,
 	#[error("Unsupported field")]
 	ErrUnsupportedField,
+	#[error("Bad value for field: {0}")]
+	ErrBadFieldValue(String),
 	#[error("Unsupported hash type")]
 	ErrUnsupportedHashType,
 	#[error("Unsupported encryption type")]
