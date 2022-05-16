@@ -1456,7 +1456,7 @@ mod tests {
 	}
 
 	#[test]
-	fn orgentry_from() -> Result<(), MensagoError> {
+	fn orgentry_from_datacompliant() -> Result<(), MensagoError> {
 
 		let good_carddata = concat!(
 			"Type:Organization\r\n",
@@ -1476,12 +1476,26 @@ mod tests {
 			"Previous-Hash:BLAKE2B-256:tSl@QzD1w-vNq@CC-5`($KuxO0#aOl^-cy(l7XXT\r\n",
 			"Hash:BLAKE2B-256:6XG#bSNuJyLCIJxUa-O`V~xR{kF4UWxaFJvPvcwg\r\n",
 			"Organization-Signature:ED25519:x3)dYq@S0rd1Rfbie*J7kF{fkxQ=J=A)OoO1WGx97o-utWtfbw\r\n");
+		
 
-		match crate::keycard::OrgEntry::from(good_carddata) {
-			Ok(_) => { /* Test case passes. Do nothing. */ },
+		let entry = match crate::keycard::OrgEntry::from(good_carddata) {
+			Ok(v) => { v },
 			Err(e) => {
 				return Err(MensagoError::ErrProgramException(
-					format!("orgentry_set failed on good data: {}", e.to_string())))
+					format!("orgentry_set_datacompliant failed on good data: {}", e.to_string())))
+			}
+		};
+
+		match entry.is_data_compliant() {
+			Ok(v) => {
+				if !v {
+					return Err(MensagoError::ErrProgramException(
+						String::from("orgentry_set_datacompliant failed on compliant data")))
+				}
+			},
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("orgentry_set_datacompliant failed on good data: {}", e.to_string())))
 			}
 		}
 
