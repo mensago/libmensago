@@ -1490,12 +1490,12 @@ mod tests {
 			Ok(v) => {
 				if !v {
 					return Err(MensagoError::ErrProgramException(
-						String::from("orgentry_set_datacompliant failed on compliant data")))
+						String::from("orgentry_set_datacompliant failed compliant data")))
 				}
 			},
 			Err(e) => {
 				return Err(MensagoError::ErrProgramException(
-					format!("orgentry_set_datacompliant failed on good data: {}", e.to_string())))
+					format!("orgentry_set_datacompliant error on compliant data: {}", e.to_string())))
 			}
 		}
 
