@@ -1313,7 +1313,7 @@ impl DateTimeField {
 
 		let trimmed = s.trim();
 
-		match chrono::NaiveDateTime::parse_from_str(trimmed, "%Y%m%dT%H%M%SZ") {
+		match chrono::NaiveDateTime::parse_from_str(trimmed, "%Y%m%dT%H%MZ") {
 			Ok(_) => {
 				Some(DateTimeField { data: String::from(trimmed) })
 			},
@@ -1460,14 +1460,22 @@ mod tests {
 
 		let good_carddata = concat!(
 			"Type:Organization\r\n",
+			"Index:2\r\n",
 			"Name:Acme, Inc.\r\n",
 			"Contact-Admin:11111111-2222-2222-2222-333333333333/acme.com\r\n",
+			"Contact-Support:11111111-2222-2222-2222-444444444444/acme.com\r\n",
+			"Contact-Abuse:11111111-2222-2222-2222-555555555555/acme.com\r\n",
 			"Language:en\r\n",
 			"Primary-Verification-Key:ED25519:&JEq)5Ktu@jfM+Sa@+1GU6E&Ct2*<2ZYXh#l0FxP\r\n",
+			"Secondary-Verification-Key:ED25519:&JEq)5Ktu@jfM+Sa@+1GU6E&Ct2*<2ZYXh#l0FxP\r\n",
 			"Encryption-Key:CURVE25519:^fI7bdC(IEwC#(nG8Em-;nx98TcH<TnfvajjjDV@\r\n",
 			"Time-To-Live:14\r\n",
 			"Expires:20231231\r\n",
-			"Organization-Signature:ED25519:x3)dYq@S0rd1Rfbie*J7kF{fkxQ=J=A)OoO1WGx97o-utWtfbwr\n");
+			"Timestamp:20220501T1352Z\r\n",
+			"Custody-Signature:ED25519:x3)dYq@S0rd1Rfbie*J7kF{fkxQ=J=A)OoO1WGx97o-utWtfbw\r\n",
+			"Previous-Hash:BLAKE2B-256:tSl@QzD1w-vNq@CC-5`($KuxO0#aOl^-cy(l7XXT\r\n",
+			"Hash:BLAKE2B-256:6XG#bSNuJyLCIJxUa-O`V~xR{kF4UWxaFJvPvcwg\r\n",
+			"Organization-Signature:ED25519:x3)dYq@S0rd1Rfbie*J7kF{fkxQ=J=A)OoO1WGx97o-utWtfbw\r\n");
 
 		match crate::keycard::OrgEntry::from(good_carddata) {
 			Ok(_) => { /* Test case passes. Do nothing. */ },
