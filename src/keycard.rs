@@ -595,11 +595,19 @@ impl OrgEntry {
 
 	/// Creates a new, empty OrgEntry
 	pub fn new() -> OrgEntry {
-		OrgEntry {
+		let mut out = OrgEntry {
 			_type: EntryType::Organization,
 			fields: HashMap::<EntryFieldType, Box<dyn VerifiedString>>::new(),
 			sigs: OrgSigBlock::new(),
-		}
+		};
+
+		// Set some default values to save the caller some time.
+		out.set_field(&EntryFieldType::TimeToLive, &String::from("14")).unwrap();
+		// Timestamp
+		// Expiration
+		
+		// TODO: Finish default field values in OrgEntry::new()
+		out
 	}
 
 	/// Creates a new OrgEntry from string data. Note that unlike most libmensago from() calls, 
@@ -1431,6 +1439,7 @@ impl CryptoStringField {
 #[cfg(test)]
 mod tests {
 	use crate::*;
+	use eznacl::*;
 	use std::env;
 	use std::fs;
 	use std::path::PathBuf;
@@ -1674,6 +1683,52 @@ mod tests {
 			}
 		}
 
+		Ok(())
+	}
+
+	#[test]
+	fn orgentry_is_compliant() -> Result<(), MensagoError> {
+
+		let mut entry = crate::keycard::OrgEntry::new();
+		
+		let primary_keypair = match eznacl::SigningPair::generate() {
+			Some(v) => v,
+			None => {
+				return Err(MensagoError::ErrProgramException(
+					format!("orgentry_is_compliant: failed to generate primary keypair")))
+			},
+		};
+		let secondary_keypair = match eznacl::SigningPair::generate() {
+			Some(v) => v,
+			None => {
+				return Err(MensagoError::ErrProgramException(
+					format!("orgentry_is_compliant: failed to generate secondary keypair")))
+			},
+		};
+		let encryption_keypair = match eznacl::EncryptionPair::generate() {
+			Some(v) => v,
+			None => {
+				return Err(MensagoError::ErrProgramException(
+					format!("orgentry_is_compliant: failed to generate encryption keypair")))
+			},
+		};
+
+		let mut carddata = vec![
+			(EntryFieldType::Name, String::from("Example, Inc.")),
+			(EntryFieldType::ContactAdmin, 
+				String::from("11111111-2222-2222-2222-333333333333/acme.com")),
+			(EntryFieldType::ContactSupport, 
+				String::from("11111111-2222-2222-2222-444444444444/acme.com")),
+			(EntryFieldType::ContactAbuse, 
+				String::from("11111111-2222-2222-2222-555555555555/acme.com")),
+			(EntryFieldType::Language, String::from("en")),
+			(EntryFieldType::PrimaryVerificationKey, primary_keypair.get_public_str()),
+			(EntryFieldType::SecondaryVerificationKey, secondary_keypair.get_public_str()),
+			(EntryFieldType::EncryptionKey, encryption_keypair.get_public_str()),
+		];
+		
+		// TODO: Finish orgentry_is_compliant() test
+		
 		Ok(())
 	}
 }
