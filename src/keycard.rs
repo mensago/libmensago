@@ -606,14 +606,10 @@ impl OrgEntry {
 		out.set_field(&EntryFieldType::TimeToLive, &String::from("14")).unwrap();
 		out.set_field(&EntryFieldType::Timestamp, &get_timestamp()).unwrap();
 
-		let in_one_year = Utc::now().date().naive_utc()
-			.checked_add_signed(Duration::days(365))
+		let in_one_year = get_offset_date(Duration::days(365))
 			.expect("Unable to create date 365 days from now");
+		out.set_field(&EntryFieldType::Expires,&in_one_year).unwrap();
 		
-		// This needs to output in the specific ISO 8601 format for keycards
-		// out.set_field(&EntryFieldType::Expires, &in_one_year.to_string()).unwrap();
-		
-		// TODO: Finish default field values in OrgEntry::new()
 		out
 	}
 

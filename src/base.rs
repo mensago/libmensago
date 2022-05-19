@@ -1,4 +1,5 @@
 use chrono::prelude::*;
+use chrono::Duration;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -83,6 +84,14 @@ pub fn get_timestamp() -> String {
 	String::from(formatted.to_string())
 }
 
+pub fn get_offset_date(d: Duration) -> Option<String> {
+
+	let offset_date = Utc::now().date().naive_utc()
+		.checked_add_signed(d)
+		.expect("Unable to create date 365 days from now");
+
+	Some(offset_date.format("%Y%m%d").to_string())
+}
 
 /// Returns a string, given a database query
 pub fn get_string_from_db(conn: &rusqlite::Connection, query: &str, params: &Vec<String>)
