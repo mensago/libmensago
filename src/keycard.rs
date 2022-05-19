@@ -1716,7 +1716,7 @@ mod tests {
 			},
 		};
 
-		let mut carddata = vec![
+		let carddata = vec![
 			(EntryFieldType::Name, String::from("Example, Inc.")),
 			(EntryFieldType::ContactAdmin, 
 				String::from("11111111-2222-2222-2222-333333333333/acme.com")),
@@ -1728,8 +1728,17 @@ mod tests {
 			(EntryFieldType::PrimaryVerificationKey, primary_keypair.get_public_str()),
 			(EntryFieldType::SecondaryVerificationKey, secondary_keypair.get_public_str()),
 			(EntryFieldType::EncryptionKey, encryption_keypair.get_public_str()),
+			(EntryFieldType::Expires, String::from("20250601")),
+			(EntryFieldType::Timestamp, String::from("20220520T1200Z"))
 		];
-		
+		match entry.set_fields(&carddata) {
+			Ok(_) => { /* fields are set as expected */ },
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("orgentry_is_compliant: failed to set entry fields: {}", e.to_string())))
+			}
+		}
+
 		// TODO: Finish orgentry_is_compliant() test
 		
 		Ok(())
