@@ -161,8 +161,7 @@ pub trait KeycardEntry {
 	fn is_expired(&self) -> Result<bool, MensagoError>;
 	
 	/// Returns the entire text of the entry minus any signatures or hashes
-	fn get_text(&self, signature_level: &AuthStrType, include_auth: bool)
-		-> Result<String, MensagoError>;
+	fn get_text(&self, signature_level: Option<&AuthStrType>) -> Result<String, MensagoError>;
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]

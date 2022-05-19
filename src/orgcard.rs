@@ -440,6 +440,55 @@ impl OrgEntry {
 
 		Ok(out)
 	}
+
+	fn has_authstr(&self, astype: &AuthStrType) -> Result<bool, MensagoError> {
+		self.sigs.has_authstr(astype)
+	}
+
+	/// Returns the specified authentication string
+	fn get_authstr(&self, astype: &AuthStrType) -> Result<CryptoString, MensagoError> {
+		self.sigs.get_authstr(astype)
+	}
+
+	/// Sets the specified authentication string to the value passed. NOTE: no validation of the
+	/// authentication string is performed by this call. The primary use for this method is to set
+	/// the previous hash for the signature block
+	fn add_authstr(&mut self, astype: &AuthStrType, astr: &CryptoString)
+		-> Result<(), MensagoError> {
+		
+		self.sigs.add_authstr(astype, astr)
+	}
+
+	/// Calculates the hash for the entry text using the specified algorithm. Requirements for this
+	/// call vary with the entry implementation. ErrOutOfOrderSignature is returned if a hash is
+	/// requested before another required authentication string has been set.
+	fn hash(&mut self, algorithm: &str) -> Result<(), MensagoError> {
+
+		// TODO: Finish implementing OrgEntry::hash()
+		// let text = self.get_text(None);
+		// self.sigs.hash(&text, algorithm)
+		Err(MensagoError::ErrUnimplemented)
+	}
+
+	/// Creates the requested signature. Requirements for this call vary with the entry
+	/// implementation. ErrOutOfOrderSignature is returned if a signature is requested before
+	/// another required authentication string has been set. ErrBadValue is returned for a
+	/// signature type not used by the specific implementation.
+	fn sign(&mut self, entry: &str, astype: &AuthStrType, signing_key: &SigningPair)
+		-> Result<(), MensagoError> {
+		
+		// TODO: Implement OrgEntry::verify
+		Err(MensagoError::ErrUnimplemented)
+	}
+	
+	/// Verifies the requested signature. ErrBadValue is returned for a signature type not used by
+	/// the specific implementation.
+	fn verify(&mut self, entry: &str, astype: &AuthStrType, verify_key: &dyn VerifySignature)
+		-> Result<(), MensagoError> {
+		
+		// TODO: Implement OrgEntry::verify
+		Err(MensagoError::ErrUnimplemented)
+	}
 }
 
 impl KeycardEntry for OrgEntry {
@@ -669,8 +718,7 @@ impl KeycardEntry for OrgEntry {
 	}
 	
 	/// Returns the entire text of the entry minus any signatures or hashes
-	fn get_text(&self, signature_level: &AuthStrType, include_auth: bool)
-		-> Result<String, MensagoError> {
+	fn get_text(&self, signature_level: Option<&AuthStrType>) -> Result<String, MensagoError> {
 		
 		let mut lines = Vec::<String>::new();
 		
@@ -682,10 +730,13 @@ impl KeycardEntry for OrgEntry {
 			lines.push(parts.join(":"));
 		}
 
-		if include_auth {
-			lines.extend(self.sigs.get_text(signature_level)?
+		match signature_level {
+			Some(v) => {
+				lines.extend(self.sigs.get_text(v)?
 				.iter()
 				.map(|x| x.to_string()));
+			},
+			None => { /* Do nothing */ }
 		}
 
 		Ok(lines.join("\r\n"))
