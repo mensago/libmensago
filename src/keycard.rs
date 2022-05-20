@@ -751,61 +751,140 @@ mod tests {
 	// EntryFieldType::ContactAbuse => WAddress::new(s),
 	// EntryFieldType::ContactSupport => WAddress::new(s),
 
-	// We're not testing all of the different field types, just a subset of the keycard-specific
-	// ones. Some don't need testing, like CryptoStringField, because they're tested elsewhere and
-	// the code needing tested is already covered. Others have their tests in other modules, like
-	// RandomID and WAddress.
 	#[test]
-	fn fieldtypes_tests() -> Result<(), MensagoError> {
-
-		// Type Field
+	fn fieldtypes_typefield() -> Result<(), MensagoError> {
 
 		match TypeField::new("User") {
 			Some(_) => { /* test case passes */ },
 			None => {
 				return Err(MensagoError::ErrProgramException(
-					format!("fieldtypes_tests: failed to create User type field")))
+					format!("fieldtypes_typefield: failed to create User type field")))
 			}
 		}
 		match TypeField::new("Organization") {
 			Some(_) => { /* test case passes */ },
 			None => {
 				return Err(MensagoError::ErrProgramException(
-					format!("fieldtypes_tests: failed to create Organization type field")))
+					format!("fieldtypes_typefield: failed to create Organization type field")))
 			}
 		}
 		match TypeField::new("NotARealType") {
-			None => { /* test case passes */ },
 			Some(_) => {
 				return Err(MensagoError::ErrProgramException(
-					format!("fieldtypes_tests: failed to handle bogus field type")))
-			}
+					format!("fieldtypes_typefield: failed to handle bogus field type")))
+			},
+			None => { /* test case passes */ },
 		}
 
-		// IndexField
+		Ok(())
+	}
+
+	#[test]
+	fn fieldtypes_namefield() -> Result<(), MensagoError> {
+
+		// Organization names must conform to 3 criteria:
+		// 1. Length in the range 1 <= x <= 64, measured in Unicode codepoints
+		// 2. At least 1 printable character
+		// 3. No leading or trailing whitespace
+		//
+		// We only need to test the first two conditions because the NameField type automatically
+		// strips leading and trailing whitespace.
+
+		match NameField::new("Example, Inc.") {
+			Some(_) => { /* test case passes */ },
+			None => {
+				return Err(MensagoError::ErrProgramException(
+					format!("fieldtypes_namefield: failed to create legitimate name field")))
+			}
+		}
+		match NameField::new("\x07") {
+			Some(_) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("fieldtypes_namefield: failed to handle nonprintable name")))
+			},
+			None => { /* test case passes */ },
+		}
+		match NameField::new("") {
+			Some(_) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("fieldtypes_namefield: failed to handle empty name")))
+			},
+			None => { /* test case passes */ },
+		}
+		match NameField::new(&"A".repeat(65)) {
+			Some(_) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("fieldtypes_namefield: failed to name of out-of-range length")))
+			},
+			None => { /* test case passes */ },
+		}
+
+		Ok(())
+	}
+
+	#[test]
+	fn fieldtypes_indexfield() -> Result<(), MensagoError> {
 
 		match IndexField::new("2") {
 			Some(_) => { /* test case passes */ },
 			None => {
 				return Err(MensagoError::ErrProgramException(
-					format!("fieldtypes_tests: failed to create index field with value 2")))
+					format!("fieldtypes_indexfield: failed to create index field with value 2")))
 			}
 		}
 		match TypeField::new("-1") {
-			None => { /* test case passes */ },
 			Some(_) => {
 				return Err(MensagoError::ErrProgramException(
-					format!("fieldtypes_tests: failed to handle negative index field value")))
-			}
+					format!("fieldtypes_indexfield: failed to handle negative index field value")))
+			},
+			None => { /* test case passes */ },
 		}
 		match IndexField::new("BadValue") {
-			None => { /* test case passes */ },
 			Some(_) => {
 				return Err(MensagoError::ErrProgramException(
-					format!("fieldtypes_tests: failed to handle bad index field value")))
-			}
+					format!("fieldtypes_indexfield: failed to handle bad index field value")))
+			},
+			None => { /* test case passes */ },
 		}
 
 		Ok(())
 	}
+
+	#[test]
+	fn fieldtypes_ttlfield() -> Result<(), MensagoError> {
+
+		// The TTLField, according to the spec, must be in the range 1 <= x <= 30
+
+		match TTLField::new("6") {
+			Some(_) => { /* test case passes */ },
+			None => {
+				return Err(MensagoError::ErrProgramException(
+					format!("fieldtypes_ttlfield: failed to create TTL field with value 6")))
+			},
+		}
+		match TTLField::new("30") {
+			Some(_) => { /* test case passes */ },
+			None => {
+				return Err(MensagoError::ErrProgramException(
+					format!("fieldtypes_ttlfield: failed to create TTL field with value 30")))
+			},
+		}
+		match TTLField::new("0") {
+			Some(_) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("fieldtypes_ttlfield: failed to handle TTL field with value 0")))
+			},
+			None => { /* test case passes */ },
+		}
+		match TTLField::new("31") {
+			Some(_) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("fieldtypes_ttlfield: failed to handle TTL field with value 31")))
+			},
+			None => { /* test case passes */ },
+		}
+
+		Ok(())
+	}
+
 }
