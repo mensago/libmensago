@@ -725,31 +725,10 @@ impl CryptoStringField {
 #[cfg(test)]
 mod tests {
 	use crate::*;
-	// use eznacl::*;
-	// use std::env;
-	// use std::fs;
-	// use std::path::PathBuf;
-	// use std::str::FromStr;
 	
-	// EntryFieldType::Type => TypeField::new(s),
-	// EntryFieldType::Index => IndexField::new(s),
-	// EntryFieldType::Name => NameField::new(s),
-	// EntryFieldType::WorkspaceID => RandomID::new(s),
-	// EntryFieldType::UserID => MAddress::new(s),
-	// EntryFieldType::Domain => Domain::new(s),
-	// EntryFieldType::ContactRequestEncryptionKey => CryptoStringField::new(s),
-	// EntryFieldType::ContactRequestVerificationKey => CryptoStringField::new(s),
-	// EntryFieldType::EncryptionKey => CryptoStringField::new(s),
-	// EntryFieldType::VerificationKey => CryptoStringField::new(s),
-	// EntryFieldType::TimeToLive => TTLField::new(s),
 	// EntryFieldType::Expires => DateField::new(s),
 	// EntryFieldType::Timestamp => DateTimeField::new(s),
 	// EntryFieldType::Language => LanguageField::new(s),
-	// EntryFieldType::PrimaryVerificationKey => CryptoStringField::new(s),
-	// EntryFieldType::SecondaryVerificationKey => CryptoStringField::new(s),
-	// EntryFieldType::ContactAdmin => WAddress::new(s),
-	// EntryFieldType::ContactAbuse => WAddress::new(s),
-	// EntryFieldType::ContactSupport => WAddress::new(s),
 
 	#[test]
 	fn fieldtypes_typefield() -> Result<(), MensagoError> {
@@ -843,6 +822,48 @@ mod tests {
 			Some(_) => {
 				return Err(MensagoError::ErrProgramException(
 					format!("fieldtypes_indexfield: failed to handle bad index field value")))
+			},
+			None => { /* test case passes */ },
+		}
+
+		Ok(())
+	}
+
+	#[test]
+	fn fieldtypes_datefield() -> Result<(), MensagoError> {
+
+		match DateField::new("20150510") {
+			Some(_) => { /* test case passes */ },
+			None => {
+				return Err(MensagoError::ErrProgramException(
+					format!("fieldtypes_datefield: failed to create date field with good value")))
+			}
+		}
+		match DateField::new("BadValue") {
+			Some(_) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("fieldtypes_datefield: failed to handle bad date field value")))
+			},
+			None => { /* test case passes */ },
+		}
+
+		Ok(())
+	}
+
+	#[test]
+	fn fieldtypes_datetimefield() -> Result<(), MensagoError> {
+
+		match DateTimeField::new("20150510T120011Z") {
+			Some(_) => { /* test case passes */ },
+			None => {
+				return Err(MensagoError::ErrProgramException(
+					format!("fieldtypes_datetimefield: failed to create date field with good value")))
+			}
+		}
+		match DateField::new("BadValue") {
+			Some(_) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("fieldtypes_datetimefield: failed to handle bad date field value")))
 			},
 			None => { /* test case passes */ },
 		}
