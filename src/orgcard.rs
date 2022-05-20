@@ -7,7 +7,7 @@ use crate::keycard::*;
 use crate::types::*;
 
 #[derive(Debug)]
-struct OrgSigBlock {
+pub struct OrgSigBlock {
 	signatures: [Option<CryptoString>; 4]
 }
 
@@ -326,7 +326,7 @@ impl SignatureBlock for OrgSigBlock {
 }
 
 // OrgEntry is an entry for an organizational keycard
-struct OrgEntry {
+pub struct OrgEntry {
 	_type: EntryType,
 	fields: HashMap<EntryFieldType, Box<dyn VerifiedString>>,
 	sigs: OrgSigBlock,
@@ -441,19 +441,19 @@ impl OrgEntry {
 		Ok(out)
 	}
 
-	fn has_authstr(&self, astype: &AuthStrType) -> Result<bool, MensagoError> {
+	pub fn has_authstr(&self, astype: &AuthStrType) -> Result<bool, MensagoError> {
 		self.sigs.has_authstr(astype)
 	}
 
 	/// Returns the specified authentication string
-	fn get_authstr(&self, astype: &AuthStrType) -> Result<CryptoString, MensagoError> {
+	pub fn get_authstr(&self, astype: &AuthStrType) -> Result<CryptoString, MensagoError> {
 		self.sigs.get_authstr(astype)
 	}
 
 	/// Sets the specified authentication string to the value passed. NOTE: no validation of the
 	/// authentication string is performed by this call. The primary use for this method is to set
 	/// the previous hash for the signature block
-	fn add_authstr(&mut self, astype: &AuthStrType, astr: &CryptoString)
+	pub fn add_authstr(&mut self, astype: &AuthStrType, astr: &CryptoString)
 		-> Result<(), MensagoError> {
 		
 		self.sigs.add_authstr(astype, astr)
@@ -462,32 +462,30 @@ impl OrgEntry {
 	/// Calculates the hash for the entry text using the specified algorithm. Requirements for this
 	/// call vary with the entry implementation. ErrOutOfOrderSignature is returned if a hash is
 	/// requested before another required authentication string has been set.
-	fn hash(&mut self, algorithm: &str) -> Result<(), MensagoError> {
+	pub fn hash(&mut self, algorithm: &str) -> Result<(), MensagoError> {
 
-		// TODO: Finish implementing OrgEntry::hash()
-		// let text = self.get_text(None);
-		// self.sigs.hash(&text, algorithm)
-		Err(MensagoError::ErrUnimplemented)
+		let text = self.get_text(None)?;
+		self.sigs.hash(&text, algorithm)
 	}
 
 	/// Creates the requested signature. Requirements for this call vary with the entry
 	/// implementation. ErrOutOfOrderSignature is returned if a signature is requested before
 	/// another required authentication string has been set. ErrBadValue is returned for a
 	/// signature type not used by the specific implementation.
-	fn sign(&mut self, entry: &str, astype: &AuthStrType, signing_key: &SigningPair)
+	pub fn sign(&mut self, astype: &AuthStrType, signing_key: &SigningPair)
 		-> Result<(), MensagoError> {
 		
-		// TODO: Implement OrgEntry::verify
-		Err(MensagoError::ErrUnimplemented)
+		let text = self.get_text(None)?;
+		self.sigs.sign(&text, astype, signing_key)
 	}
 	
 	/// Verifies the requested signature. ErrBadValue is returned for a signature type not used by
 	/// the specific implementation.
-	fn verify(&mut self, entry: &str, astype: &AuthStrType, verify_key: &dyn VerifySignature)
+	pub fn verify(&mut self, astype: &AuthStrType, verify_key: &dyn VerifySignature)
 		-> Result<(), MensagoError> {
 		
-		// TODO: Implement OrgEntry::verify
-		Err(MensagoError::ErrUnimplemented)
+		let text = self.get_text(None)?;
+		self.sigs.verify(&text, astype, verify_key)
 	}
 }
 
