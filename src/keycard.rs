@@ -782,6 +782,30 @@ mod tests {
 			}
 		}
 
+		// IndexField
+
+		match IndexField::new("2") {
+			Some(_) => { /* test case passes */ },
+			None => {
+				return Err(MensagoError::ErrProgramException(
+					format!("fieldtypes_tests: failed to create index field with value 2")))
+			}
+		}
+		match TypeField::new("-1") {
+			None => { /* test case passes */ },
+			Some(_) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("fieldtypes_tests: failed to handle negative index field value")))
+			}
+		}
+		match IndexField::new("BadValue") {
+			None => { /* test case passes */ },
+			Some(_) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("fieldtypes_tests: failed to handle bad index field value")))
+			}
+		}
+
 		Ok(())
 	}
 }
