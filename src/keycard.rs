@@ -608,7 +608,7 @@ impl DateTimeField {
 
 		let trimmed = s.trim();
 
-		match chrono::NaiveDateTime::parse_from_str(trimmed, "%Y%m%dT%H%MZ") {
+		match chrono::NaiveDateTime::parse_from_str(trimmed, "%Y%m%dT%H%M%SZ") {
 			Ok(_) => {
 				Some(DateTimeField { data: String::from(trimmed) })
 			},

@@ -355,11 +355,13 @@ impl OrgEntry {
 
 		// Set some default values to save the caller some time.
 		out.set_field(&EntryFieldType::TimeToLive, &String::from("14")).unwrap();
-		out.set_field(&EntryFieldType::Timestamp, &get_timestamp()).unwrap();
+		out.set_field(&EntryFieldType::Timestamp, &get_timestamp())
+			.expect("OrgField::new encountered error in setting timestamp");
 
 		let in_one_year = get_offset_date(Duration::days(365))
 			.expect("Unable to create date 365 days from now");
-		out.set_field(&EntryFieldType::Expires,&in_one_year).unwrap();
+		out.set_field(&EntryFieldType::Expires,&in_one_year)
+			.expect("OrgField::new encountered error in setting expiration");
 		
 		out
 	}
@@ -785,7 +787,7 @@ mod tests {
 			"Encryption-Key:CURVE25519:^fI7bdC(IEwC#(nG8Em-;nx98TcH<TnfvajjjDV@\r\n",
 			"Time-To-Live:14\r\n",
 			"Expires:20231231\r\n",
-			"Timestamp:20220501T1352Z\r\n",
+			"Timestamp:20220501T135211Z\r\n",
 			"Custody-Signature:ED25519:x3)dYq@S0rd1Rfbie*J7kF{fkxQ=J=A)OoO1WGx97o-utWtfbw\r\n",
 			"Previous-Hash:BLAKE2B-256:tSl@QzD1w-vNq@CC-5`($KuxO0#aOl^-cy(l7XXT\r\n",
 			"Hash:BLAKE2B-256:6XG#bSNuJyLCIJxUa-O`V~xR{kF4UWxaFJvPvcwg\r\n",
@@ -1019,6 +1021,7 @@ mod tests {
 		};
 
 		let carddata = vec![
+			(EntryFieldType::Index, String::from("1")),
 			(EntryFieldType::Name, String::from("Example, Inc.")),
 			(EntryFieldType::ContactAdmin, 
 				String::from("11111111-2222-2222-2222-333333333333/acme.com")),
@@ -1031,7 +1034,7 @@ mod tests {
 			(EntryFieldType::SecondaryVerificationKey, secondary_keypair.get_public_str()),
 			(EntryFieldType::EncryptionKey, encryption_keypair.get_public_str()),
 			(EntryFieldType::Expires, String::from("20250601")),
-			(EntryFieldType::Timestamp, String::from("20220520T1200Z"))
+			(EntryFieldType::Timestamp, String::from("20220520T120000Z"))
 		];
 		match entry.set_fields(&carddata) {
 			Ok(_) => { /* fields are set as expected */ },
@@ -1041,7 +1044,37 @@ mod tests {
 			}
 		}
 
-		// TODO: Finish orgentry_is_compliant() test
+		// We have finished creating a root entry for an organization. All that we need now is to
+		// hash it and then sign it. This will make the entry compliant and is_compliant() should
+		// return true.
+		match entry.hash("BLAKE2B-256") {
+			Ok(_) => { /* Do nothing */ },
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("orgentry_is_compliant: hash returned an error: {}", e.to_string())))
+			}
+		}
+
+		match entry.sign(&AuthStrType::Organization, &primary_keypair) {
+			Ok(_) => { /* Do nothing */ },
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("orgentry_is_compliant: sign returned an error: {}", e.to_string())))
+			}
+		}
+
+		match entry.is_compliant() {
+			Ok(v) => {
+				if !v {
+					return Err(MensagoError::ErrProgramException(
+						format!("orgentry_is_compliant: compliant entry failed compliance check")))
+				}
+			},
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("orgentry_is_compliant: is_compliant returned an error: {}", e.to_string())))
+			}
+		}
 		
 		Ok(())
 	}
