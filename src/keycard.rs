@@ -721,3 +721,67 @@ impl CryptoStringField {
 		}
 	}
 }
+
+#[cfg(test)]
+mod tests {
+	use crate::*;
+	// use eznacl::*;
+	// use std::env;
+	// use std::fs;
+	// use std::path::PathBuf;
+	// use std::str::FromStr;
+	
+	// EntryFieldType::Type => TypeField::new(s),
+	// EntryFieldType::Index => IndexField::new(s),
+	// EntryFieldType::Name => NameField::new(s),
+	// EntryFieldType::WorkspaceID => RandomID::new(s),
+	// EntryFieldType::UserID => MAddress::new(s),
+	// EntryFieldType::Domain => Domain::new(s),
+	// EntryFieldType::ContactRequestEncryptionKey => CryptoStringField::new(s),
+	// EntryFieldType::ContactRequestVerificationKey => CryptoStringField::new(s),
+	// EntryFieldType::EncryptionKey => CryptoStringField::new(s),
+	// EntryFieldType::VerificationKey => CryptoStringField::new(s),
+	// EntryFieldType::TimeToLive => TTLField::new(s),
+	// EntryFieldType::Expires => DateField::new(s),
+	// EntryFieldType::Timestamp => DateTimeField::new(s),
+	// EntryFieldType::Language => LanguageField::new(s),
+	// EntryFieldType::PrimaryVerificationKey => CryptoStringField::new(s),
+	// EntryFieldType::SecondaryVerificationKey => CryptoStringField::new(s),
+	// EntryFieldType::ContactAdmin => WAddress::new(s),
+	// EntryFieldType::ContactAbuse => WAddress::new(s),
+	// EntryFieldType::ContactSupport => WAddress::new(s),
+
+	// We're not testing all of the different field types, just a subset of the keycard-specific
+	// ones. Some don't need testing, like CryptoStringField, because they're tested elsewhere and
+	// the code needing tested is already covered. Others have their tests in other modules, like
+	// RandomID and WAddress.
+	#[test]
+	fn fieldtypes_tests() -> Result<(), MensagoError> {
+
+		// Type Field
+
+		match TypeField::new("User") {
+			Some(_) => { /* test case passes */ },
+			None => {
+				return Err(MensagoError::ErrProgramException(
+					format!("fieldtypes_tests: failed to create User type field")))
+			}
+		}
+		match TypeField::new("Organization") {
+			Some(_) => { /* test case passes */ },
+			None => {
+				return Err(MensagoError::ErrProgramException(
+					format!("fieldtypes_tests: failed to create Organization type field")))
+			}
+		}
+		match TypeField::new("NotARealType") {
+			None => { /* test case passes */ },
+			Some(_) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("fieldtypes_tests: failed to handle bogus field type")))
+			}
+		}
+
+		Ok(())
+	}
+}
