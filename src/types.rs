@@ -203,6 +203,15 @@ impl UserID {
 		Some(out)
 	}
 
+	/// Creates a heap-allocated version of the field from a string or None if not valid
+	pub fn new(s: &str) -> Option<Box<dyn VerifiedString>> {
+
+		match Self::from(s) {
+			Some(v) => Some(Box::<Self>::new(v)),
+			None => None
+		}
+	}
+
 	/// Creates a UserID from a workspace ID
 	pub fn from_wid(wid: &RandomID) -> UserID {
 		UserID {
