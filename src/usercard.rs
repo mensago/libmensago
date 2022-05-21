@@ -4,7 +4,6 @@ use chrono::prelude::*;
 use chrono::{NaiveDate, Duration};
 use eznacl::*;
 use crate::base::*;
-use crate::keycard::*;
 use crate::types::*;
 
 #[derive(Debug)]
@@ -798,5 +797,319 @@ impl KeycardEntry for UserEntry {
 		}
 
 		Ok(lines.join("\r\n"))
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use crate::*;
+	use eznacl::*;
+
+	#[test]
+	fn userentry_from_datacompliant() -> Result<(), MensagoError> {
+
+		let good_carddata = concat!(
+			"Type:User\r\n",
+			"Index:2\r\n",
+			"Name:Corbin Simons\r\n",
+			"Workspace-ID:1111111-2222-3333-4444-555555555555\r\n",
+			"User-ID:csimons\r\n",
+			"Domain:example.com\r\n",
+			"Contact-Request-Verification-Key:ED25519:&JEq)5Ktu@jfM+Sa@+1GU6E&Ct2*<2ZYXh#l0FxP\r\n",
+			"Contact-Request-Encryption-Key:CURVE25519:^fI7bdC(IEwC#(nG8Em-;nx98TcH<TnfvajjjDV@\r\n",
+			"Verification-Key:ED25519:&JEq)5Ktu@jfM+Sa@+1GU6E&Ct2*<2ZYXh#l0FxP\r\n",
+			"Encryption-Key:CURVE25519:^fI7bdC(IEwC#(nG8Em-;nx98TcH<TnfvajjjDV@\r\n",
+			"Time-To-Live:14\r\n",
+			"Expires:20231231\r\n",
+			"Timestamp:20220501T135211Z\r\n",
+			"Custody-Signature:ED25519:x3)dYq@S0rd1Rfbie*J7kF{fkxQ=J=A)OoO1WGx97o-utWtfbw\r\n",
+			"Organization-Signature:ED25519:x3)dYq@S0rd1Rfbie*J7kF{fkxQ=J=A)OoO1WGx97o-utWtfbw\r\n",
+			"Previous-Hash:BLAKE2B-256:tSl@QzD1w-vNq@CC-5`($KuxO0#aOl^-cy(l7XXT\r\n",
+			"Hash:BLAKE2B-256:6XG#bSNuJyLCIJxUa-O`V~xR{kF4UWxaFJvPvcwg\r\n",
+			"User-Signature:ED25519:x3)dYq@S0rd1Rfbie*J7kF{fkxQ=J=A)OoO1WGx97o-utWtfbw\r\n");
+
+		let entry = match crate::usercard::UserEntry::from(good_carddata) {
+			Ok(v) => { v },
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("userentry_set_datacompliant failed on good data: {}", e.to_string())))
+			}
+		};
+
+		match entry.is_data_compliant() {
+			Ok(v) => {
+				if !v {
+					return Err(MensagoError::ErrProgramException(
+						String::from("userentry_set_datacompliant failed compliant data")))
+				}
+			},
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("userentry_set_datacompliant error on compliant data: {}", e.to_string())))
+			}
+		}
+
+		Ok(())
+	}
+
+	#[test]
+	fn userentry_set_get_field() -> Result<(), MensagoError> {
+		
+		let mut entry = crate::usercard::UserEntry::new();
+
+		// Try setting a bad field value
+		match entry.set_field(&EntryFieldType::Domain, "/123*") {
+			Ok(_) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("userentry_set_field passed an invalid value")))
+			},
+			Err(_) => {
+				/* Test condition passes. Do nothing. */
+			}
+		}
+
+		// Try setting a field which isn't used for organizations
+		match entry.set_field(&EntryFieldType::UserID, "csimons") {
+			Ok(_) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("userentry_set_field allowed an invalid entry type")))
+			},
+			Err(_) => {
+				/* Test condition passes. Do nothing. */
+			}
+		}
+
+		// Try setting a good field value
+		match entry.set_field(&EntryFieldType::Name, "Corbin Simons") {
+			Ok(_) => { /* Test condition passes. Do nothing. */ },
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("userentry_set_field failed: {}", e.to_string())))
+			}
+		}
+
+		// Try getting a field which doesn't exist
+		match entry.get_field(&EntryFieldType::Domain) {
+			Ok(_) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("userentry_get_field passed a nonexistent field")))
+			},
+			Err(_) => {
+				/* Test condition passes. Do nothing. */
+			}
+		}
+
+		// Try getting a field, expecting success here
+		match entry.get_field(&EntryFieldType::Name) {
+			Ok(_) => { /* Test condition passes. Do nothing. */ },
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("userentry_get_field failed: {}", e.to_string())))
+			}
+		}
+
+		Ok(())
+	}
+
+	#[test]
+	fn userentry_set_fields() -> Result<(), MensagoError> {
+		
+		let mut entry = crate::usercard::UserEntry::new();
+
+		let mut testdata = vec![
+			(EntryFieldType::Name, String::from("Example, Inc.")),
+			(EntryFieldType::ContactAdmin, String::from("example.com")),
+		];
+		
+		match entry.set_fields(&testdata) {
+			Ok(_) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("userentry_set_fields passed an invalid value")))
+			},
+			Err(_) => {
+				/* Test condition passes. Do nothing. */
+			}
+		}
+
+		testdata = vec![
+			(EntryFieldType::Name, String::from("Example, Inc.")),
+			(EntryFieldType::ContactAdmin, String::from("11111111-1111-1111-1111-111111111111/example.com")),
+		];
+		match entry.set_fields(&testdata) {
+			Ok(_) => Ok(()),
+			Err(e) => {
+				Err(MensagoError::ErrProgramException(
+					format!("userentry_set_fields failed: {}", e.to_string())))
+			}
+		}
+	}
+
+	#[test]
+	fn userentry_set_fields_str() -> Result<(), MensagoError> {
+		
+		let mut entry = crate::usercard::UserEntry::new();
+
+		let mut testdata = vec![
+			(String::from("Name"), String::from("Example, Inc.")),
+			(String::from("contactAdmin"),
+				String::from("11111111-1111-1111-1111-111111111111/example.com")),
+		];
+		
+		match entry.set_fields_str(&testdata) {
+			Ok(_) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("userentry_set_fields_str passed an invalid key")))
+			},
+			Err(_) => {
+				/* Test condition passes. Do nothing. */
+			}
+		}
+
+		testdata = vec![
+			(String::from("Name"), String::from("Example, Inc.")),
+			(String::from("Contact-Admin"),
+				String::from("11111111-1111-1111-1111-111111111111/example.com")),
+		];
+		match entry.set_fields_str(&testdata) {
+			Ok(_) => Ok(()),
+			Err(e) => {
+				Err(MensagoError::ErrProgramException(
+					format!("userentry_set_fields_str failed: {}", e.to_string())))
+			}
+		}
+	}
+
+	#[test]
+	fn userentry_delete_field() -> Result<(), MensagoError> {
+		
+		let mut entry = crate::usercard::UserEntry::new();
+
+		// Setup
+		match entry.set_field(&EntryFieldType::Name, "Corbin Simons") {
+			Ok(_) => { /* Test condition passes. Do nothing. */ },
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("userentry_delete_field failed: {}", e.to_string())))
+			}
+		}
+
+		// Make sure we can get the field
+		match entry.get_field(&EntryFieldType::Name) {
+			Ok(_) => { /* Test condition passes. Do nothing. */ },
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("userentry_delete_field failed to get field: {}", e.to_string())))
+			}
+		}
+
+		// Remove it
+		match entry.delete_field(&EntryFieldType::Name) {
+			Ok(_) => {
+				/* Test condition passes. Do nothing. */
+			},
+			Err(_) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("userentry_delete_field failed to delete a field")))
+			}
+		}
+		
+		// Make sure the field doesn't exist anymore
+		match entry.get_field(&EntryFieldType::Name) {
+			Ok(_) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("userentry_delete_field didn't actually delete the test field")))
+			},
+			Err(_) => {
+				/* Test condition passes. Do nothing. */
+			}
+		}
+
+		Ok(())
+	}
+
+	#[test]
+	fn userentry_is_compliant() -> Result<(), MensagoError> {
+
+		let mut entry = crate::usercard::UserEntry::new();
+		
+		let primary_keypair = match eznacl::SigningPair::generate() {
+			Some(v) => v,
+			None => {
+				return Err(MensagoError::ErrProgramException(
+					format!("userentry_is_compliant: failed to generate primary keypair")))
+			},
+		};
+		let secondary_keypair = match eznacl::SigningPair::generate() {
+			Some(v) => v,
+			None => {
+				return Err(MensagoError::ErrProgramException(
+					format!("userentry_is_compliant: failed to generate secondary keypair")))
+			},
+		};
+		let encryption_keypair = match eznacl::EncryptionPair::generate() {
+			Some(v) => v,
+			None => {
+				return Err(MensagoError::ErrProgramException(
+					format!("userentry_is_compliant: failed to generate encryption keypair")))
+			},
+		};
+
+		let carddata = vec![
+			(EntryFieldType::Index, String::from("1")),
+			(EntryFieldType::Name, String::from("Example, Inc.")),
+			(EntryFieldType::ContactAdmin, 
+				String::from("11111111-2222-2222-2222-333333333333/acme.com")),
+			(EntryFieldType::ContactSupport, 
+				String::from("11111111-2222-2222-2222-444444444444/acme.com")),
+			(EntryFieldType::ContactAbuse, 
+				String::from("11111111-2222-2222-2222-555555555555/acme.com")),
+			(EntryFieldType::Language, String::from("en")),
+			(EntryFieldType::PrimaryVerificationKey, primary_keypair.get_public_str()),
+			(EntryFieldType::SecondaryVerificationKey, secondary_keypair.get_public_str()),
+			(EntryFieldType::EncryptionKey, encryption_keypair.get_public_str()),
+			(EntryFieldType::Expires, String::from("20250601")),
+			(EntryFieldType::Timestamp, String::from("20220520T120000Z"))
+		];
+		match entry.set_fields(&carddata) {
+			Ok(_) => { /* fields are set as expected */ },
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("userentry_is_compliant: failed to set entry fields: {}", e.to_string())))
+			}
+		}
+
+		// We have finished creating a root entry for an organization. All that we need now is to
+		// hash it and then sign it. This will make the entry compliant and is_compliant() should
+		// return true.
+		match entry.hash("BLAKE2B-256") {
+			Ok(_) => { /* Do nothing */ },
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("userentry_is_compliant: hash returned an error: {}", e.to_string())))
+			}
+		}
+
+		match entry.sign(&AuthStrType::Organization, &primary_keypair) {
+			Ok(_) => { /* Do nothing */ },
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("userentry_is_compliant: sign returned an error: {}", e.to_string())))
+			}
+		}
+
+		match entry.is_compliant() {
+			Ok(v) => {
+				if !v {
+					return Err(MensagoError::ErrProgramException(
+						format!("userentry_is_compliant: compliant entry failed compliance check")))
+				}
+			},
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("userentry_is_compliant: is_compliant returned an error: {}", e.to_string())))
+			}
+		}
+		
+		Ok(())
 	}
 }
