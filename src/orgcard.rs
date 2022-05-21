@@ -24,17 +24,6 @@ impl OrgSigBlock {
 		}
 	}
 
-	fn index_to_astype(index: &usize) -> Result<AuthStrType,MensagoError> {
-
-		match index {
-			0 => Ok(AuthStrType::Custody),
-			1 => Ok(AuthStrType::PrevHash),
-			2 => Ok(AuthStrType::Hash),
-			3 => Ok(AuthStrType::Organization),
-			_ => Err(MensagoError::ErrBadValue),
-		}
-	}
-
 	pub fn new() -> OrgSigBlock {
 		OrgSigBlock { signatures: [None, None, None, None].clone() }
 	}
@@ -747,29 +736,6 @@ impl KeycardEntry for OrgEntry {
 mod tests {
 	use crate::*;
 	use eznacl::*;
-	use std::env;
-	use std::fs;
-	use std::path::PathBuf;
-	use std::str::FromStr;
-
-	// Sets up the path to contain the profile tests
-	fn setup_test(name: &str) -> PathBuf {
-		if name.len() < 1 {
-			panic!("Invalid name {} in setup_test", name);
-		}
-		let args: Vec<String> = env::args().collect();
-		let test_path = PathBuf::from_str(&args[0]).unwrap();
-		let mut test_path = test_path.parent().unwrap().to_path_buf();
-		test_path.push("testfiles");
-		test_path.push(name);
-
-		if test_path.exists() {
-			fs::remove_dir_all(&test_path).unwrap();
-		}
-		fs::create_dir_all(&test_path).unwrap();
-
-		test_path
-	}
 
 	#[test]
 	fn orgentry_from_datacompliant() -> Result<(), MensagoError> {
