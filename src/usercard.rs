@@ -7,35 +7,6 @@ use crate::base::*;
 use crate::keycard::*;
 use crate::types::*;
 
-
-static USER_FIELDS: [&EntryFieldType; 12] = [
-	&EntryFieldType::Index,
-	&EntryFieldType::Name,
-	&EntryFieldType::WorkspaceID,
-	&EntryFieldType::UserID,
-	&EntryFieldType::Domain,
-	&EntryFieldType::ContactRequestVerificationKey,
-	&EntryFieldType::ContactRequestEncryptionKey,
-	&EntryFieldType::EncryptionKey,
-	&EntryFieldType::VerificationKey,
-	&EntryFieldType::TimeToLive,
-	&EntryFieldType::Expires,
-	&EntryFieldType::Timestamp,
-];
-
-static USER_REQUIRED_FIELDS: [&EntryFieldType; 10] = [
-	&EntryFieldType::Index,
-	&EntryFieldType::WorkspaceID,
-	&EntryFieldType::Domain,
-	&EntryFieldType::ContactRequestVerificationKey,
-	&EntryFieldType::ContactRequestEncryptionKey,
-	&EntryFieldType::EncryptionKey,
-	&EntryFieldType::VerificationKey,
-	&EntryFieldType::TimeToLive,
-	&EntryFieldType::Expires,
-	&EntryFieldType::Timestamp,
-];
-
 #[derive(Debug)]
 pub struct UserSigBlock {
 	signatures: [Option<CryptoString>; 5]
@@ -46,7 +17,6 @@ impl UserSigBlock {
 	fn astype_to_index(astype: &AuthStrType) -> Result<usize,MensagoError> {
 
 		match astype {
-			AuthStrType::User => Err(MensagoError::ErrBadValue),
 			AuthStrType::Custody => Ok(0),
 			AuthStrType::PrevHash => Ok(1),
 			AuthStrType::Hash => Ok(2),
@@ -408,5 +378,425 @@ impl SignatureBlock for UserSigBlock {
 		} else {
 			Err(MensagoError::ErrInvalidKeycard)
 		}
+	}
+}
+
+// UserEntry is an entry for an organizational keycard
+pub struct UserEntry {
+	_type: EntryType,
+	fields: HashMap<EntryFieldType, Box<dyn VerifiedString>>,
+	sigs: UserSigBlock,
+}
+
+static USER_REQUIRED_FIELDS: [&EntryFieldType; 10] = [
+	&EntryFieldType::Index,
+	&EntryFieldType::WorkspaceID,
+	&EntryFieldType::Domain,
+	&EntryFieldType::ContactRequestVerificationKey,
+	&EntryFieldType::ContactRequestEncryptionKey,
+	&EntryFieldType::EncryptionKey,
+	&EntryFieldType::VerificationKey,
+	&EntryFieldType::TimeToLive,
+	&EntryFieldType::Expires,
+	&EntryFieldType::Timestamp,
+];
+
+impl UserEntry {
+
+	/// Creates a new, empty UserEntry
+	pub fn new() -> UserEntry {
+		let mut out = UserEntry {
+			_type: EntryType::Organization,
+			fields: HashMap::<EntryFieldType, Box<dyn VerifiedString>>::new(),
+			sigs: UserSigBlock::new(),
+		};
+
+		// Set some default values to save the caller some time.
+		out.set_field(&EntryFieldType::TimeToLive, &String::from("14")).unwrap();
+		out.set_field(&EntryFieldType::Timestamp, &get_timestamp())
+			.expect("UserField::new encountered error in setting timestamp");
+
+		let in_one_year = get_offset_date(Duration::days(365))
+			.expect("Unable to create date 365 days from now");
+		out.set_field(&EntryFieldType::Expires,&in_one_year)
+			.expect("UserField::new encountered error in setting expiration");
+		
+		out
+	}
+
+	/// Creates a new UserEntry from string data. Note that unlike most libmensago from() calls, 
+	/// this version returns a Result, not an option. This is to provide a better experience for the
+	/// caller -- a keycard's data can be invalid for a lot of different reasons and returning an
+	/// error will aid debugging. Note that compliance of the keycard is not guaranteed if this 
+	/// function returns success; it only ensures that all fields are valid and have data which
+	/// conforms to the expected formats.
+	pub fn from(s: &str) -> Result<UserEntry, MensagoError> {
+
+		// 160 is a close approximation. It includes the names of all required fields and the
+		// minimum length for any variable-length fields, including keys. It's a good quick way of
+		// ruling out obviously bad data.
+		if s.len() < 160 {
+			return Err(MensagoError::ErrBadValue)
+		}
+
+		let mut out = UserEntry::new();
+		for line in s.split("\r\n") {
+
+			if line.len() == 0 {
+				continue
+			}
+
+			let trimmed = line.trim();
+			if trimmed.len() == 0 {
+				continue
+			}
+
+
+			let parts = trimmed.splitn(2, ":").collect::<Vec<&str>>();
+			if parts.len() != 2 {
+				return Err(MensagoError::ErrBadFieldValue(String::from(trimmed)))
+			}
+
+			let field_value = match parts.get(1) {
+				Some(v) => v.clone(),
+				None => { return Err(MensagoError::ErrBadFieldValue(String::from(parts[0]))) },
+			};
+
+			match AuthStrType::from(parts[0]) {
+				Some(ast) => {
+					
+					match CryptoString::from(field_value) {
+						Some(cs) => {
+							out.sigs.add_authstr(&ast, &cs)?;
+							continue
+						},
+						None => {
+							return Err(MensagoError::ErrBadFieldValue(String::from(parts[0])))
+						}
+					}
+				},
+				None => { /* A different field type. Just move on. */ },
+			}
+
+			let field_type = match EntryFieldType::from(parts[0]) {
+				Some(v) => v,
+				None => return Err(MensagoError::ErrUnsupportedField)
+			};
+			
+			if field_type == EntryFieldType::Type {
+				if field_value != "Organization" {
+					return Err(MensagoError::ErrUnsupportedKeycardType)
+				}
+				continue
+			}
+
+			match out.set_field(&field_type, field_value) {
+				Ok(_) => { /* */ },
+				Err(e) => {
+					return Err(e)	
+				}
+			}
+		}
+
+		Ok(out)
+	}
+
+	pub fn has_authstr(&self, astype: &AuthStrType) -> Result<bool, MensagoError> {
+		self.sigs.has_authstr(astype)
+	}
+
+	/// Returns the specified authentication string
+	pub fn get_authstr(&self, astype: &AuthStrType) -> Result<CryptoString, MensagoError> {
+		self.sigs.get_authstr(astype)
+	}
+
+	/// Sets the specified authentication string to the value passed. NOTE: no validation of the
+	/// authentication string is performed by this call. The primary use for this method is to set
+	/// the previous hash for the signature block
+	pub fn add_authstr(&mut self, astype: &AuthStrType, astr: &CryptoString)
+		-> Result<(), MensagoError> {
+		
+		self.sigs.add_authstr(astype, astr)
+	}
+
+	/// Calculates the hash for the entry text using the specified algorithm. Requirements for this
+	/// call vary with the entry implementation. ErrOutOfOrderSignature is returned if a hash is
+	/// requested before another required authentication string has been set.
+	pub fn hash(&mut self, algorithm: &str) -> Result<(), MensagoError> {
+
+		let text = self.get_text(None)?;
+		self.sigs.hash(&text, algorithm)
+	}
+
+	/// Creates the requested signature. Requirements for this call vary with the entry
+	/// implementation. ErrOutOfOrderSignature is returned if a signature is requested before
+	/// another required authentication string has been set. ErrBadValue is returned for a
+	/// signature type not used by the specific implementation.
+	pub fn sign(&mut self, astype: &AuthStrType, signing_key: &SigningPair)
+		-> Result<(), MensagoError> {
+		
+		let text = self.get_text(None)?;
+		self.sigs.sign(&text, astype, signing_key)
+	}
+	
+	/// Verifies the requested signature. ErrBadValue is returned for a signature type not used by
+	/// the specific implementation.
+	pub fn verify(&mut self, astype: &AuthStrType, verify_key: &dyn VerifySignature)
+		-> Result<(), MensagoError> {
+		
+		let text = self.get_text(None)?;
+		self.sigs.verify(&text, astype, verify_key)
+	}
+}
+
+impl KeycardEntry for UserEntry {
+
+	fn get_type(&self) -> EntryType {
+		self._type
+	}
+	
+	fn get_field(&self, field: &EntryFieldType) -> Result<String, MensagoError> {
+
+		match self.fields.get(field) {
+			Some(v) => {
+				Ok(String::from(v.get()))
+			},
+			None => {
+				Err(MensagoError::ErrNotFound)
+			}
+		}
+	}
+
+	fn set_field(&mut self, field: &EntryFieldType, value: &str) -> Result<(), MensagoError> {
+
+		match field {
+			EntryFieldType::Type => { 
+				// The Type field doesn't get put into the field index, so just return OK.
+				return Ok(())
+			},
+			EntryFieldType::Index => { /* Field is OK. Do nothing. */ },
+			EntryFieldType::Name => { /* Field is OK. Do nothing. */ },
+			EntryFieldType::WorkspaceID => { /* Field is OK. Do nothing. */ },
+			EntryFieldType::UserID => { /* Field is OK. Do nothing. */ },
+			EntryFieldType::Domain => { /* Field is OK. Do nothing. */ },
+			EntryFieldType::ContactRequestVerificationKey => { /* Field is OK. Do nothing. */ },
+			EntryFieldType::ContactRequestEncryptionKey => { /* Field is OK. Do nothing. */ },
+			EntryFieldType::EncryptionKey => { /* Field is OK. Do nothing. */ },
+			EntryFieldType::VerificationKey => { /* Field is OK. Do nothing. */ },
+			EntryFieldType::TimeToLive => { /* Field is OK. Do nothing. */ },
+			EntryFieldType::Expires => { /* Field is OK. Do nothing. */ },
+			EntryFieldType::Timestamp => { /* Field is OK. Do nothing. */ },
+			_ => {
+				return Err(MensagoError::ErrBadFieldValue(field.to_string()))
+			}
+		}
+
+		match EntryFieldType::new_field(field, value) {
+			Some(v) => {
+				let _ = self.fields.insert(*field, v);
+			},
+			None => {
+				return Err(MensagoError::ErrBadFieldValue(String::from(field.to_string())))
+			}
+		}
+		Ok(())
+	}
+
+	fn set_fields(&mut self, fields: &Vec<(EntryFieldType, String)>) -> Result<(), MensagoError> {
+
+		if fields.len() < 1 {
+			return Err(MensagoError::ErrEmptyData)
+		}
+		
+		// I'm sure there's a more compact way to do this, but I can't figure out what it would be.
+		// :(
+		for (k, v) in fields.iter() {
+			match EntryFieldType::new_field(k, v) {
+				Some(v) => {
+					let _ = self.fields.insert(*k, v);
+				},
+				None => {
+					return Err(MensagoError::ErrBadValue)
+				}
+			}
+		}
+		
+		Ok(())
+	}
+
+	fn set_fields_str(&mut self, fields: &Vec<(String, String)>) -> Result<(), MensagoError> {
+
+		if fields.len() < 1 {
+			return Err(MensagoError::ErrEmptyData)
+		}
+		
+		for (k, v) in fields.iter() {
+			match EntryFieldType::from(k) {
+				Some(ft) => {
+					match EntryFieldType::new_field(&ft, v) {
+						Some(fieldval) => {
+							let _ = self.fields.insert(ft, fieldval);
+						},
+						None => {
+							return Err(MensagoError::ErrBadValue)
+						}
+					}
+			
+				},
+				None => {
+					return Err(MensagoError::ErrBadValue)
+				}
+			};
+		}
+		
+		Ok(())
+	}
+
+	fn delete_field(&mut self, field: &EntryFieldType) -> Result<(), MensagoError> {
+
+		let _ = self.fields.remove(field);
+		Ok(())
+	}
+
+	fn is_data_compliant(&self) -> Result<bool, MensagoError> {
+
+		// Ensure that all required fields are present. Because each field is a ValidatedString, we
+		// already know that if the field is present, it's valid, too. :)
+		for f in USER_REQUIRED_FIELDS {
+			match self.fields.get(f) {
+				Some(_) => { /* do nothing */ },
+				None => {
+					return Ok(false)
+				}
+			}
+		}
+
+		Ok(true)
+	}
+
+	fn is_compliant(&self) -> Result<bool, MensagoError> {
+
+		let status = self.is_data_compliant()?;
+		if !status {
+			return Ok(status);
+		}
+
+		// The Custody signature and the PrevHash field are both required if the entry is not the
+		// root entry of the org's keycard.
+		let entry_index = match self.fields.get(&EntryFieldType::Index) {
+			Some(v) => {
+				match v.get().parse::<u32>() {
+					Ok(i) => i,
+					Err(e) => {
+						// We should never be here
+						return Err(MensagoError::ErrProgramException(e.to_string()))
+					},
+				}
+			},
+			None => {
+				return Ok(false)
+			}
+		};
+
+		if entry_index > 0 {
+			match UserSigBlock::astype_to_index(&AuthStrType::Custody) {
+				Ok(_) => { /* Do nothing*/ },
+				Err(_) => return Ok(false)
+			}
+			match UserSigBlock::astype_to_index(&AuthStrType::PrevHash) {
+				Ok(_) => { /* Do nothing*/ },
+				Err(_) => return Ok(false)
+			}
+		}
+
+		match UserSigBlock::astype_to_index(&AuthStrType::Hash) {
+			Ok(_) => { /* Do nothing*/ },
+			Err(_) => return Ok(false)
+		}
+
+		match UserSigBlock::astype_to_index(&AuthStrType::Custody) {
+			Ok(_) => Ok(true),
+			Err(_) => Ok(false)
+		}
+	}
+
+	fn set_expiration(&mut self, numdays: Option<&u16>) -> Result<(), MensagoError> {
+
+		let count = match numdays {
+			Some(v) => {
+				// The expiration date may be no longer than 3 years
+				if *v > 1095 {
+					return Err(MensagoError::ErrBadValue)
+				}
+				*v
+			},
+			None => {
+				if self._type == EntryType::Organization {
+					365
+				} else {
+					90
+				}
+			}
+		};
+
+		self.set_field(&EntryFieldType::Expires, &count.to_string())?;
+
+		Ok(())
+	}
+
+	/// Returns true if the entry has exceeded its expiration date
+	fn is_expired(&self) -> Result<bool, MensagoError> {
+
+		// Yes, it would make more sense to simply have a stored value which was already parsed,
+		// but the necessary code to do the dynamic dispatch to handle this would probably increase
+		// complexity by an order of magnitude. We'll sacrifice a tiny bit of performance for 
+		// simplicity.
+		let expdate = match self.fields.get(&EntryFieldType::Expires) {
+			Some(v) => {
+				match NaiveDate::parse_from_str(v.get(), "%Y%m%d") {
+					Ok(d) => d,
+					Err(e) => {
+						// We should never be here
+						return Err(MensagoError::ErrProgramException(e.to_string()))
+					}
+				}
+			},
+			None => {
+				return Err(MensagoError::ErrNotFound)
+			}
+		};
+
+		let now = Utc::now().date().naive_utc();
+
+		if now > expdate {
+			Ok(true)
+		} else {
+			Ok(false)
+		}
+	}
+	
+	/// Returns the entire text of the entry minus any signatures or hashes
+	fn get_text(&self, signature_level: Option<&AuthStrType>) -> Result<String, MensagoError> {
+		
+		let mut lines = Vec::<String>::new();
+		
+		// First line of an entry must be the type
+		lines.push(String::from("Type:")+&self._type.to_string());
+
+		for (k,v) in self.fields.iter() {
+			let parts = [k.to_string(), v.get().to_string()];
+			lines.push(parts.join(":"));
+		}
+
+		match signature_level {
+			Some(v) => {
+				lines.extend(self.sigs.get_text(v)?
+				.iter()
+				.map(|x| x.to_string()));
+			},
+			None => { /* Do nothing */ }
+		}
+
+		Ok(lines.join("\r\n"))
 	}
 }
