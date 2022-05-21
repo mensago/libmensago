@@ -483,7 +483,7 @@ impl UserEntry {
 			};
 			
 			if field_type == EntryFieldType::Type {
-				if field_value != "Organization" {
+				if field_value != "User" {
 					return Err(MensagoError::ErrUnsupportedKeycardType)
 				}
 				continue
@@ -810,10 +810,10 @@ mod tests {
 
 		let good_carddata = concat!(
 			"Type:User\r\n",
+			"User-ID:csimons\r\n",
 			"Index:2\r\n",
 			"Name:Corbin Simons\r\n",
-			"Workspace-ID:1111111-2222-3333-4444-555555555555\r\n",
-			"User-ID:csimons\r\n",
+			"Workspace-ID:11111111-2222-3333-4444-555555555555\r\n",
 			"Domain:example.com\r\n",
 			"Contact-Request-Verification-Key:ED25519:&JEq)5Ktu@jfM+Sa@+1GU6E&Ct2*<2ZYXh#l0FxP\r\n",
 			"Contact-Request-Encryption-Key:CURVE25519:^fI7bdC(IEwC#(nG8Em-;nx98TcH<TnfvajjjDV@\r\n",

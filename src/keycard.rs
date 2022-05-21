@@ -82,7 +82,7 @@ impl EntryFieldType {
 			EntryFieldType::Index => IndexField::new(s),
 			EntryFieldType::Name => NameField::new(s),
 			EntryFieldType::WorkspaceID => RandomID::new(s),
-			EntryFieldType::UserID => MAddress::new(s),
+			EntryFieldType::UserID => UserID::new(s),
 			EntryFieldType::Domain => Domain::new(s),
 			EntryFieldType::ContactRequestEncryptionKey => CryptoStringField::new(s),
 			EntryFieldType::ContactRequestVerificationKey => CryptoStringField::new(s),
