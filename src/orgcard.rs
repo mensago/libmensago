@@ -3,7 +3,7 @@ use chrono::prelude::*;
 use chrono::{NaiveDate, Duration};
 use eznacl::*;
 use crate::base::*;
-use crate::keycard::*;
+use crate::keycardbase::*;
 use crate::types::*;
 
 #[derive(Debug)]
