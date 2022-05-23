@@ -164,6 +164,46 @@ pub trait KeycardEntry {
 	fn get_text(&self, signature_level: Option<&AuthStrType>) -> Result<String, MensagoError>;
 }
 
+/// A Keycard object is a collection of entries tied together in an authenticated blockchain. It
+/// consists of the root entry for the entity all the way through the current entry.
+pub struct Keycard {
+
+	_type: EntryType,
+	entries: Vec<Box<dyn KeycardEntry>>,
+}
+
+impl Keycard {
+	
+	/// Creates a new Keycard of the specified type
+	pub fn new(t: &EntryType) -> Keycard {
+
+		Keycard {
+			_type: *t,
+			entries: Vec::<Box<dyn KeycardEntry>>::new(),
+		}
+	}
+
+	pub fn from(data: &str) -> Result<Keycard, MensagoError> {
+
+		let card_type: EntryType;
+		let mut accumulator = Vec::<&str>::new();
+		let mut line_index: usize = 1;
+		let mut entry_index: usize = 1;
+		
+		for line in data.split("\r\n") {
+
+			let trimmed = line.trim();
+
+			if trimmed == "----- BEGIN ENTRY -----" {
+				accumulator.clear();
+			}
+		}
+
+		// TODO: Finish implementing Keycard::from
+		Err(MensagoError::ErrUnimplemented)
+	}
+}
+
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
 pub enum EntryType {
 	Organization,
