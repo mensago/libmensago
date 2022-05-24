@@ -162,6 +162,16 @@ pub trait KeycardEntry {
 	
 	/// Returns the entire text of the entry minus any signatures or hashes
 	fn get_text(&self, signature_level: Option<&AuthStrType>) -> Result<String, MensagoError>;
+
+	// TODO: Move chain() and verify_chain() for OrgEntry and User Entry to KeycardEntry trait implementation once implemented for both types
+	// /// Creates a new KeycardEntry object with new keys and a custody signature. It requires the contact
+	// /// request signing keypair used for the entry so that the Custody-Signature field is
+	// /// generated correctly. The rotate_optional parameter determines if optional keys are rotated.
+	// /// This should normally be true except under special circumstances.
+	// fn chain(&self, crspair: &SigningPair, rotate_optional: &bool) -> Result<Box<dyn Self>, MensagoError>;
+
+	// /// Verifies the chain of custody between the provided entry and the current one
+	// fn verify_chain(&self, previous: &Box<dyn Self>) -> Result<bool, MensagoError>;
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]

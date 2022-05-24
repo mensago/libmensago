@@ -486,14 +486,15 @@ impl OrgEntry {
 	/// rotate_optional is true, the primary verification key becomes the secondary verification key
 	/// in the new OrgEntry instance. When rotate_optional is false, a new primary key is generated
 	/// and the secondary key field is not present in the returned OrgEntry.
-	pub fn chain(&self, crspair: &SigningPair, rotate_optional: &bool) -> Result<OrgEntry, MensagoError> {
+	pub fn chain(&self, crspair: &SigningPair, rotate_optional: &bool)
+		-> Result<Box<dyn KeycardEntry>, MensagoError> {
 
 		// TODO: implement OrgEntry::chain()
 		Err(MensagoError::ErrUnimplemented)
 	}
 
 	/// Verifies the chain of custody between the provided entry and the current one
-	pub fn verify_chain(&self, previous: &OrgEntry) -> Result<bool, MensagoError> {
+	pub fn verify_chain(&self, previous: &Box<dyn KeycardEntry>) -> Result<bool, MensagoError> {
 
 		// TODO: implement OrgEntry::verify_chain()
 		Err(MensagoError::ErrUnimplemented)
