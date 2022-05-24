@@ -478,6 +478,26 @@ impl OrgEntry {
 		let text = self.get_text(None)?;
 		self.sigs.verify(&text, astype, verify_key)
 	}
+
+	/// Creates a new OrgEntry object with new keys and a custody signature. It requires the contact
+	/// request signing keypair used for the entry so that the Custody-Signature field is
+	/// generated correctly. The rotate_optional parameter determines if optional keys are rotated.
+	/// This should normally be true unless revoking the current primary signing key. When
+	/// rotate_optional is true, the primary verification key becomes the secondary verification key
+	/// in the new OrgEntry instance. When rotate_optional is false, a new primary key is generated
+	/// and the secondary key field is not present in the returned OrgEntry.
+	pub fn chain(&self, crspair: &SigningPair, rotate_optional: &bool) -> Result<OrgEntry, MensagoError> {
+
+		// TODO: implement OrgEntry::chain()
+		Err(MensagoError::ErrUnimplemented)
+	}
+
+	/// Verifies the chain of custody between the provided entry and the current one
+	pub fn verify_chain(&self, previous: &OrgEntry) -> Result<bool, MensagoError> {
+
+		// TODO: implement OrgEntry::verify_chain()
+		Err(MensagoError::ErrUnimplemented)
+	}
 }
 
 impl KeycardEntry for OrgEntry {
