@@ -8,7 +8,7 @@ use crate::usercard::UserEntry;
 pub struct Keycard {
 
 	_type: EntryType,
-	entries: Vec<Box<dyn KeycardEntry>>,
+	pub entries: Vec<Box<dyn KeycardEntry>>,
 }
 
 impl Keycard {
@@ -22,6 +22,7 @@ impl Keycard {
 		}
 	}
 
+	/// Creates a new keycard entry chain from text.
 	pub fn from(data: &str) -> Result<Keycard, MensagoError> {
 
 		// We have to have a card type, so we'll default to the most common one. When we determine
@@ -85,5 +86,27 @@ impl Keycard {
 
 		Ok(out)
 	}
+
+	/// Returns the type of entries stored in the keycard
+	pub fn get_type(&self) -> EntryType {
+		self._type
+	}
+
+	/// Returns the entire keycard chain as text
+	pub fn get_text(&self) -> Result<String, MensagoError> {
+
+		// TODO: implement Keycard::get_text()
+		Err(MensagoError::ErrUnimplemented)
+	}
+
+	/// Verifies the keycard's complete chain of entries
+	pub fn verify(&self) -> Result<bool, MensagoError>  {
+
+		// TODO: implement Keycard::verify()
+		Err(MensagoError::ErrUnimplemented)
+	}
 }
 
+// TODO: implement function to add entry to the database
+// TODO: implement function to get most recent entry from the database
+// TODO: implement function to get an entire keycard from the database 
