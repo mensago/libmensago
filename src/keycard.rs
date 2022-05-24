@@ -83,8 +83,7 @@ impl Keycard {
 			line_index += 1;
 		}
 
-		// TODO: Finish implementing Keycard::from
-		Err(MensagoError::ErrUnimplemented)
+		Ok(out)
 	}
 }
 
