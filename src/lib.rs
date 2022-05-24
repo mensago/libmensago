@@ -2,6 +2,7 @@ mod auth;
 mod base;
 mod keycardbase;
 mod keycard;
+mod keycard_private;
 mod orgcard;
 mod profile;
 mod types;

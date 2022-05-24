@@ -4,6 +4,7 @@ use chrono::{NaiveDate, Duration};
 use eznacl::*;
 use crate::base::*;
 use crate::keycardbase::*;
+use crate::keycard_private::*;
 use crate::types::*;
 
 #[derive(Debug)]
@@ -488,8 +489,14 @@ impl OrgEntry {
 	/// and the secondary key field is not present in the returned OrgEntry.
 	pub fn chain(&self, crspair: &SigningPair, rotate_optional: &bool)
 		-> Result<Box<dyn KeycardEntry>, MensagoError> {
+		
+		// TODO: Need to be able to optionally specify the expiration period in chain()
+		// TODO: Need to change the return type for chain()
+		// The signed new entry needs to be returned, but so do all the new keys
+		
+		let out = self.copy();
 
-		// TODO: implement OrgEntry::chain()
+		// TODO: Finish mplementing OrgEntry::chain()
 		Err(MensagoError::ErrUnimplemented)
 	}
 
@@ -498,6 +505,51 @@ impl OrgEntry {
 
 		// TODO: implement OrgEntry::verify_chain()
 		Err(MensagoError::ErrUnimplemented)
+	}
+
+	/// Makes a careful duplicate of the entry. Note that this is NOT the same as the standard
+	/// library trait of the same name. This method handles the data duplication needs for chaining
+	/// together two entries, excluding certain fields and handling expiration carefully.
+	fn copy(&self) -> Self {
+
+		let mut out = OrgEntry::new();
+
+		for (k,v) in self.fields.iter() {
+			match k {
+				EntryFieldType::Type => { /* Field is already set. Do nothing. */ },
+				EntryFieldType::Index => { /* Field will be set below. Do nothing for now. */ },
+				EntryFieldType::PrimaryVerificationKey => {
+					/* Field should not be copied. Do nothing. */ 
+				},
+				EntryFieldType::SecondaryVerificationKey => {
+					/* Field should not be copied. Do nothing. */ 
+				},
+				EntryFieldType::EncryptionKey => {
+					/* Field should not be copied. Do nothing. */ 
+				},
+				EntryFieldType::Expires => {
+					/* Field should not be copied. Do nothing. */ 
+				},
+				EntryFieldType::Timestamp => {
+					/* Field is set correctly in new(). Do nothing. */
+				},
+				_ => {
+					out.set_field(k, v.get())
+					.expect("Failed to copy field in OrgEntry::copy()");
+				}
+			}
+		}
+
+		// The copy has an Index value of one greater than the original
+
+		let index = self.get_field(&EntryFieldType::Index)
+			.expect("Missing Index field in OrgEntry::copy()");
+		let new_index = increment_index_string(&index)
+			.expect("Failed to increment Index field in OrgEntry::copy()");
+		out.set_field(&EntryFieldType::Index, &new_index)
+			.expect("Failed to set Index field to new value in OrgEntry::copy()");
+
+		out
 	}
 }
 

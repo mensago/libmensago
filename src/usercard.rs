@@ -1,4 +1,5 @@
 use crate::keycardbase::*;
+use crate::keycard_private::*;
 use std::collections::HashMap;
 use chrono::prelude::*;
 use chrono::{NaiveDate, Duration};
