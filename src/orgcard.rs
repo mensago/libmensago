@@ -482,21 +482,68 @@ impl OrgEntry {
 
 	/// Creates a new OrgEntry object with new keys and a custody signature. It requires the contact
 	/// request signing keypair used for the entry so that the Custody-Signature field is
-	/// generated correctly. The rotate_optional parameter determines if optional keys are rotated.
-	/// This should normally be true unless revoking the current primary signing key. When
-	/// rotate_optional is true, the primary verification key becomes the secondary verification key
-	/// in the new OrgEntry instance. When rotate_optional is false, a new primary key is generated
-	/// and the secondary key field is not present in the returned OrgEntry.
-	pub fn chain(&self, crspair: &SigningPair, rotate_optional: &bool)
-		-> Result<Box<dyn KeycardEntry>, MensagoError> {
+	/// generated correctly. Note that if a new entry is being created because a key must be
+	/// revoked, 
+	pub fn chain(&self, crspair: &SigningPair, expires: Option<u16>)
+		-> Result<(Box<dyn KeycardEntry>, HashMap<&str,CryptoString>), MensagoError> {
 		
-		// TODO: Need to be able to optionally specify the expiration period in chain()
-		// TODO: Need to change the return type for chain()
-		// The signed new entry needs to be returned, but so do all the new keys
+		let mut map = HashMap::<&str, CryptoString>::new();
+		let mut entry = self.copy();
 		
-		let out = self.copy();
+		let spair = match SigningPair::generate() {
+			Some(v) => v,
+			None => { return Err(MensagoError::ErrProgramException(
+				String::from("Unable to generate new signing pair in OrgEntry::chain()")))
+			}
+		};
+		map.insert("primary.public",
+			CryptoString::from(&spair.get_public_str()).expect(
+				"Error getting inserting primary verification key in OrgEntry::chain()"));
+		map.insert("primary.private",
+			CryptoString::from(&spair.get_public_str()).expect(
+				"Error getting inserting primary signing key in OrgEntry::chain()"));
+		match entry.set_field(&EntryFieldType::PrimaryVerificationKey, &spair.get_public_str()) {
+			Ok(_) => { /* Everything's OK */ },
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("Error setting primary verification key in OrgEntry::chain(): {}",
+						e.to_string())))
+			},
+		}
 
-		// TODO: Finish mplementing OrgEntry::chain()
+		let epair = match SigningPair::generate() {
+			Some(v) => v,
+			None => { return Err(MensagoError::ErrProgramException(
+				String::from("Unable to generate new encryption pair in OrgEntry::chain()")))
+			}
+		};
+		map.insert("primary.public",
+			CryptoString::from(&spair.get_public_str()).expect(
+				"Error getting inserting encryption key in OrgEntry::chain()"));
+		map.insert("primary.private",
+			CryptoString::from(&spair.get_public_str()).expect(
+				"Error getting inserting decryption key in OrgEntry::chain()"));
+		match entry.set_field(&EntryFieldType::EncryptionKey, &epair.get_public_str()) {
+			Ok(_) => { /* Everything's OK */ },
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("Error setting encryption key in OrgEntry::chain(): {}",
+						e.to_string())))
+			},
+		}
+		
+		// Now that we have a new primary signing pair, move the old one over to secondary
+		// match entry.set_field(&EntryFieldType::SecondaryVerificationKey, 
+		// 	&self.get_field(&EntryFieldType::SecondaryVerificationKey).expect("")) {
+		// 	Ok(_) => { /* Everything's OK */ },
+		// 	Err(e) => {
+		// 		return Err(MensagoError::ErrProgramException(
+		// 			format!("Error setting primary verification key in OrgEntry::chain(): {}",
+		// 				e.to_string())))
+		// 	},
+		// }
+
+		// TODO: Finish implementing OrgEntry::chain()
 		Err(MensagoError::ErrUnimplemented)
 	}
 
@@ -504,6 +551,15 @@ impl OrgEntry {
 	pub fn verify_chain(&self, previous: &Box<dyn KeycardEntry>) -> Result<bool, MensagoError> {
 
 		// TODO: implement OrgEntry::verify_chain()
+		Err(MensagoError::ErrUnimplemented)
+	}
+
+	/// This method is called when the current entry must be revoked because one or more keys were
+	/// compromised.
+	pub fn revoke(&self, crspair: &SigningPair, expires: Option<u16>)
+		-> Result<(Box<dyn KeycardEntry>, HashMap<&str,CryptoString>), MensagoError> {
+
+		// TODO: implement OrgEntry::revoke()
 		Err(MensagoError::ErrUnimplemented)
 	}
 
