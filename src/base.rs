@@ -50,6 +50,8 @@ pub enum MensagoError {
 	ErrUnsupportedHashType,
 	#[error("Unsupported encryption type")]
 	ErrUnsupportedEncryptionType,
+	#[error("Noncompliant keycard")]
+	ErrNoncompliantKeycard,
 	#[error("Invalid keycard")]
 	ErrInvalidKeycard,
 	#[error("Invalid hash")]
