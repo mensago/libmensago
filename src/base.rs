@@ -55,6 +55,8 @@ pub enum MensagoError {
 	ErrInvalidKeycard,
 	#[error("Invalid hash")]
 	ErrInvalidHash,
+	#[error("Invalid key")]
+	ErrInvalidKey,
 	#[error("Hash mismatch")]
 	ErrHashMismatch,
 	// Returned when attempting to add a signature to a keycard out of the required order, e.g.
