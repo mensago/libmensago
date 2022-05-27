@@ -532,10 +532,56 @@ impl OrgEntry {
 	}
 
 	/// Verifies the chain of custody between the provided entry and the current one
-	pub fn verify_chain(&self, previous: &Box<dyn KeycardEntry>) -> Result<bool, MensagoError> {
+	pub fn verify_chain(&self, previous: &Box<dyn KeycardEntry>) -> Result<(), MensagoError> {
 
-		// TODO: implement OrgEntry::verify_chain()
-		Err(MensagoError::ErrUnimplemented)
+		if previous.get_type() != EntryType::Organization {
+			return Err(MensagoError::ErrTypeMismatch)
+		}
+
+		match self.get_authstr(&AuthStrType::Custody) {
+			Ok(_) => { /* */ },
+			Err(_) => {
+				return Err(MensagoError::ErrNotFound)
+			}
+		}
+
+		match previous.get_field(&EntryFieldType::PrimaryVerificationKey) {
+			Ok(_) => { /* */ },
+			Err(_) => {
+				return Err(MensagoError::ErrNotFound)
+			},
+		}
+
+		// Make sure that the previous entry is the immediate predecessor of the current one
+		let previndex = match previous.get_field(&EntryFieldType::Index) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrInvalidKeycard)
+			}
+		};
+		let currentindex = match self.get_field(&EntryFieldType::Index) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrInvalidKeycard)
+			}
+		};
+		match increment_index_string(&previndex) {
+			Ok(v) => {
+				if v != currentindex {
+					return Err(MensagoError::ErrBadValue)
+				}
+			}
+		}
+
+		let verkeystr = self.get_field(&EntryFieldType::PrimaryVerificationKey)?;
+		let verkey = match VerificationKey::from_string(&verkeystr) {
+			Some(v) => v,
+			None => {
+				return Err(MensagoError::ErrInvalidKey)
+			}
+		};
+
+		self.verify(&AuthStrType::Custody, &verkey)
 	}
 
 	/// This method is called when the current entry must be revoked because one or more keys were

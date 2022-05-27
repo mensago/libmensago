@@ -181,7 +181,9 @@ pub trait KeycardEntry {
 	// /// This should normally be true except under special circumstances.
 	// fn chain(&self, crspair: &SigningPair, rotate_optional: &bool) -> Result<Box<dyn Self>, MensagoError>;
 
-	// /// Verifies the chain of custody between the provided entry and the current one
+	// /// Verifies the chain of custody between the provided entry and the current one. If either
+	// /// card is invalid, ErrInvalidKeycard is returned. If the index of entry is not the
+	// /// immediate successor to the previous one, ErrBadValue is returned.
 	// fn verify_chain(&self, previous: &Box<dyn Self>) -> Result<bool, MensagoError>;
 }
 
