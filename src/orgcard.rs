@@ -484,7 +484,7 @@ impl OrgEntry {
 	/// request signing keypair used for the entry so that the Custody-Signature field is
 	/// generated correctly. Note that if a new entry is being created because a key must be
 	/// revoked, 
-	pub fn chain(&self, crspair: &SigningPair, expires: Option<u16>)
+	pub fn chain(&self, crspair: &SigningPair, expires: Option<&u16>)
 		-> Result<(Box<dyn KeycardEntry>, HashMap<&str,CryptoString>), MensagoError> {
 		
 		let mut map = HashMap::<&str, CryptoString>::new();
@@ -533,18 +533,20 @@ impl OrgEntry {
 		}
 		
 		// Now that we have a new primary signing pair, move the old one over to secondary
-		// match entry.set_field(&EntryFieldType::SecondaryVerificationKey, 
-		// 	&self.get_field(&EntryFieldType::SecondaryVerificationKey).expect("")) {
-		// 	Ok(_) => { /* Everything's OK */ },
-		// 	Err(e) => {
-		// 		return Err(MensagoError::ErrProgramException(
-		// 			format!("Error setting primary verification key in OrgEntry::chain(): {}",
-		// 				e.to_string())))
-		// 	},
-		// }
+		match entry.set_field(&EntryFieldType::SecondaryVerificationKey, 
+			&self.get_field(&EntryFieldType::PrimaryVerificationKey).expect("")) {
+			Ok(_) => { /* Everything's OK */ },
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("Error moving primary key to secondary in OrgEntry::chain(): {}",
+						e.to_string())))
+			},
+		}
 
-		// TODO: Finish implementing OrgEntry::chain()
-		Err(MensagoError::ErrUnimplemented)
+		entry.set_expiration(expires)?;
+		entry.sign(&AuthStrType::Custody, &crspair)?;
+
+		Ok((Box::new(entry), map))
 	}
 
 	/// Verifies the chain of custody between the provided entry and the current one
