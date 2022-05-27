@@ -433,24 +433,6 @@ impl OrgEntry {
 		Ok(out)
 	}
 
-	pub fn has_authstr(&self, astype: &AuthStrType) -> Result<bool, MensagoError> {
-		self.sigs.has_authstr(astype)
-	}
-
-	/// Returns the specified authentication string
-	pub fn get_authstr(&self, astype: &AuthStrType) -> Result<CryptoString, MensagoError> {
-		self.sigs.get_authstr(astype)
-	}
-
-	/// Sets the specified authentication string to the value passed. NOTE: no validation of the
-	/// authentication string is performed by this call. The primary use for this method is to set
-	/// the previous hash for the signature block
-	pub fn add_authstr(&mut self, astype: &AuthStrType, astr: &CryptoString)
-		-> Result<(), MensagoError> {
-		
-		self.sigs.add_authstr(astype, astr)
-	}
-
 	/// Calculates the hash for the entry text using the specified algorithm. Requirements for this
 	/// call vary with the entry implementation. ErrOutOfOrderSignature is returned if a hash is
 	/// requested before another required authentication string has been set.
@@ -861,6 +843,25 @@ impl KeycardEntry for OrgEntry {
 
 		Ok(lines.join("\r\n"))
 	}
+
+	fn has_authstr(&self, astype: &AuthStrType) -> Result<bool, MensagoError> {
+		self.sigs.has_authstr(astype)
+	}
+
+	/// Returns the specified authentication string
+	fn get_authstr(&self, astype: &AuthStrType) -> Result<CryptoString, MensagoError> {
+		self.sigs.get_authstr(astype)
+	}
+
+	/// Sets the specified authentication string to the value passed. NOTE: no validation of the
+	/// authentication string is performed by this call. The primary use for this method is to set
+	/// the previous hash for the signature block
+	fn add_authstr(&mut self, astype: &AuthStrType, astr: &CryptoString)
+		-> Result<(), MensagoError> {
+		
+		self.sigs.add_authstr(astype, astr)
+	}
+
 }
 
 #[cfg(test)]

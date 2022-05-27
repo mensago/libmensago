@@ -163,6 +163,17 @@ pub trait KeycardEntry {
 	/// Returns the entire text of the entry minus any signatures or hashes
 	fn get_text(&self, signature_level: Option<&AuthStrType>) -> Result<String, MensagoError>;
 
+	fn has_authstr(&self, astype: &AuthStrType) -> Result<bool, MensagoError>;
+
+	/// Returns the specified authentication string
+	fn get_authstr(&self, astype: &AuthStrType) -> Result<CryptoString, MensagoError>;
+
+	/// Sets the specified authentication string to the value passed. NOTE: no validation of the
+	/// authentication string is performed by this call. The primary use for this method is to set
+	/// the previous hash for the signature block
+	fn add_authstr(&mut self, astype: &AuthStrType, astr: &CryptoString)
+		-> Result<(), MensagoError>;
+
 	// TODO: Move chain() and verify_chain() for OrgEntry and User Entry to KeycardEntry trait implementation once implemented for both types
 	// /// Creates a new KeycardEntry object with new keys and a custody signature. It requires the contact
 	// /// request signing keypair used for the entry so that the Custody-Signature field is
