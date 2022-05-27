@@ -59,6 +59,9 @@ pub enum MensagoError {
 	ErrInvalidKey,
 	#[error("Hash mismatch")]
 	ErrHashMismatch,
+	#[error("Verification failure")]
+	ErrVerificationFailure,
+	
 	// Returned when attempting to add a signature to a keycard out of the required order, e.g.
 	// adding a Custody signature anywhere but first.
 	#[error("Out-of-order signature")]
