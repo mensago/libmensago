@@ -269,12 +269,10 @@ pub trait SignatureBlock {
 	
 	/// Verifies the requested signature. ErrBadValue is returned for a signature type not used by
 	/// the specific implementation.
-	fn verify(&mut self, entry: &str, astype: &AuthStrType, verify_key: &dyn VerifySignature)
+	fn verify(&self, entry: &str, astype: &AuthStrType, verify_key: &dyn VerifySignature)
 		-> Result<(), MensagoError>;
 }
 
-
-// TODO: Implement UserSigBlock
 
 /// A verified type for handling keycard type fields
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
