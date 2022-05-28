@@ -463,131 +463,6 @@ impl OrgEntry {
 		self.sigs.verify(&text, astype, verify_key)
 	}
 
-	/// Creates a new OrgEntry object with new keys and a custody signature. It requires the contact
-	/// request signing keypair used for the entry so that the Custody-Signature field is
-	/// generated correctly. Note that if a new entry is being created because a key must be
-	/// revoked, 
-	pub fn chain(&self, primpair: &SigningPair, expires: Option<&u16>)
-		-> Result<(Box<dyn KeycardEntry>, HashMap<&str,CryptoString>), MensagoError> {
-		
-		let mut map = HashMap::<&str, CryptoString>::new();
-		let mut entry = self.copy();
-		
-		let spair = match SigningPair::generate() {
-			Some(v) => v,
-			None => { return Err(MensagoError::ErrProgramException(
-				String::from("Unable to generate new signing pair in OrgEntry::chain()")))
-			}
-		};
-		map.insert("primary.public",
-			CryptoString::from(&spair.get_public_str()).expect(
-				"Error getting inserting primary verification key in OrgEntry::chain()"));
-		map.insert("primary.private",
-			CryptoString::from(&spair.get_public_str()).expect(
-				"Error getting inserting primary signing key in OrgEntry::chain()"));
-		match entry.set_field(&EntryFieldType::PrimaryVerificationKey, &spair.get_public_str()) {
-			Ok(_) => { /* Everything's OK */ },
-			Err(e) => {
-				return Err(MensagoError::ErrProgramException(
-					format!("Error setting primary verification key in OrgEntry::chain(): {}",
-						e.to_string())))
-			},
-		}
-
-		let epair = match SigningPair::generate() {
-			Some(v) => v,
-			None => { return Err(MensagoError::ErrProgramException(
-				String::from("Unable to generate new encryption pair in OrgEntry::chain()")))
-			}
-		};
-		map.insert("encryption.public",
-			CryptoString::from(&epair.get_public_str()).expect(
-				"Error getting inserting encryption key in OrgEntry::chain()"));
-		map.insert("encryption.private",
-			CryptoString::from(&epair.get_public_str()).expect(
-				"Error getting inserting decryption key in OrgEntry::chain()"));
-		match entry.set_field(&EntryFieldType::EncryptionKey, &epair.get_public_str()) {
-			Ok(_) => { /* Everything's OK */ },
-			Err(e) => {
-				return Err(MensagoError::ErrProgramException(
-					format!("Error setting encryption key in OrgEntry::chain(): {}",
-						e.to_string())))
-			},
-		}
-		
-		// Now that we have a new primary signing pair, move the old one over to secondary
-		match entry.set_field(&EntryFieldType::SecondaryVerificationKey, 
-			&self.get_field(&EntryFieldType::PrimaryVerificationKey).expect("")) {
-			Ok(_) => { /* Everything's OK */ },
-			Err(e) => {
-				return Err(MensagoError::ErrProgramException(
-					format!("Error moving primary key to secondary in OrgEntry::chain(): {}",
-						e.to_string())))
-			},
-		}
-
-		entry.set_expiration(expires)?;
-		entry.sign(&AuthStrType::Custody, &primpair)?;
-
-		Ok((Box::new(entry), map))
-	}
-
-	/// Verifies the chain of custody between the provided entry and the current one
-	pub fn verify_chain(&self, previous: &Box<dyn KeycardEntry>) -> Result<(), MensagoError> {
-
-		if previous.get_type() != EntryType::Organization {
-			return Err(MensagoError::ErrTypeMismatch)
-		}
-
-		match self.get_authstr(&AuthStrType::Custody) {
-			Ok(_) => { /* */ },
-			Err(_) => {
-				return Err(MensagoError::ErrNotFound)
-			}
-		}
-
-		match previous.get_field(&EntryFieldType::PrimaryVerificationKey) {
-			Ok(_) => { /* */ },
-			Err(_) => {
-				return Err(MensagoError::ErrNotFound)
-			},
-		}
-
-		// Make sure that the previous entry is the immediate predecessor of the current one
-		let previndex = match previous.get_field(&EntryFieldType::Index) {
-			Ok(v) => v,
-			Err(_) => {
-				return Err(MensagoError::ErrInvalidKeycard)
-			}
-		};
-		let currentindex = match self.get_field(&EntryFieldType::Index) {
-			Ok(v) => v,
-			Err(_) => {
-				return Err(MensagoError::ErrInvalidKeycard)
-			}
-		};
-		match increment_index_string(&previndex) {
-			Ok(v) => {
-				if v != currentindex {
-					return Err(MensagoError::ErrBadValue)
-				}
-			},
-			Err(_) => {
-				return Err(MensagoError::ErrBadFieldValue(String::from("Index")))
-			}
-		}
-
-		let verkeystr = self.get_field(&EntryFieldType::PrimaryVerificationKey)?;
-		let verkey = match VerificationKey::from_string(&verkeystr) {
-			Some(v) => v,
-			None => {
-				return Err(MensagoError::ErrInvalidKey)
-			}
-		};
-
-		self.verify(&AuthStrType::Custody, &verkey)
-	}
-
 	/// This method is called when the current entry must be revoked because one or more keys were
 	/// compromised.
 	pub fn revoke(&self, crspair: &SigningPair, expires: Option<u16>)
@@ -912,74 +787,134 @@ impl KeycardEntry for OrgEntry {
 		self.sigs.add_authstr(astype, astr)
 	}
 
+	/// Creates a new OrgEntry object with new keys and a custody signature. It requires the contact
+	/// request signing keypair used for the entry so that the Custody-Signature field is
+	/// generated correctly. Note that if a new entry is being created because a key must be
+	/// revoked, 
+	fn chain(&self, primpair: &SigningPair, expires: Option<&u16>)
+		-> Result<(Box<dyn KeycardEntry>, HashMap<&str,CryptoString>), MensagoError> {
+		
+		let mut map = HashMap::<&str, CryptoString>::new();
+		let mut entry = self.copy();
+		
+		let spair = match SigningPair::generate() {
+			Some(v) => v,
+			None => { return Err(MensagoError::ErrProgramException(
+				String::from("Unable to generate new signing pair in OrgEntry::chain()")))
+			}
+		};
+		map.insert("primary.public",
+			CryptoString::from(&spair.get_public_str()).expect(
+				"Error getting inserting primary verification key in OrgEntry::chain()"));
+		map.insert("primary.private",
+			CryptoString::from(&spair.get_public_str()).expect(
+				"Error getting inserting primary signing key in OrgEntry::chain()"));
+		match entry.set_field(&EntryFieldType::PrimaryVerificationKey, &spair.get_public_str()) {
+			Ok(_) => { /* Everything's OK */ },
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("Error setting primary verification key in OrgEntry::chain(): {}",
+						e.to_string())))
+			},
+		}
+
+		let epair = match SigningPair::generate() {
+			Some(v) => v,
+			None => { return Err(MensagoError::ErrProgramException(
+				String::from("Unable to generate new encryption pair in OrgEntry::chain()")))
+			}
+		};
+		map.insert("encryption.public",
+			CryptoString::from(&epair.get_public_str()).expect(
+				"Error getting inserting encryption key in OrgEntry::chain()"));
+		map.insert("encryption.private",
+			CryptoString::from(&epair.get_public_str()).expect(
+				"Error getting inserting decryption key in OrgEntry::chain()"));
+		match entry.set_field(&EntryFieldType::EncryptionKey, &epair.get_public_str()) {
+			Ok(_) => { /* Everything's OK */ },
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("Error setting encryption key in OrgEntry::chain(): {}",
+						e.to_string())))
+			},
+		}
+		
+		// Now that we have a new primary signing pair, move the old one over to secondary
+		match entry.set_field(&EntryFieldType::SecondaryVerificationKey, 
+			&self.get_field(&EntryFieldType::PrimaryVerificationKey).expect("")) {
+			Ok(_) => { /* Everything's OK */ },
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("Error moving primary key to secondary in OrgEntry::chain(): {}",
+						e.to_string())))
+			},
+		}
+
+		entry.set_expiration(expires)?;
+		entry.sign(&AuthStrType::Custody, &primpair)?;
+
+		Ok((Box::new(entry), map))
+	}
+
+	/// Verifies the chain of custody between the provided entry and the current one
+	fn verify_chain(&self, previous: &Box<dyn KeycardEntry>) -> Result<(), MensagoError> {
+
+		if previous.get_type() != EntryType::Organization {
+			return Err(MensagoError::ErrTypeMismatch)
+		}
+
+		match self.get_authstr(&AuthStrType::Custody) {
+			Ok(_) => { /* */ },
+			Err(_) => {
+				return Err(MensagoError::ErrNotFound)
+			}
+		}
+
+		match previous.get_field(&EntryFieldType::PrimaryVerificationKey) {
+			Ok(_) => { /* */ },
+			Err(_) => {
+				return Err(MensagoError::ErrNotFound)
+			},
+		}
+
+		// Make sure that the previous entry is the immediate predecessor of the current one
+		let previndex = match previous.get_field(&EntryFieldType::Index) {
+			Ok(v) => v,
+			Err(_) => {
+				return Err(MensagoError::ErrInvalidKeycard)
+			}
+		};
+		let currentindex = match self.get_field(&EntryFieldType::Index) {
+			Ok(v) => v,
+			Err(_) => {
+				return Err(MensagoError::ErrInvalidKeycard)
+			}
+		};
+		match increment_index_string(&previndex) {
+			Ok(v) => {
+				if v != currentindex {
+					return Err(MensagoError::ErrBadValue)
+				}
+			},
+			Err(_) => {
+				return Err(MensagoError::ErrBadFieldValue(String::from("Index")))
+			}
+		}
+
+		let verkeystr = self.get_field(&EntryFieldType::PrimaryVerificationKey)?;
+		let verkey = match VerificationKey::from_string(&verkeystr) {
+			Some(v) => v,
+			None => {
+				return Err(MensagoError::ErrInvalidKey)
+			}
+		};
+
+		self.verify(&AuthStrType::Custody, &verkey)
+	}
+
 	fn as_any(&self) -> &dyn Any {
 		self
 	}
-}
-
-impl KeycardEntry for Box<dyn KeycardEntry> {
-	
-	fn get_type(&self) -> EntryType {
-		self.as_ref().get_type()
-	}
-
-	fn get_field(&self, field: &EntryFieldType) -> Result<String, MensagoError> {
-		self.as_ref().get_field(field)
-	}
-
-	fn set_field(&mut self, field: &EntryFieldType, value: &str) -> Result<(), MensagoError> {
-		self.as_mut().set_field(field, value)
-	}
-
-	fn set_fields(&mut self, fields: &Vec<(EntryFieldType, String)>) -> Result<(), MensagoError> {
-		self.as_mut().set_fields(fields)
-	}
-
-	fn set_fields_str(&mut self, fields: &Vec<(String, String)>) -> Result<(), MensagoError> {
-		self.as_mut().set_fields_str(fields)
-	}
-
-	fn delete_field(&mut self, field: &EntryFieldType) -> Result<(), MensagoError> {
-		self.as_mut().delete_field(field)
-	}
-
-	fn is_data_compliant(&self) -> Result<bool, MensagoError> {
-		self.as_ref().is_data_compliant()
-	}
-
-	fn is_compliant(&self) -> Result<bool, MensagoError> {
-		self.as_ref().is_compliant()
-	}
-
-	fn set_expiration(&mut self, numdays: Option<&u16>) -> Result<(), MensagoError> {
-		self.as_mut().set_expiration(numdays)
-	}
-
-	fn is_expired(&self) -> Result<bool, MensagoError> {
-		self.as_ref().is_expired()
-	}
-	
-	fn get_text(&self, signature_level: Option<&AuthStrType>) -> Result<String, MensagoError> {
-		self.as_ref().get_text(signature_level)
-	}
-
-	fn has_authstr(&self, astype: &AuthStrType) -> Result<bool, MensagoError> {
-		self.as_ref().has_authstr(astype)
-	}
-
-	fn get_authstr(&self, astype: &AuthStrType) -> Result<CryptoString, MensagoError> {
-		self.as_ref().get_authstr(astype)
-	}
-
-	fn add_authstr(&mut self, astype: &AuthStrType, astr: &CryptoString)
-		-> Result<(), MensagoError> {
-			self.as_mut().add_authstr(astype, astr)
-	}
-
-	fn as_any(&self) -> &dyn Any { {
-		self.as_ref().as_any()
-	}}
-
 }
 
 #[cfg(test)]
@@ -991,7 +926,7 @@ mod tests {
 	// This setup function exists because so much work is required to generate a compliant keycard
 	// and the associated keys
 	fn orgentry_make_compliant_card()
-		-> Result<(OrgEntry, HashMap<&'static str,CryptoString>), MensagoError> {
+		-> Result<(Box<dyn KeycardEntry>, HashMap<&'static str,CryptoString>), MensagoError> {
 		
 		let mut entry = crate::orgcard::OrgEntry::new();
 		let mut map = HashMap::<&str, CryptoString>::new();
@@ -1066,7 +1001,7 @@ mod tests {
 		}
 
 		match entry.sign(&AuthStrType::Organization, &primary_keypair) {
-			Ok(_) => { Ok((entry, map)) },
+			Ok(_) => { Ok((Box::new(entry), map)) },
 			Err(e) => {
 				return Err(MensagoError::ErrProgramException(
 					format!("orgentry_is_compliant: sign returned an error: {}", e.to_string())))
@@ -1344,7 +1279,7 @@ mod tests {
 		
 		let primarypair = SigningPair::from(&primaryver, &primarysign);
 		
-		let (newentry, newkeys) = match firstentry.chain(&primarypair, None) {
+		let (newentry, _) = match firstentry.chain(&primarypair, None) {
 			Ok(v) => v,
 			Err(e) => {
 				return Err(MensagoError::ErrProgramException(
@@ -1353,7 +1288,15 @@ mod tests {
 			}
 		};
 
-		// TODO: add call to verify_chain()
+		match newentry.verify_chain(&firstentry) {
+			Ok(_) => { /* */ },
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("orgentry_chain_verify: verify_chain returned an error: {}",
+						e.to_string())))
+			}
+		}
+
 
 		Ok(())
 	}

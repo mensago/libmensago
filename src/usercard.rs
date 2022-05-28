@@ -837,6 +837,19 @@ impl KeycardEntry for UserEntry {
 		self.sigs.add_authstr(astype, astr)
 	}
 
+	fn chain(&self, primpair: &SigningPair, expires: Option<&u16>)
+		-> Result<(Box<dyn KeycardEntry>, HashMap<&str,CryptoString>), MensagoError> {
+
+		// TODO: Implement UserEntry::chain()
+		return Err(MensagoError::ErrUnimplemented)
+	}
+
+	fn verify_chain(&self, previous: &Box<dyn KeycardEntry>) -> Result<(), MensagoError> {
+
+		// TODO: Implement UserEntry::verify_chain()
+		return Err(MensagoError::ErrUnimplemented)
+	}
+
 	fn as_any(&self) -> &dyn Any {
 		self
 	}

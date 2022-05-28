@@ -1,4 +1,5 @@
 use std::any::Any;
+use std::collections::HashMap;
 use std::fmt;
 use chrono::prelude::*;
 use regex::Regex;
@@ -181,13 +182,89 @@ pub trait KeycardEntry {
 	// /// generated correctly. The rotate_optional parameter determines if optional keys are rotated.
 	// /// This should normally be true except under special circumstances.
 	// fn chain(&self, crspair: &SigningPair, rotate_optional: &bool) -> Result<Box<dyn Self>, MensagoError>;
+	fn chain(&self, primpair: &SigningPair, expires: Option<&u16>)
+		-> Result<(Box<dyn KeycardEntry>, HashMap<&str,CryptoString>), MensagoError>;
 
 	// /// Verifies the chain of custody between the provided entry and the current one. If either
 	// /// card is invalid, ErrInvalidKeycard is returned. If the index of entry is not the
 	// /// immediate successor to the previous one, ErrBadValue is returned.
-	// fn verify_chain(&self, previous: &Box<dyn Self>) -> Result<bool, MensagoError>;
+	fn verify_chain(&self, previous: &Box<dyn KeycardEntry>) -> Result<(), MensagoError>;
 
 	fn as_any(&self) -> &dyn Any;
+}
+
+impl KeycardEntry for Box<dyn KeycardEntry> {
+	
+	fn get_type(&self) -> EntryType {
+		self.as_ref().get_type()
+	}
+
+	fn get_field(&self, field: &EntryFieldType) -> Result<String, MensagoError> {
+		self.as_ref().get_field(field)
+	}
+
+	fn set_field(&mut self, field: &EntryFieldType, value: &str) -> Result<(), MensagoError> {
+		self.as_mut().set_field(field, value)
+	}
+
+	fn set_fields(&mut self, fields: &Vec<(EntryFieldType, String)>) -> Result<(), MensagoError> {
+		self.as_mut().set_fields(fields)
+	}
+
+	fn set_fields_str(&mut self, fields: &Vec<(String, String)>) -> Result<(), MensagoError> {
+		self.as_mut().set_fields_str(fields)
+	}
+
+	fn delete_field(&mut self, field: &EntryFieldType) -> Result<(), MensagoError> {
+		self.as_mut().delete_field(field)
+	}
+
+	fn is_data_compliant(&self) -> Result<bool, MensagoError> {
+		self.as_ref().is_data_compliant()
+	}
+
+	fn is_compliant(&self) -> Result<bool, MensagoError> {
+		self.as_ref().is_compliant()
+	}
+
+	fn set_expiration(&mut self, numdays: Option<&u16>) -> Result<(), MensagoError> {
+		self.as_mut().set_expiration(numdays)
+	}
+
+	fn is_expired(&self) -> Result<bool, MensagoError> {
+		self.as_ref().is_expired()
+	}
+	
+	fn get_text(&self, signature_level: Option<&AuthStrType>) -> Result<String, MensagoError> {
+		self.as_ref().get_text(signature_level)
+	}
+
+	fn has_authstr(&self, astype: &AuthStrType) -> Result<bool, MensagoError> {
+		self.as_ref().has_authstr(astype)
+	}
+
+	fn get_authstr(&self, astype: &AuthStrType) -> Result<CryptoString, MensagoError> {
+		self.as_ref().get_authstr(astype)
+	}
+
+	fn add_authstr(&mut self, astype: &AuthStrType, astr: &CryptoString)
+		-> Result<(), MensagoError> {
+			self.as_mut().add_authstr(astype, astr)
+	}
+
+	fn chain(&self, primpair: &SigningPair, expires: Option<&u16>)
+		-> Result<(Box<dyn KeycardEntry>, HashMap<&str,CryptoString>), MensagoError> {
+			self.as_ref().chain(primpair, expires)
+	}
+
+	fn verify_chain(&self, previous: &Box<dyn KeycardEntry>) -> Result<(), MensagoError> {
+		self.as_ref().verify_chain(previous)
+	}
+
+	fn as_any(&self) -> &dyn Any {
+		self.as_ref().as_any()
+	}
+
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
