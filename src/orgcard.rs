@@ -180,7 +180,7 @@ impl SignatureBlock for OrgSigBlock {
 		self.add_authstr(&AuthStrType::Organization, &signature)
 	}
 
-	fn verify(&mut self, entry: &str, astype: &AuthStrType, verify_key: &dyn VerifySignature) 
+	fn verify(&self, entry: &str, astype: &AuthStrType, verify_key: &dyn VerifySignature) 
 		-> Result<(), MensagoError> {
 		
 		let mut strings = Vec::<String>::new();
@@ -455,7 +455,7 @@ impl OrgEntry {
 	
 	/// Verifies the requested signature. ErrBadValue is returned for a signature type not used by
 	/// the specific implementation.
-	pub fn verify(&mut self, astype: &AuthStrType, verify_key: &dyn VerifySignature)
+	pub fn verify(&self, astype: &AuthStrType, verify_key: &dyn VerifySignature)
 		-> Result<(), MensagoError> {
 		
 		let text = self.get_text(None)?;
@@ -555,13 +555,13 @@ impl OrgEntry {
 		// Make sure that the previous entry is the immediate predecessor of the current one
 		let previndex = match previous.get_field(&EntryFieldType::Index) {
 			Ok(v) => v,
-			Err(e) => {
+			Err(_) => {
 				return Err(MensagoError::ErrInvalidKeycard)
 			}
 		};
 		let currentindex = match self.get_field(&EntryFieldType::Index) {
 			Ok(v) => v,
-			Err(e) => {
+			Err(_) => {
 				return Err(MensagoError::ErrInvalidKeycard)
 			}
 		};
@@ -570,6 +570,9 @@ impl OrgEntry {
 				if v != currentindex {
 					return Err(MensagoError::ErrBadValue)
 				}
+			},
+			Err(_) => {
+				return Err(MensagoError::ErrBadFieldValue(String::from("Index")))
 			}
 		}
 

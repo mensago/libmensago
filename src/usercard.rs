@@ -206,7 +206,7 @@ impl SignatureBlock for UserSigBlock {
 		self.add_authstr(&AuthStrType::Organization, &signature)
 	}
 
-	fn verify(&mut self, entry: &str, astype: &AuthStrType, verify_key: &dyn VerifySignature) 
+	fn verify(&self, entry: &str, astype: &AuthStrType, verify_key: &dyn VerifySignature) 
 		-> Result<(), MensagoError> {
 		
 		let mut strings = Vec::<String>::new();
@@ -816,6 +816,24 @@ impl KeycardEntry for UserEntry {
 		}
 
 		Ok(lines.join("\r\n"))
+	}
+
+	fn has_authstr(&self, astype: &AuthStrType) -> Result<bool, MensagoError> {
+		self.sigs.has_authstr(astype)
+	}
+
+	/// Returns the specified authentication string
+	fn get_authstr(&self, astype: &AuthStrType) -> Result<CryptoString, MensagoError> {
+		self.sigs.get_authstr(astype)
+	}
+
+	/// Sets the specified authentication string to the value passed. NOTE: no validation of the
+	/// authentication string is performed by this call. The primary use for this method is to set
+	/// the previous hash for the signature block
+	fn add_authstr(&mut self, astype: &AuthStrType, astr: &CryptoString)
+		-> Result<(), MensagoError> {
+		
+		self.sigs.add_authstr(astype, astr)
 	}
 }
 
