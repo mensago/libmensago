@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::fmt;
 use chrono::prelude::*;
 use regex::Regex;
@@ -185,6 +186,8 @@ pub trait KeycardEntry {
 	// /// card is invalid, ErrInvalidKeycard is returned. If the index of entry is not the
 	// /// immediate successor to the previous one, ErrBadValue is returned.
 	// fn verify_chain(&self, previous: &Box<dyn Self>) -> Result<bool, MensagoError>;
+
+	fn as_any(&self) -> &dyn Any;
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]

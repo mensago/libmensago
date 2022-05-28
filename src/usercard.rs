@@ -1,10 +1,11 @@
-use crate::keycardbase::*;
-use crate::keycard_private::*;
+use std::any::Any;
 use std::collections::HashMap;
 use chrono::prelude::*;
 use chrono::{NaiveDate, Duration};
 use eznacl::*;
 use crate::base::*;
+use crate::keycardbase::*;
+use crate::keycard_private::*;
 use crate::types::*;
 
 #[derive(Debug)]
@@ -834,6 +835,10 @@ impl KeycardEntry for UserEntry {
 		-> Result<(), MensagoError> {
 		
 		self.sigs.add_authstr(astype, astr)
+	}
+
+	fn as_any(&self) -> &dyn Any {
+		self
 	}
 }
 

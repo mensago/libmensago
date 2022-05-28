@@ -485,7 +485,7 @@ impl ArgonHash {
 	/// Creates a new ArgonHash from the provided password
 	pub fn from(password: &str) -> ArgonHash {
 		ArgonHash {
-			hash: eznacl::hash_password(password, eznacl::HashStrength::Basic),
+			hash: eznacl::hash_password(password, &eznacl::HashStrength::Basic),
 			hashtype: String::from("argon2id"),
 		}
 	}

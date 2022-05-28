@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::collections::HashMap;
 use chrono::prelude::*;
 use chrono::{NaiveDate, Duration};
@@ -466,7 +467,7 @@ impl OrgEntry {
 	/// request signing keypair used for the entry so that the Custody-Signature field is
 	/// generated correctly. Note that if a new entry is being created because a key must be
 	/// revoked, 
-	pub fn chain(&self, crspair: &SigningPair, expires: Option<&u16>)
+	pub fn chain(&self, primpair: &SigningPair, expires: Option<&u16>)
 		-> Result<(Box<dyn KeycardEntry>, HashMap<&str,CryptoString>), MensagoError> {
 		
 		let mut map = HashMap::<&str, CryptoString>::new();
@@ -526,7 +527,7 @@ impl OrgEntry {
 		}
 
 		entry.set_expiration(expires)?;
-		entry.sign(&AuthStrType::Custody, &crspair)?;
+		entry.sign(&AuthStrType::Custody, &primpair)?;
 
 		Ok((Box::new(entry), map))
 	}
@@ -911,6 +912,74 @@ impl KeycardEntry for OrgEntry {
 		self.sigs.add_authstr(astype, astr)
 	}
 
+	fn as_any(&self) -> &dyn Any {
+		self
+	}
+}
+
+impl KeycardEntry for Box<dyn KeycardEntry> {
+	
+	fn get_type(&self) -> EntryType {
+		self.as_ref().get_type()
+	}
+
+	fn get_field(&self, field: &EntryFieldType) -> Result<String, MensagoError> {
+		self.as_ref().get_field(field)
+	}
+
+	fn set_field(&mut self, field: &EntryFieldType, value: &str) -> Result<(), MensagoError> {
+		self.as_mut().set_field(field, value)
+	}
+
+	fn set_fields(&mut self, fields: &Vec<(EntryFieldType, String)>) -> Result<(), MensagoError> {
+		self.as_mut().set_fields(fields)
+	}
+
+	fn set_fields_str(&mut self, fields: &Vec<(String, String)>) -> Result<(), MensagoError> {
+		self.as_mut().set_fields_str(fields)
+	}
+
+	fn delete_field(&mut self, field: &EntryFieldType) -> Result<(), MensagoError> {
+		self.as_mut().delete_field(field)
+	}
+
+	fn is_data_compliant(&self) -> Result<bool, MensagoError> {
+		self.as_ref().is_data_compliant()
+	}
+
+	fn is_compliant(&self) -> Result<bool, MensagoError> {
+		self.as_ref().is_compliant()
+	}
+
+	fn set_expiration(&mut self, numdays: Option<&u16>) -> Result<(), MensagoError> {
+		self.as_mut().set_expiration(numdays)
+	}
+
+	fn is_expired(&self) -> Result<bool, MensagoError> {
+		self.as_ref().is_expired()
+	}
+	
+	fn get_text(&self, signature_level: Option<&AuthStrType>) -> Result<String, MensagoError> {
+		self.as_ref().get_text(signature_level)
+	}
+
+	fn has_authstr(&self, astype: &AuthStrType) -> Result<bool, MensagoError> {
+		self.as_ref().has_authstr(astype)
+	}
+
+	fn get_authstr(&self, astype: &AuthStrType) -> Result<CryptoString, MensagoError> {
+		self.as_ref().get_authstr(astype)
+	}
+
+	fn add_authstr(&mut self, astype: &AuthStrType, astr: &CryptoString)
+		-> Result<(), MensagoError> {
+			self.as_mut().add_authstr(astype, astr)
+	}
+
+	fn as_any(&self) -> &dyn Any { {
+		self.as_ref().as_any()
+	}}
+
 }
 
 #[cfg(test)]
@@ -1241,10 +1310,51 @@ mod tests {
 			},
 			Err(e) => {
 				return Err(MensagoError::ErrProgramException(
-					format!("orgentry_is_compliant: is_compliant returned an error: {}", e.to_string())))
+					format!("orgentry_is_compliant: is_compliant returned an error: {}",
+						e.to_string())))
 			}
 		}
 		
+		Ok(())
+	}
+
+	#[test]
+	fn orgentry_chain_verify() -> Result<(), MensagoError> {
+
+		let (firstentry, firstkeys) = orgentry_make_compliant_card()?;
+
+		match firstentry.is_compliant() {
+			Ok(v) => {
+				if !v {
+					return Err(MensagoError::ErrProgramException(
+						format!("orgentry_chain_verify: compliant entry failed compliance check")))
+				}
+			},
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("orgentry_chain_verify: is_compliant returned an error: {}",
+						e.to_string())))
+			}
+		}
+		
+		let primaryver = firstkeys.get("primary.public")
+			.expect("orgentry_chain_verify: Failed to get primary verification key");
+		let primarysign = firstkeys.get("primary.private")
+			.expect("orgentry_chain_verify: Failed to get primary signing key");
+		
+		let primarypair = SigningPair::from(&primaryver, &primarysign);
+		
+		let (newentry, newkeys) = match firstentry.chain(&primarypair, None) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("orgentry_chain_verify: chain returned an error: {}",
+						e.to_string())))
+			}
+		};
+
+		// TODO: add call to verify_chain()
+
 		Ok(())
 	}
 }
