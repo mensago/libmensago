@@ -499,11 +499,11 @@ impl OrgEntry {
 				String::from("Unable to generate new encryption pair in OrgEntry::chain()")))
 			}
 		};
-		map.insert("primary.public",
-			CryptoString::from(&spair.get_public_str()).expect(
+		map.insert("encryption.public",
+			CryptoString::from(&epair.get_public_str()).expect(
 				"Error getting inserting encryption key in OrgEntry::chain()"));
-		map.insert("primary.private",
-			CryptoString::from(&spair.get_public_str()).expect(
+		map.insert("encryption.private",
+			CryptoString::from(&epair.get_public_str()).expect(
 				"Error getting inserting decryption key in OrgEntry::chain()"));
 		match entry.set_field(&EntryFieldType::EncryptionKey, &epair.get_public_str()) {
 			Ok(_) => { /* Everything's OK */ },
@@ -915,8 +915,95 @@ impl KeycardEntry for OrgEntry {
 
 #[cfg(test)]
 mod tests {
+	use std::collections::HashMap;
 	use crate::*;
 	use eznacl::*;
+
+	// This setup function exists because so much work is required to generate a compliant keycard
+	// and the associated keys
+	fn orgentry_make_compliant_card()
+		-> Result<(OrgEntry, HashMap<&'static str,CryptoString>), MensagoError> {
+		
+		let mut entry = crate::orgcard::OrgEntry::new();
+		let mut map = HashMap::<&str, CryptoString>::new();
+		
+		let primary_keypair = match eznacl::SigningPair::generate() {
+			Some(v) => v,
+			None => {
+				return Err(MensagoError::ErrProgramException(
+					format!("orgentry_is_compliant: failed to generate primary keypair")))
+			},
+		};
+		map.insert("primary.public",
+			CryptoString::from(&primary_keypair.get_public_str()).expect(
+				"Error getting inserting primary verification key in OrgEntry::chain()"));
+		map.insert("primary.private",
+			CryptoString::from(&primary_keypair.get_public_str()).expect(
+				"Error getting inserting primary signing key in OrgEntry::chain()"));
+		let secondary_keypair = match eznacl::SigningPair::generate() {
+			Some(v) => v,
+			None => {
+				return Err(MensagoError::ErrProgramException(
+					format!("orgentry_is_compliant: failed to generate secondary keypair")))
+			},
+		};
+		let encryption_keypair = match eznacl::EncryptionPair::generate() {
+			Some(v) => v,
+			None => {
+				return Err(MensagoError::ErrProgramException(
+					format!("orgentry_is_compliant: failed to generate encryption keypair")))
+			},
+		};
+		map.insert("encryption.public",
+			CryptoString::from(&encryption_keypair.get_public_str()).expect(
+				"Error getting inserting encryption key in OrgEntry::chain()"));
+		map.insert("encryption.private",
+			CryptoString::from(&encryption_keypair.get_public_str()).expect(
+				"Error getting inserting decryption key in OrgEntry::chain()"));
+
+		let carddata = vec![
+			(EntryFieldType::Index, String::from("1")),
+			(EntryFieldType::Name, String::from("Example, Inc.")),
+			(EntryFieldType::ContactAdmin, 
+				String::from("11111111-2222-2222-2222-333333333333/acme.com")),
+			(EntryFieldType::ContactSupport, 
+				String::from("11111111-2222-2222-2222-444444444444/acme.com")),
+			(EntryFieldType::ContactAbuse, 
+				String::from("11111111-2222-2222-2222-555555555555/acme.com")),
+			(EntryFieldType::Language, String::from("en")),
+			(EntryFieldType::PrimaryVerificationKey, primary_keypair.get_public_str()),
+			(EntryFieldType::SecondaryVerificationKey, secondary_keypair.get_public_str()),
+			(EntryFieldType::EncryptionKey, encryption_keypair.get_public_str()),
+			(EntryFieldType::Expires, String::from("20250601")),
+			(EntryFieldType::Timestamp, String::from("20220520T120000Z"))
+		];
+		match entry.set_fields(&carddata) {
+			Ok(_) => { /* fields are set as expected */ },
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("orgentry_is_compliant: failed to set entry fields: {}", e.to_string())))
+			}
+		}
+
+		// We have finished creating a root entry for an organization. All that we need now is to
+		// hash it and then sign it. This will make the entry compliant and is_compliant() should
+		// return true.
+		match entry.hash("BLAKE2B-256") {
+			Ok(_) => { /* Do nothing */ },
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("orgentry_is_compliant: hash returned an error: {}", e.to_string())))
+			}
+		}
+
+		match entry.sign(&AuthStrType::Organization, &primary_keypair) {
+			Ok(_) => { Ok((entry, map)) },
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("orgentry_is_compliant: sign returned an error: {}", e.to_string())))
+			}
+		}
+	}
 
 	#[test]
 	fn orgentry_from_datacompliant() -> Result<(), MensagoError> {
@@ -1143,72 +1230,7 @@ mod tests {
 	#[test]
 	fn orgentry_is_compliant() -> Result<(), MensagoError> {
 
-		let mut entry = crate::orgcard::OrgEntry::new();
-		
-		let primary_keypair = match eznacl::SigningPair::generate() {
-			Some(v) => v,
-			None => {
-				return Err(MensagoError::ErrProgramException(
-					format!("orgentry_is_compliant: failed to generate primary keypair")))
-			},
-		};
-		let secondary_keypair = match eznacl::SigningPair::generate() {
-			Some(v) => v,
-			None => {
-				return Err(MensagoError::ErrProgramException(
-					format!("orgentry_is_compliant: failed to generate secondary keypair")))
-			},
-		};
-		let encryption_keypair = match eznacl::EncryptionPair::generate() {
-			Some(v) => v,
-			None => {
-				return Err(MensagoError::ErrProgramException(
-					format!("orgentry_is_compliant: failed to generate encryption keypair")))
-			},
-		};
-
-		let carddata = vec![
-			(EntryFieldType::Index, String::from("1")),
-			(EntryFieldType::Name, String::from("Example, Inc.")),
-			(EntryFieldType::ContactAdmin, 
-				String::from("11111111-2222-2222-2222-333333333333/acme.com")),
-			(EntryFieldType::ContactSupport, 
-				String::from("11111111-2222-2222-2222-444444444444/acme.com")),
-			(EntryFieldType::ContactAbuse, 
-				String::from("11111111-2222-2222-2222-555555555555/acme.com")),
-			(EntryFieldType::Language, String::from("en")),
-			(EntryFieldType::PrimaryVerificationKey, primary_keypair.get_public_str()),
-			(EntryFieldType::SecondaryVerificationKey, secondary_keypair.get_public_str()),
-			(EntryFieldType::EncryptionKey, encryption_keypair.get_public_str()),
-			(EntryFieldType::Expires, String::from("20250601")),
-			(EntryFieldType::Timestamp, String::from("20220520T120000Z"))
-		];
-		match entry.set_fields(&carddata) {
-			Ok(_) => { /* fields are set as expected */ },
-			Err(e) => {
-				return Err(MensagoError::ErrProgramException(
-					format!("orgentry_is_compliant: failed to set entry fields: {}", e.to_string())))
-			}
-		}
-
-		// We have finished creating a root entry for an organization. All that we need now is to
-		// hash it and then sign it. This will make the entry compliant and is_compliant() should
-		// return true.
-		match entry.hash("BLAKE2B-256") {
-			Ok(_) => { /* Do nothing */ },
-			Err(e) => {
-				return Err(MensagoError::ErrProgramException(
-					format!("orgentry_is_compliant: hash returned an error: {}", e.to_string())))
-			}
-		}
-
-		match entry.sign(&AuthStrType::Organization, &primary_keypair) {
-			Ok(_) => { /* Do nothing */ },
-			Err(e) => {
-				return Err(MensagoError::ErrProgramException(
-					format!("orgentry_is_compliant: sign returned an error: {}", e.to_string())))
-			}
-		}
+		let (entry, _) = orgentry_make_compliant_card()?;
 
 		match entry.is_compliant() {
 			Ok(v) => {
