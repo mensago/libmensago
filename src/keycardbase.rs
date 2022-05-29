@@ -191,6 +191,7 @@ pub trait KeycardEntry {
 	fn verify_chain(&self, previous: &Box<dyn KeycardEntry>) -> Result<(), MensagoError>;
 
 	fn as_any(&self) -> &dyn Any;
+	fn as_any_mut(&mut self) -> &mut dyn Any;
 }
 
 impl KeycardEntry for Box<dyn KeycardEntry> {
@@ -263,6 +264,10 @@ impl KeycardEntry for Box<dyn KeycardEntry> {
 
 	fn as_any(&self) -> &dyn Any {
 		self.as_ref().as_any()
+	}
+
+	fn as_any_mut(&mut self) -> &mut dyn Any {
+		self.as_mut().as_any_mut()
 	}
 
 }

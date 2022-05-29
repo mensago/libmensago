@@ -202,6 +202,8 @@ impl SignatureBlock for OrgSigBlock {
 			}
 		};
 
+		strings.push(String::from(""));
+
 		let totaldata = strings.join("\r\n");
 		let signature = signing_pair.sign(totaldata.as_bytes())?;
 
@@ -973,6 +975,10 @@ impl KeycardEntry for OrgEntry {
 	fn as_any(&self) -> &dyn Any {
 		self
 	}
+
+	fn as_any_mut(&mut self) -> &mut dyn Any {
+		self
+	}
 }
 
 #[cfg(test)]
@@ -1370,6 +1376,62 @@ mod tests {
 	}
 
 	#[test]
+	fn orgentry_hash_sign_verify() -> Result<(), MensagoError> {
+
+		let (mut entry, keys) = orgentry_make_compliant_card()?;
+
+		match entry.is_compliant() {
+			Ok(v) => {
+				if !v {
+					return Err(MensagoError::ErrProgramException(
+						format!("orgentry_hash_sign_verify: compliant entry failed compliance check")))
+				}
+			},
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("orgentry_hash_sign_verify: is_compliant returned an error: {}",
+						e.to_string())))
+			}
+		}
+
+		let primaryver = keys.get("primary.public")
+			.expect("orgentry_hash_sign_verify: Failed to get primary verification key");
+		let primarysign = keys.get("primary.private")
+			.expect("orgentry_hash_sign_verify: Failed to get primary signing key");
+		
+		let primarypair = SigningPair::from(&primaryver, &primarysign);
+
+		let orgentry = entry.as_mut().as_any_mut().downcast_mut::<OrgEntry>().unwrap();
+
+		// Test hash()
+
+		match orgentry.hash("BLAKE2B-256") {
+			Ok(_) => { /* Test case passes */ },
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("orgentry_hash_sign_verify: hash() returned an error: {}",
+						e.to_string())))
+			}
+		}
+
+		match orgentry.get_authstr(&AuthStrType::Hash) {
+			Ok(v) => {
+				if v.to_string() != "BLAKE2B-256:F1R>zkeda3)I=31Z3H~%=wTZ%7cE(qomc8?N5`LI" {
+					return Err(MensagoError::ErrProgramException(
+						format!("orgentry_hash_sign_verify: hash mismatch: {}", v.to_string())))
+				}
+			},
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("orgentry_hash_sign_verify: failed to obtain hash: {}",
+						e.to_string())))
+			},
+		}
+
+		Ok(())
+	}
+
+	#[test]
 	fn orgentry_chain_verify() -> Result<(), MensagoError> {
 
 		let (firstentry, firstkeys) = orgentry_make_compliant_card()?;
@@ -1412,7 +1474,6 @@ mod tests {
 						e.to_string())))
 			}
 		}
-
 
 		Ok(())
 	}
