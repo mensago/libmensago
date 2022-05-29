@@ -8,6 +8,33 @@ use crate::keycardbase::*;
 use crate::keycard_private::*;
 use crate::types::*;
 
+// Keys used in the various tests
+
+// THESE KEYS ARE PUBLICLY ACCESSIBLE! DO NOT USE THESE FOR ANYTHING EXCEPT UNIT TESTS!!
+
+// User Verification Key: ED25519:6|HBWrxMY6-?r&Sm)_^PLPerpqOj#b&x#N_#C3}p
+// User Signing Key: ED25519:p;XXU0XF#UO^}vKbC-wS(#5W6=OEIFmR2z`rS1j+
+
+// User Contact Request Verification Key: ED25519:d0-oQb;{QxwnO{=!|^62+E=UYk2Y3mr2?XKScF4D
+// User Contact Request Signing Key: ED25519:ip52{ps^jH)t$k-9bc_RzkegpIW?}FFe~BX&<V}9
+
+// User Contact Request Encryption Key: CURVE25519:j(IBzX*F%OZF;g77O8jrVjM1a`Y<6-ehe{S;{gph
+// User Contact Request Decryption Key: CURVE25519:55t6A0y%S?{7c47p(R@C*X#at9Y`q5(Rc#YBS;r}
+
+// User Primary Encryption Key: CURVE25519:nSRso=K(WF{P+4x5S*5?Da-rseY-^>S8VN#v+)IN
+// User Primary Decryption Key: CURVE25519:4A!nTPZSVD#tm78d=-?1OIQ43{ipSpE;@il{lYkg
+
+// Organization Primary Verification Key: ED25519:)8id(gE02^S<{3H>9B;X4{DuYcb`%wo^mC&1lN88
+// Organization Primary Signing Key: ED25519:msvXw(nII<Qm6oBHc+92xwRI3>VFF-RcZ=7DEu3|
+
+// Organization Secondary Verification Key: ED25519:^j&t+&+q3fgPe1%PLmW4i|RCV|KNWZBLByIUZg+~
+// Organization Secondary Signing Key: ED25519:4%Xb|FD_^#62(<)y0>C7LM0K=bdq7pwV62{V&O+1
+
+// Organization Encryption Key: CURVE25519:@b?cjpeY;<&y+LSOA&yUQ&ZIrp(JGt{W$*V>ATLG
+// Organization Decryption Key: CURVE25519:nQxAR1Rh{F4gKR<KZz)*)7}5s_^!`!eb!sod0<aT
+
+// THESE KEYS ARE PUBLICLY ACCESSIBLE! DO NOT USE THESE FOR ANYTHING EXCEPT UNIT TESTS!!
+
 #[derive(Debug)]
 pub struct OrgSigBlock {
 	signatures: [Option<CryptoString>; 4]
@@ -178,7 +205,7 @@ impl SignatureBlock for OrgSigBlock {
 		let totaldata = strings.join("\r\n");
 		let signature = signing_pair.sign(totaldata.as_bytes())?;
 
-		self.add_authstr(&AuthStrType::Organization, &signature)
+		self.add_authstr(&astype, &signature)
 	}
 
 	fn verify(&self, entry: &str, astype: &AuthStrType, verify_key: &dyn VerifySignature) 
@@ -759,9 +786,30 @@ impl KeycardEntry for OrgEntry {
 		// First line of an entry must be the type
 		lines.push(String::from("Type:")+&self._type.to_string());
 
-		for (k,v) in self.fields.iter() {
-			let parts = [k.to_string(), v.get().to_string()];
-			lines.push(parts.join(":"));
+		// Yes, it would be less work to simply iterate over the available keys here, but there is
+		// value in getting a consistent order -- mostly for readability, debugging, and testing
+		for k in [
+			EntryFieldType::Index,
+			EntryFieldType::Name,
+			EntryFieldType::PrimaryVerificationKey,
+			EntryFieldType::SecondaryVerificationKey,
+			EntryFieldType::EncryptionKey,
+			EntryFieldType::ContactAdmin,
+			EntryFieldType::ContactAbuse,
+			EntryFieldType::ContactSupport,
+			EntryFieldType::Language,
+			EntryFieldType::TimeToLive,
+			EntryFieldType::Expires,
+			EntryFieldType::Timestamp,
+		] {
+			
+			match self.fields.get(&k) {
+				Some(v) => {
+					let parts = [k.to_string(), v.get().to_string()];
+					lines.push(parts.join(":"));
+				},
+				None => { /* */ },
+			}
 		}
 
 		match signature_level {
@@ -772,6 +820,9 @@ impl KeycardEntry for OrgEntry {
 			},
 			None => { /* Do nothing */ }
 		}
+
+		// Keycards are expected to end with a blank line
+		lines.push(String::from(""));
 
 		Ok(lines.join("\r\n"))
 	}
@@ -938,7 +989,9 @@ mod tests {
 		let mut entry = crate::orgcard::OrgEntry::new();
 		let mut map = HashMap::<&str, CryptoString>::new();
 		
-		let primary_keypair = match eznacl::SigningPair::generate() {
+		let primary_keypair = match eznacl::SigningPair::from_strings(
+				"ED25519:)8id(gE02^S<{3H>9B;X4{DuYcb`%wo^mC&1lN88",
+				"ED25519:msvXw(nII<Qm6oBHc+92xwRI3>VFF-RcZ=7DEu3|") {
 			Some(v) => v,
 			None => {
 				return Err(MensagoError::ErrProgramException(
@@ -951,14 +1004,18 @@ mod tests {
 		map.insert("primary.private",
 			CryptoString::from(&primary_keypair.get_public_str()).expect(
 				"Error getting inserting primary signing key in OrgEntry::chain()"));
-		let secondary_keypair = match eznacl::SigningPair::generate() {
+		let secondary_keypair = match eznacl::SigningPair::from_strings(
+				"ED25519:^j&t+&+q3fgPe1%PLmW4i|RCV|KNWZBLByIUZg+~",
+				"ED25519:4%Xb|FD_^#62(<)y0>C7LM0K=bdq7pwV62{V&O+1") {
 			Some(v) => v,
 			None => {
 				return Err(MensagoError::ErrProgramException(
 					format!("orgentry_is_compliant: failed to generate secondary keypair")))
 			},
 		};
-		let encryption_keypair = match eznacl::EncryptionPair::generate() {
+		let encryption_keypair = match eznacl::SigningPair::from_strings(
+				"CURVE25519:@b?cjpeY;<&y+LSOA&yUQ&ZIrp(JGt{W$*V>ATLG",
+				"CURVE25519:nQxAR1Rh{F4gKR<KZz)*)7}5s_^!`!eb!sod0<aT") {
 			Some(v) => v,
 			None => {
 				return Err(MensagoError::ErrProgramException(
@@ -976,15 +1033,16 @@ mod tests {
 			(EntryFieldType::Index, String::from("1")),
 			(EntryFieldType::Name, String::from("Example, Inc.")),
 			(EntryFieldType::ContactAdmin, 
-				String::from("11111111-2222-2222-2222-333333333333/acme.com")),
+				String::from("11111111-2222-2222-2222-333333333333/example.com")),
 			(EntryFieldType::ContactSupport, 
-				String::from("11111111-2222-2222-2222-444444444444/acme.com")),
+				String::from("11111111-2222-2222-2222-444444444444/example.com")),
 			(EntryFieldType::ContactAbuse, 
-				String::from("11111111-2222-2222-2222-555555555555/acme.com")),
+				String::from("11111111-2222-2222-2222-555555555555/example.com")),
 			(EntryFieldType::Language, String::from("en")),
 			(EntryFieldType::PrimaryVerificationKey, primary_keypair.get_public_str()),
 			(EntryFieldType::SecondaryVerificationKey, secondary_keypair.get_public_str()),
 			(EntryFieldType::EncryptionKey, encryption_keypair.get_public_str()),
+			(EntryFieldType::TimeToLive, String::from("14")),
 			(EntryFieldType::Expires, String::from("20250601")),
 			(EntryFieldType::Timestamp, String::from("20220520T120000Z"))
 		];
@@ -1019,6 +1077,8 @@ mod tests {
 	#[test]
 	fn orgentry_from_datacompliant() -> Result<(), MensagoError> {
 
+		// NOTE: This card data is data compliant only -- the signatures are just throwaways and
+		// this data will not pass a full compliance check
 		let good_carddata = concat!(
 			"Type:Organization\r\n",
 			"Index:2\r\n",
@@ -1027,9 +1087,9 @@ mod tests {
 			"Contact-Support:11111111-2222-2222-2222-444444444444/acme.com\r\n",
 			"Contact-Abuse:11111111-2222-2222-2222-555555555555/acme.com\r\n",
 			"Language:en\r\n",
-			"Primary-Verification-Key:ED25519:&JEq)5Ktu@jfM+Sa@+1GU6E&Ct2*<2ZYXh#l0FxP\r\n",
-			"Secondary-Verification-Key:ED25519:&JEq)5Ktu@jfM+Sa@+1GU6E&Ct2*<2ZYXh#l0FxP\r\n",
-			"Encryption-Key:CURVE25519:^fI7bdC(IEwC#(nG8Em-;nx98TcH<TnfvajjjDV@\r\n",
+			"Primary-Verification-Key:ED25519:)8id(gE02^S<{3H>9B;X4{DuYcb`%wo^mC&1lN88\r\n",
+			"Secondary-Verification-Key:ED25519:^j&t+&+q3fgPe1%PLmW4i|RCV|KNWZBLByIUZg+~\r\n",
+			"Encryption-Key:CURVE25519:@b?cjpeY;<&y+LSOA&yUQ&ZIrp(JGt{W$*V>ATLG\r\n",
 			"Time-To-Live:14\r\n",
 			"Expires:20231231\r\n",
 			"Timestamp:20220501T135211Z\r\n",
@@ -1232,6 +1292,55 @@ mod tests {
 			},
 			Err(_) => {
 				/* Test condition passes. Do nothing. */
+			}
+		}
+
+		Ok(())
+	}
+
+	#[test]
+	fn orgentry_get_text() -> Result<(), MensagoError> {
+
+		let (entry, _) = orgentry_make_compliant_card()?;
+
+		let entrytext = match entry.get_text(None) {
+			Ok(v) => v,
+			Err(_) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("orgentry_get_text failed to generate entry text")))
+			}
+		};
+
+		let expectedtext = "Type:Organization\r\n\
+						Index:1\r\n\
+						Name:Example, Inc.\r\n\
+						Primary-Verification-Key:ED25519:)8id(gE02^S<{3H>9B;X4{DuYcb`%wo^mC&1lN88\r\n\
+						Secondary-Verification-Key:ED25519:^j&t+&+q3fgPe1%PLmW4i|RCV|KNWZBLByIUZg+~\r\n\
+						Encryption-Key:CURVE25519:@b?cjpeY;<&y+LSOA&yUQ&ZIrp(JGt{W$*V>ATLG\r\n\
+						Contact-Admin:11111111-2222-2222-2222-333333333333/example.com\r\n\
+						Contact-Abuse:11111111-2222-2222-2222-555555555555/example.com\r\n\
+						Contact-Support:11111111-2222-2222-2222-444444444444/example.com\r\n\
+						Language:en\r\n\
+						Time-To-Live:14\r\n\
+						Expires:20250601\r\n\
+						Timestamp:20220520T120000Z\r\n";
+		
+		// Although it would be really easy to just do a quick string compare, it doesn't help at
+		// all if the test fails.
+		let entrybytes = entrytext.as_bytes();
+		let expectedbytes = expectedtext.as_bytes();
+
+		if entrybytes.len() != expectedbytes.len() {
+			return Err(MensagoError::ErrProgramException(
+				format!("orgentry_get_text: byte lengths differ")))
+		}
+
+		for i in 0..entrybytes.len() {
+
+			if entrybytes[i] != expectedbytes[i] {
+				print!("{}\n-----\n{}", entrytext, expectedtext);
+				return Err(MensagoError::ErrProgramException(
+					format!("orgentry_get_text: strings differ at index {} ({})", i, entrybytes[i])))
 			}
 		}
 
