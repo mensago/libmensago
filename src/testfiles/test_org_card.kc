@@ -1,0 +1,13 @@
+Type:Organization
+Index:1
+Name:Example, Inc.
+Primary-Verification-Key:ED25519:)8id(gE02^S<{3H>9B;X4{DuYcb`%wo^mC&1lN88
+Secondary-Verification-Key:ED25519:^j&t+&+q3fgPe1%PLmW4i|RCV|KNWZBLByIUZg+~
+Encryption-Key:CURVE25519:@b?cjpeY;<&y+LSOA&yUQ&ZIrp(JGt{W$*V>ATLG
+Contact-Admin:11111111-2222-2222-2222-333333333333/example.com
+Contact-Abuse:11111111-2222-2222-2222-555555555555/example.com
+Contact-Support:11111111-2222-2222-2222-444444444444/example.com
+Language:en
+Time-To-Live:14
+Expires:20250601
+Timestamp:20220520T120000Z
