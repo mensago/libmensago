@@ -708,7 +708,14 @@ impl KeycardEntry for OrgEntry {
 			}
 		};
 
-		self.set_field(&EntryFieldType::Expires, &count.to_string())?;
+		let offdate = match get_offset_date(Duration::days(count as i64)) {
+			Some(v) => v,
+			None => {
+				return Err(MensagoError::ErrProgramException(String::from(
+					"set_expiration: failure to create expiration date")))
+			}
+		};
+		self.set_field(&EntryFieldType::Expires, &offdate)?;
 
 		Ok(())
 	}
