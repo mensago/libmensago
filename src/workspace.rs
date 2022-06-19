@@ -1,13 +1,16 @@
-use eznacl::{ PublicKey, PrivateKey };
+use eznacl::{ PublicKey, PrivateKey, get_hash };
 use libkeycard::*;
+use std::fs;
 use std::path::PathBuf;
 use crate::auth;
 use crate::base::*;
+use crate::dbfs::*;
 use crate::types::*;
 
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub struct Workspace {
 	dbpath: PathBuf,
+	secretspath: PathBuf,
 	path: PathBuf,
 	uid: Option<UserID>,
 	wid: Option<RandomID>,
@@ -19,10 +22,11 @@ pub struct Workspace {
 impl Workspace {
 
 	/// Creates a new, uninitialized Workspace object
-	pub fn new(dbpath: &PathBuf, path: &PathBuf) -> Workspace {
+	pub fn new(dbpath: &PathBuf, secretspath: &PathBuf, path: &PathBuf) -> Workspace {
 
 		return Workspace{
 			dbpath: dbpath.clone(),
+			secretspath: secretspath.clone(),
 			path: path.clone(),
 			uid: None,
 			wid: None,
@@ -45,7 +49,7 @@ impl Workspace {
 		//let address = MAddress::from_parts(&UserID::from_wid(wid), server);
 		let waddr = WAddress::from_parts(&wid, &server);
 		
-		let conn = match rusqlite::Connection::open_with_flags(&self.dbpath,
+		let conn = match rusqlite::Connection::open_with_flags(&self.secretspath,
 			rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE) {
 				Ok(v) => v,
 				Err(e) => {
@@ -77,9 +81,37 @@ impl Workspace {
 		let storagekey = eznacl::SecretKey::generate().unwrap();
 		auth::add_key(&conn, &waddr, &storagekey.get_public_key(), &KeyCategory::Storage)?;
 		
-		// TODO: Finish implementing Workspace::generate()
+		let fkeyhash = get_hash("SHA-256", folderkey.get_public_str().as_bytes())?;
+		
+		for folder in [
+			"/messages",
+			"/contacts",
+			"/events",
+			"/tasks",
+			"/notes",
+			"/files",
+			"/files/attachments"] {
+			
+			self.add_folder(&FolderMap{
+				fid: RandomID::generate(),
+				address: waddr.clone(),
+				keyid: fkeyhash.clone(),
+				path: DBPath::from(folder).unwrap(),
+				permissions: String::from(""),
+			})?;
+		}
 
-		Err(MensagoError::ErrUnimplemented)
+		// Create the folders for files and attachments
+		let mut attachmentdir = self.path.clone();
+		attachmentdir.push("files");
+		attachmentdir.push("attachments");
+		if !attachmentdir.exists() {
+			fs::create_dir_all(attachmentdir)?;
+		}
+
+		self.set_userid(uid)?;
+		
+		Ok(())
 	}
 
 	/// Loads the workspace information from the local database. If no workspace ID is specified,
@@ -308,29 +340,29 @@ impl Workspace {
 	}
 	
 
-	// /// Adds a mapping of a folder ID to a specific path in the workspace
-	// pub fn add_folder(&self, fid: &FolderMap) -> Result<(), MensagoError> {
+	/// Adds a mapping of a folder ID to a specific path in the workspace
+	pub fn add_folder(&self, fmap: &FolderMap) -> Result<(), MensagoError> {
 
-	// 	// TODO: Implement add_folder() once the DBFS layer is implemented
+		// TODO: Implement add_folder() once the DBFS layer is implemented
 
-	// 	Err(MensagoError::ErrUnimplemented)
-	// }
+		Ok(())
+	}
 
-	// /// Deletes a folder mapping
-	// pub fn remove_folder(&self, fid: &FolderMap) -> Result<(), MensagoError> {
+	/// Deletes a mapping of a folder ID to a specific path in the workspace
+	pub fn remove_folder(&self, fid: &FolderMap) -> Result<(), MensagoError> {
 
-	// 	// TODO: Implement remove_folder() once the DBFS layer is implemented
+		// TODO: Implement remove_folder() once the DBFS layer is implemented
 		
-	// 	Err(MensagoError::ErrUnimplemented)
-	// }
+		Ok(())
+	}
 	
-	// /// Gets the specified folder mapping.
-	// pub fn get_folder(self, fid: &FolderMap) -> Result<FolderMap, MensagoError> {
+	/// Gets the specified folder mapping.
+	pub fn get_folder(self, fid: &FolderMap) -> Result<FolderMap, MensagoError> {
 
-	// 	// TODO: Implement get_folder() once the DBFS layer is implemented
+		// TODO: Implement get_folder() once the DBFS layer is implemented
 
-	// 	Err(MensagoError::ErrUnimplemented)
-	// }
+		Err(MensagoError::ErrUnimplemented)
+	}
 	
 	/// Sets the human-friendly name for the workspace
 	pub fn set_userid(&mut self, uid: &UserID) -> Result<(), MensagoError> {
