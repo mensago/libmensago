@@ -1,9 +1,9 @@
+use libkeycard::*;
 use rusqlite;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use crate::base::*;
-use crate::types::*;
 use crate::workspace::*;
 
 // String for initializing a new profile database

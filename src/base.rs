@@ -1,4 +1,3 @@
-use chrono::prelude::*;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -33,41 +32,6 @@ pub enum MensagoError {
 	#[error("Program exception: {0}")]
 	ErrProgramException(String),
 
-	// Keycard error codes
-
-	#[error("Feature not available")]
-	ErrFeatureNotAvailable,
-	#[error("Unsupported keycard type")]
-	ErrUnsupportedKeycardType,
-	#[error("Unsupported signature type")]
-	ErrUnsupportedSignatureType,
-	#[error("Unsupported field")]
-	ErrUnsupportedField,
-	#[error("Bad value for field: {0}")]
-	ErrBadFieldValue(String),
-	#[error("Unsupported hash type")]
-	ErrUnsupportedHashType,
-	#[error("Unsupported encryption type")]
-	ErrUnsupportedEncryptionType,
-	#[error("Noncompliant keycard")]
-	ErrNoncompliantKeycard,
-	#[error("Invalid keycard")]
-	ErrInvalidKeycard,
-	#[error("Invalid hash")]
-	ErrInvalidHash,
-	#[error("Invalid key")]
-	ErrInvalidKey,
-	#[error("Hash mismatch")]
-	ErrHashMismatch,
-	#[error("Verification failure")]
-	ErrVerificationFailure,
-	
-	// Returned when attempting to add a signature to a keycard out of the required order, e.g.
-	// adding a Custody signature anywhere but first.
-	#[error("Out-of-order signature")]
-	ErrOutOfOrderSignature,
-
-
 	// Passthrough errors
 
 	#[error(transparent)]
@@ -81,16 +45,6 @@ pub enum MensagoError {
 
 	#[error(transparent)]
     RusqliteError(#[from] rusqlite::Error),
-}
-
-/// Returns a string containing the current UTC with second precision in the format
-/// YYYYMMDDTHHMMSSZ.
-pub fn get_timestamp() -> String {
-
-	let utc: DateTime<Utc> = Utc::now();
-	let formatted = utc.format("%Y%m%dT%H%M%SZ");
-
-	String::from(formatted.to_string())
 }
 
 /// Returns a string, given a database query

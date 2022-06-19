@@ -1,4 +1,5 @@
 use eznacl::*;
+use libkeycard::*;
 use sys_info;
 use rusqlite;
 
