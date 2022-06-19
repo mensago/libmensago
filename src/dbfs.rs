@@ -3,6 +3,7 @@
 //! Only attachments are stored outside the database, and this is for bloat protection and ease of 
 //! access. The files' names are the same as those on the server to make tracking them easier.
 //! Folder names OTOH are stored in the database using the user-facing names (inbox, notes, etc.)
+use eznacl::CryptoString;
 use lazy_static::lazy_static;
 use libkeycard::*;
 use regex::Regex;
@@ -95,7 +96,7 @@ impl DBPath {
 pub struct FolderMap {
 	pub fid: RandomID,
 	pub address: WAddress,
-	pub keyid: RandomID,
+	pub keyid: CryptoString,
 	pub path: DBPath,
 	pub permissions: String,
 }
