@@ -71,13 +71,16 @@ pub enum MensagoError {
 	// Passthrough errors
 
 	#[error(transparent)]
+	EzNaclError(#[from] eznacl::EzNaclError),
+
+	#[error(transparent)]
     IOError(#[from] std::io::Error),
 
 	#[error(transparent)]
-    RusqliteError(#[from] rusqlite::Error),
+    LKCError(#[from] libkeycard::LKCError),
 
 	#[error(transparent)]
-	EzNaclError(#[from] eznacl::EzNaclError),
+    RusqliteError(#[from] rusqlite::Error),
 }
 
 /// Returns a string containing the current UTC with second precision in the format
