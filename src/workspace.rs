@@ -36,6 +36,21 @@ impl Workspace {
 		}
 	}
 
+	/// Returns the workspace ID of the workspace, assuming one has been set
+	pub fn get_wid(&self) -> Option<RandomID> {
+		self.wid.clone()
+	}
+
+	/// Returns the user ID of the workspace, assuming one has been set
+	pub fn get_uid(&self) -> Option<UserID> {
+		self.uid.clone()
+	}
+
+	/// Returns the domain of the workspace, assuming one has been set
+	pub fn get_domain(&self) -> Option<Domain> {
+		self.domain.clone()
+	}
+
 	/// Creates all the data needed for an individual workspace account
 	pub fn generate(&mut self, uid: &UserID, server: &Domain, wid: &RandomID, pw: &str) 
 		-> Result<(),MensagoError> {
