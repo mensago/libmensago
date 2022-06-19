@@ -1,4 +1,4 @@
-use eznacl::{ PublicKey, PrivateKey, get_hash };
+use eznacl::*;
 use libkeycard::*;
 use std::fs;
 use std::path::PathBuf;
@@ -357,11 +357,65 @@ impl Workspace {
 	}
 	
 	/// Gets the specified folder mapping.
-	pub fn get_folder(self, fid: &FolderMap) -> Result<FolderMap, MensagoError> {
+	pub fn get_folder(self, fid: &RandomID) -> Result<FolderMap, MensagoError> {
 
-		// TODO: Implement get_folder() once the DBFS layer is implemented
+		let conn = match rusqlite::Connection::open_with_flags(&self.dbpath,
+			rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE) {
+				Ok(v) => v,
+				Err(e) => {
+					return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())));
+				}
+			};
+			
+		// For the fully-commented version of this query, see profile::get_identity()
+		let mut stmt = match conn
+			.prepare("SELECT address,keyid,path,permissions FROM folders WHERE fid=?1") {
+				Ok(v) => v,
+				Err(e) => {
+					return Err(MensagoError::ErrDatabaseException(e.to_string()))
+				}
+			};
+		
+		let mut rows = match stmt.query([fid.as_string()]) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrDatabaseException(e.to_string()))
+			}
+		};
 
-		Err(MensagoError::ErrUnimplemented)
+		let option_row = match rows.next() {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrDatabaseException(e.to_string()))
+			}
+		};
+
+		// Query unwrapping complete. Start extracting the data
+		let row = option_row.unwrap();
+
+		let waddr = match WAddress::from(&row.get::<usize,String>(0).unwrap()) {
+			Some(v) => v,
+			None => { return Err(MensagoError::ErrDatabaseException(
+				String::from("Bad address in get_folder()")))}
+		};
+
+		let keyid = match CryptoString::from(&row.get::<usize,String>(1).unwrap()) {
+			Some(v) => v,
+			None => { return Err(MensagoError::ErrDatabaseException(
+				String::from("Bad key ID in get_folder()")))}
+		};
+
+		let path = DBPath::from(&row.get::<usize,String>(2).unwrap())?;
+
+		let fmap = FolderMap {
+			fid: fid.clone(),
+			address: waddr,
+			keyid: keyid,
+			path: path,
+			permissions: String::from(&row.get::<usize,String>(3).unwrap()),
+		};
+		
+		Ok(fmap)
 	}
 	
 	/// Sets the human-friendly name for the workspace
