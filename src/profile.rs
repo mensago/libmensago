@@ -336,11 +336,58 @@ impl Profile {
 			String::from("BUG: Malformed MAddress returned from get_identity")))
 	}
 
-	/// Assigns an identity workspace to the profile
-	pub fn set_identity(&self, _w: Workspace) -> Result<(),MensagoError> {
+	/// Assigns an identity workspace to the profile. The profile can have multiple workspace
+	/// memberships, but only one can be used for the identity of the user. This call sets that
+	/// address. Because so much is tied to an identity workspace, once this is set, it cannot be
+	/// changed.
+	pub fn set_identity(&mut self, w: Workspace, pw: &ArgonHash) -> Result<(),MensagoError> {
 
-		// TODO: Implement Workspace::set_identity
-		return Err(MensagoError::ErrUnimplemented)
+		// First, check to see if we already have one in the database. If so, return an error
+		// because once set, it cannot be changed.
+		
+		if self.domain.is_some() && (self.uid.is_some() || self.wid.is_some()) {
+			return Err(MensagoError::ErrExists)
+		}
+
+		let conn = self.open_db()?;
+
+		// Cached version doesn't exist, so check the database
+		{
+			let mut stmt = match conn
+				.prepare("SELECT wid,domain,userid FROM workspaces WHERE type = 'identity'") {
+					Ok(v) => v,
+					Err(e) => {
+						return Err(MensagoError::ErrDatabaseException(e.to_string()))
+					}
+				};
+			
+			let mut rows = match stmt.query([]) {
+				Ok(v) => v,
+				Err(e) => {
+					return Err(MensagoError::ErrDatabaseException(e.to_string()))
+				}
+			};
+
+			let option_row = match rows.next() {
+				Ok(v) => v,
+				Err(e) => {
+					return Err(MensagoError::ErrDatabaseException(e.to_string()))
+				}
+			};
+
+			if option_row.is_some() {
+				// Identity exists, return an error
+				return Err(MensagoError::ErrExists);
+			}
+		}
+		
+		w.add_to_db(pw)?;
+
+		self.wid = w.get_wid();
+		self.uid = w.get_uid();
+		self.domain = w.get_domain();
+		
+		Ok(())
 	}
 
 	/// Reinitializes the profile's database to empty
