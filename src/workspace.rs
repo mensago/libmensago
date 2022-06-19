@@ -343,9 +343,52 @@ impl Workspace {
 	/// Adds a mapping of a folder ID to a specific path in the workspace
 	pub fn add_folder(&self, fmap: &FolderMap) -> Result<(), MensagoError> {
 
-		// TODO: Implement add_folder() once the DBFS layer is implemented
+		let conn = match rusqlite::Connection::open_with_flags(&self.dbpath,
+			rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE) {
+				Ok(v) => v,
+				Err(e) => {
+					return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())));
+				}
+		};
 
-		Ok(())
+		{
+			let mut stmt = match conn.prepare("SELECT fid FROM folders WHERE fid=?1") {
+				Ok(v) => v,
+				Err(e) => {
+					return Err(MensagoError::ErrDatabaseException(e.to_string()))
+				}
+			};
+				
+			let mut rows = match stmt.query([fmap.fid.as_string()]) {
+				Ok(v) => v,
+				Err(e) => {
+					return Err(MensagoError::ErrDatabaseException(e.to_string()))
+				}
+			};
+	
+			match rows.next() {
+				Ok(optrow) => {
+					match optrow {
+						Some(_) => { return Err(MensagoError::ErrExists) },
+						None => (),
+					}
+				},
+				Err(e) => {
+					return Err(MensagoError::ErrDatabaseException(e.to_string()))
+				}
+			};
+		}
+	
+		match conn.execute("INSERT INTO folders(fid,address,keyid,path,name,permissions)
+			VALUES(?1,?2,?3,?4,?5,?6)",
+			[fmap.fid.to_string(), fmap.address.to_string(), fmap.keyid.to_string(),
+				fmap.path.to_string(), String::from(fmap.path.basename()), fmap.permissions.clone()]) {
+			
+			Ok(_) => { return Ok(()) },
+			Err(e) => {
+				return Err(MensagoError::ErrDatabaseException(e.to_string()))
+			}
+		}
 	}
 
 	/// Deletes a mapping of a folder ID to a specific path in the workspace
