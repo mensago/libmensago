@@ -1,4 +1,3 @@
-use eznacl::CryptoString;
 use rusqlite;
 use std::env;
 use std::fs;
