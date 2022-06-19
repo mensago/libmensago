@@ -349,11 +349,51 @@ impl Workspace {
 	}
 
 	/// Deletes a mapping of a folder ID to a specific path in the workspace
-	pub fn remove_folder(&self, fid: &FolderMap) -> Result<(), MensagoError> {
+	pub fn remove_folder(&self, fid: &RandomID) -> Result<(), MensagoError> {
 
-		// TODO: Implement remove_folder() once the DBFS layer is implemented
-		
-		Ok(())
+		let conn = match rusqlite::Connection::open_with_flags(&self.dbpath,
+			rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE) {
+				Ok(v) => v,
+				Err(e) => {
+					return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())));
+				}
+		};
+
+		// Check to see if the folder ID passed to the function exists
+		let mut stmt = match conn.prepare("SELECT fid FROM sessions WHERE fid=?1") {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrDatabaseException(e.to_string()))
+			}
+		};
+			
+		let mut rows = match stmt.query([fid.as_string()]) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrDatabaseException(e.to_string()))
+			}
+		};
+
+		match rows.next() {
+			Ok(optrow) => {
+				match optrow {
+					// This means that the device ID wasn't found
+					None => { return Err(MensagoError::ErrNotFound) },
+					Some(_) => (),
+				}
+			},
+			Err(e) => {
+				return Err(MensagoError::ErrDatabaseException(e.to_string()))
+			}
+		};
+
+		match conn.execute("DELETE FROM folders WHERE fid=?1)", [fid.as_string()]) {
+			
+			Ok(_) => { return Ok(()) },
+			Err(e) => {
+				return Err(MensagoError::ErrDatabaseException(e.to_string()))
+			}
+		}
 	}
 	
 	/// Gets the specified folder mapping.
@@ -365,7 +405,7 @@ impl Workspace {
 				Err(e) => {
 					return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())));
 				}
-			};
+		};
 			
 		// For the fully-commented version of this query, see profile::get_identity()
 		let mut stmt = match conn
