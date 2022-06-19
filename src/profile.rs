@@ -1,3 +1,4 @@
+use eznacl::CryptoString;
 use rusqlite;
 use std::env;
 use std::fs;
@@ -7,7 +8,7 @@ use crate::types::*;
 use crate::workspace::*;
 
 // String for initializing a new profile database
-static DB_SETUP_COMMANDS: &str = "
+static STORAGE_DB_SETUP_COMMANDS: &str = "
 	CREATE TABLE workspaces (
 		'wid' TEXT NOT NULL UNIQUE,
 		'userid' TEXT,
@@ -31,15 +32,6 @@ static DB_SETUP_COMMANDS: &str = "
 		'public_key' TEXT NOT NULL,
 		'private_key' TEXT NOT NULL,
 		'os' TEXT NOT NULL
-	);
-	CREATE table 'keys'(
-		'keyid' TEXT NOT NULL UNIQUE,
-		'address' TEXT NOT NULL,
-		'type' TEXT NOT NULL,
-		'category' TEXT NOT NULL,
-		'private' TEXT NOT NULL,
-		'public' TEXT,
-		'timestamp' TEXT NOT NULL
 	);
 	CREATE table 'keycards'(
 		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -111,10 +103,25 @@ static DB_SETUP_COMMANDS: &str = "
 		'path'	TEXT NOT NULL
 	);";
 
-/// The Profile type is the client's entry point to interacting with storage. One major point to
-/// note is that it owns the database instance. Unless you are specifically managing profiles, you
-/// will probably load the default profile using ProfileManager and use the profile instance
-/// to get to the database handle.
+static SECRETS_DB_SETUP_COMMANDS: &str = "
+	CREATE table 'keys'(
+		'keyid' TEXT NOT NULL UNIQUE,
+		'address' TEXT NOT NULL,
+		'type' TEXT NOT NULL,
+		'category' TEXT NOT NULL,
+		'private' TEXT NOT NULL,
+		'public' TEXT,
+		'timestamp' TEXT NOT NULL
+	);
+";
+
+
+/// The Profile type is the client's entry point to interacting with local storage. A profile
+/// consists of a SQLCipher database for storing user data (messages, etc) and config info
+/// and a SQLCipher database for storing secrets (signing keys, password hash, etc.). Neither
+/// database is encrypted currently, but will be a future date. Each profile also contains a
+/// folder called 'files' for storing files outside the databases to cut down on bloat and make
+/// it easier for the user to access attachments with other programs in the OS.
 #[derive(Debug)]
 pub struct Profile {
 	name: String,
@@ -123,7 +130,7 @@ pub struct Profile {
 	uid: Option<UserID>,
 	wid: Option<RandomID>,
 	domain: Option<Domain>,
-	devid: Option<RandomID>
+	devid: Option<RandomID>,
 }
 
 impl Profile {
@@ -185,11 +192,11 @@ impl Profile {
 			fs::create_dir_all(tempdir)?;
 		}
 
-		let mut dbpath = self.path.clone();
-		dbpath.push("storage.db");
-		if dbpath.exists() {
+		let mut storagepath = self.path.clone();
+		storagepath.push("storage.db");
+		if storagepath.exists() {
 
-			let db = rusqlite::Connection::open(dbpath)?;
+			let db = rusqlite::Connection::open(storagepath)?;
 
 			// TODO: load app config from database
 
@@ -340,25 +347,32 @@ impl Profile {
 	/// Reinitializes the profile's database to empty
 	pub fn reset_db(&self) -> Result<(),MensagoError> {
 
-		let mut dbpath = self.path.clone();
-		dbpath.push("storage.db");
+		let strdata = [
+			("storage.db", STORAGE_DB_SETUP_COMMANDS),
+			("secrets.db", SECRETS_DB_SETUP_COMMANDS),
+		];
 
-		if dbpath.exists() {
-			fs::remove_file(&dbpath)?;
-		}
-
-		{
-			let conn = match rusqlite::Connection::open(&dbpath) {
-				Ok(v) => v,
-				Err(e) => {
-					return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())));
-				}
-			};
-
-			match conn.execute(DB_SETUP_COMMANDS, []) {
-				Ok(_) => { /* do nothing. YAY */ },
-				Err(e) => {
-					return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())));
+		for s in strdata {
+			let mut dbpath = self.path.clone();
+			dbpath.push(s.0);
+	
+			if dbpath.exists() {
+				fs::remove_file(&dbpath)?;
+			}
+	
+			{
+				let conn = match rusqlite::Connection::open(&dbpath) {
+					Ok(v) => v,
+					Err(e) => {
+						return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())));
+					}
+				};
+	
+				match conn.execute(s.1, []) {
+					Ok(_) => (),
+					Err(e) => {
+						return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())));
+					}
 				}
 			}
 		}
@@ -474,7 +488,7 @@ impl ProfileManager {
 			uid: None,
 			wid: None,
 			domain: None,
-			devid: None
+			devid: None,
 		};
 
 		if self.count_profiles() == 0 {
