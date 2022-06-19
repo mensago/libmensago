@@ -93,11 +93,11 @@ impl DBPath {
 /// Represents the mapping of a server-side path to one in the database virtual filesystem
 #[derive(Debug, Clone)]
 pub struct FolderMap {
-	fid: RandomID,
-	address: WAddress,
-	keyid: RandomID,
-	path: DBPath,
-	permissions: String,
+	pub fid: RandomID,
+	pub address: WAddress,
+	pub keyid: RandomID,
+	pub path: DBPath,
+	pub permissions: String,
 }
 
-// TODO: Implement the DBFS
+// TODO: Finish implementing the DBFS
