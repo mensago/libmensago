@@ -427,10 +427,47 @@ impl Profile {
 	}
 	
 	/// Resolves a Mensago address to its corresponding workspace ID
-	pub fn resolve_address(&self, _a: MAddress) -> Result<RandomID,MensagoError> {
+	pub fn resolve_address(&self, a: MAddress) -> Result<RandomID,MensagoError> {
 
-		// TODO: Implement Workspace::resolve_address
-		return Err(MensagoError::ErrUnimplemented)
+		let conn = self.open_db()?;
+
+		let mut stmt = match conn
+			.prepare("SELECT wid FROM workspaces WHERE userid=?1 AND domain=?2") {
+				Ok(v) => v,
+				Err(e) => {
+					return Err(MensagoError::ErrDatabaseException(e.to_string()))
+				}
+			};
+		
+		let mut rows = match stmt.query([a.get_uid().as_string(), a.get_domain().as_string()]) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrDatabaseException(e.to_string()))
+			}
+		};
+
+		let option_row = match rows.next() {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrDatabaseException(e.to_string()))
+			}
+		};
+
+		if option_row.is_none() {
+			// We have a problem: no identity entry in the database for the workspace.
+			return Err(MensagoError::ErrDatabaseException(
+					String::from("Database has no identity")));
+		}
+
+		let row = option_row.unwrap();
+		match RandomID::from(&row.get::<usize,String>(0).unwrap()) {
+			Some(v) => Ok(v),
+			None => {
+				Err(MensagoError::ErrDatabaseException(
+					String::from("Bad identity workspace ID in database")
+				))
+			}
+		}
 	}
 
 	/// Private function to make code that deals with the database easier. It also ensures that
