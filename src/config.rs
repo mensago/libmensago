@@ -102,10 +102,91 @@ impl Config {
 	}
 
 	/// Saves all fields to the database
-	pub fn save_to_db(&self, _conn: &rusqlite::Connection)
+	pub fn save_to_db(&self, conn: &rusqlite::Connection)
 	-> Result<(), MensagoError> {
 	
-		// TODO: Implement AppConfig::save_to_db()
+		// Check to see if the table exists in the database
+
+		let mut stmt = match conn
+			.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='appconfig'") {
+				Ok(v) => v,
+				Err(e) => {
+					return Err(MensagoError::ErrDatabaseException(e.to_string()))
+				}
+			};
+		
+		let mut rows = match stmt.query([]) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrDatabaseException(e.to_string()))
+			}
+		};
+
+		let option_row = match rows.next() {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrDatabaseException(e.to_string()))
+			}
+		};
+
+		// If the row is None, then the table doesn't exist. Create it and move on.
+		if option_row.is_none() {
+			match conn.execute(
+				"CREATE TABLE 'appconfig'('fname' TEXT NOT NULL UNIQUE, 'fvalue' TEXT);", []) {
+				Ok(_) => (),
+				Err(e) => {
+					return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())))
+				}
+			}
+		}
+
+		// Save all values to the table
+		for (fname,fvalue) in &self.data {
+
+			let mut stmt = match conn
+			.prepare("SELECT fname FROM appconfig fname=?1") {
+				Ok(v) => v,
+				Err(e) => {
+					return Err(MensagoError::ErrDatabaseException(e.to_string()))
+				}
+			};
+		
+			let mut rows = match stmt.query([fname]) {
+				Ok(v) => v,
+				Err(e) => {
+					return Err(MensagoError::ErrDatabaseException(e.to_string()))
+				}
+			};
+
+			let option_row = match rows.next() {
+				Ok(v) => v,
+				Err(e) => {
+					return Err(MensagoError::ErrDatabaseException(e.to_string()))
+				}
+			};
+
+			match option_row {
+				Some(_) => {
+					match conn.execute(
+						"UPDATE appconfig SET fvalue=?2 WHERE fname=?1;", [fname, fvalue]) {
+						Ok(_) => (),
+						Err(e) => {
+							return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())))
+						}
+					}
+				},
+				None => {
+					match conn.execute(
+						"INSERT INTO appconfig (fname,fvalue) VALUES(?1,?2);", [fname, fvalue]) {
+						Ok(_) => (),
+						Err(e) => {
+							return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())))
+						}
+					}
+				},
+			}
+		}
+		
 		Ok(())
 	}
 
