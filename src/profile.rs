@@ -4,6 +4,7 @@ use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use crate::base::*;
+use crate::config::*;
 use crate::workspace::*;
 
 // String for initializing a new profile database
@@ -130,6 +131,7 @@ pub struct Profile {
 	wid: Option<RandomID>,
 	domain: Option<Domain>,
 	devid: Option<RandomID>,
+	config: Config,
 }
 
 impl Profile {
@@ -157,6 +159,7 @@ impl Profile {
 			wid: None,
 			domain: None,
 			devid: None,
+			config: Config::new(),
 		};
 		
 		let mut defpath = profile.path.to_path_buf();
@@ -196,9 +199,7 @@ impl Profile {
 		if storagepath.exists() {
 
 			let db = rusqlite::Connection::open(storagepath)?;
-
-			// TODO: load app config from database
-
+			self.config.load_from_db(&db)?;
 			db.close().expect("BUG: Profile.activate(): error closing database");
 			return Ok(());
 		}
@@ -572,6 +573,7 @@ impl ProfileManager {
 			wid: None,
 			domain: None,
 			devid: None,
+			config: Config::new(),
 		};
 
 		if self.count_profiles() == 0 {
