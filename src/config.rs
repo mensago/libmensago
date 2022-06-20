@@ -110,31 +110,38 @@ impl Config {
 	}
 
 	/// Sets a field value
-	pub fn set(&mut self, _field: &str, _value: &str) -> Result<(), MensagoError> {
+	pub fn set(&mut self, field: &str, value: &str) {
 
-		// TODO: Implement AppConfig::set()
-		Ok(())
+		self.data.insert(String::from(field), String::from(value));
 	}
 
 	/// Gets a field value
-	pub fn get(&self, _field: &str) -> Result<String, MensagoError> {
+	pub fn get(&self, field: &str) -> Result<String, MensagoError> {
 
-		// TODO: Implement AppConfig::get()
-		Ok(String::new())
+		match self.data.get(field) {
+			Some(v) => Ok(v.clone()),
+			None => { Err(MensagoError::ErrNotFound) }
+		}
 	}
 
 	/// Sets an integer field value
-	pub fn set_int(&mut self, _field: &str, _value: isize) -> Result<(), MensagoError> {
+	pub fn set_int(&mut self, field: &str, value: isize) {
 
-		// TODO: Implement AppConfig::set_int()
-		Ok(())
+		self.data.insert(String::from(field), value.to_string());
 	}
 
 	/// Gets a field value
-	pub fn get_int(&self, _field: &str) -> Result<isize, MensagoError> {
+	pub fn get_int(&self, field: &str) -> Result<isize, MensagoError> {
 
-		// TODO: Implement AppConfig::get_int()
-		Ok(0)
+		let s = match self.data.get(field) {
+			Some(v) => v,
+			None => { return Err(MensagoError::ErrNotFound) }
+		};
+
+		match s.parse::<isize>() {
+			Ok(v) => Ok(v),
+			Err(_) => { Err(MensagoError::ErrTypeMismatch) },
+		}
 	}
 }
 
