@@ -9,7 +9,7 @@ use crate::base::*;
 /// information with some methods to make usage easier
 #[derive(Debug)]
 pub struct Config {
-	pub data: HashMap::<&'static str, String>,
+	pub data: HashMap::<String, String>,
 }
 
 impl Config {
@@ -17,15 +17,87 @@ impl Config {
 	/// Creates a new empty AppConfig instance
 	pub fn new() -> Config {
 		Config {
-			data: HashMap::<&'static str, String>::new(),
+			data: HashMap::<String, String>::new(),
 		}
 	}
 
-	/// Loads all fields from the database
-	pub fn load_from_db(&mut self, _conn: &rusqlite::Connection)
+	/// Loads all fields from the database. NOTE: this call completely clears all data from the
+	/// object prior to loading new values
+	pub fn load_from_db(&mut self, conn: &rusqlite::Connection)
 	-> Result<(), MensagoError> {
 	
-		// TODO: Implement AppConfig::load_from_db()
+		// Regardless of the outcome, we need to have a nice clean start
+		self.data = HashMap::<String, String>::new();
+		
+		// Check to see if the table exists in the database
+
+		let mut stmt = match conn
+			.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='appconfig'") {
+				Ok(v) => v,
+				Err(e) => {
+					return Err(MensagoError::ErrDatabaseException(e.to_string()))
+				}
+			};
+		
+		let mut rows = match stmt.query([]) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrDatabaseException(e.to_string()))
+			}
+		};
+
+		let option_row = match rows.next() {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrDatabaseException(e.to_string()))
+			}
+		};
+
+		// If the row is None, then the table doesn't exist. Create it and move on.
+		if option_row.is_none() {
+			return match conn.execute(
+				"CREATE TABLE 'appconfig'('fname' TEXT NOT NULL UNIQUE, 'fvalue' TEXT);", []) {
+				Ok(_) => Ok(()),
+				Err(e) => {
+					Err(MensagoError::ErrDatabaseException(String::from(e.to_string())))
+				}
+			}
+		}
+
+		// The table exists, so load up all values from it
+		let mut stmt = match conn.prepare("SELECT fname,fvalue FROM appconfig") {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrDatabaseException(e.to_string()))
+			}
+		};
+		
+		let mut rows = match stmt.query([]) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrDatabaseException(e.to_string()))
+			}
+		};
+
+		let mut option_row = match rows.next() {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrDatabaseException(e.to_string()))
+			}
+		};
+
+		while option_row.is_some() {
+			let row = option_row.unwrap();
+			self.data.insert(String::from(&row.get::<usize,String>(0).unwrap()),
+				String::from(&row.get::<usize,String>(1).unwrap()));
+			option_row = match rows.next() {
+				Ok(v) => v,
+				Err(e) => {
+					return Err(MensagoError::ErrDatabaseException(e.to_string()))
+				}
+			};
+		}
+
 		Ok(())
 	}
 
