@@ -124,20 +124,20 @@ static SECRETS_DB_SETUP_COMMANDS: &str = "
 /// it easier for the user to access attachments with other programs in the OS.
 #[derive(Debug)]
 pub struct Profile {
-	name: String,
-	path: PathBuf,
-	is_default: bool,
-	uid: Option<UserID>,
-	wid: Option<RandomID>,
-	domain: Option<Domain>,
-	devid: Option<RandomID>,
-	config: Config,
+	pub name: String,
+	pub path: PathBuf,
+	pub is_default: bool,
+	pub uid: Option<UserID>,
+	pub wid: Option<RandomID>,
+	pub domain: Option<Domain>,
+	pub devid: Option<RandomID>,
+	pub config: Config,
 }
 
 impl Profile {
 
 	/// Creates a new profile from a specified path
-	pub fn new(profpath: &Path) -> Result<Profile, MensagoError> {
+	fn new(profpath: &Path) -> Result<Profile, MensagoError> {
 
 		let mut profname = match profpath.to_str() {
 			Some(v) => v,
@@ -169,14 +169,6 @@ impl Profile {
 		}
 
 		Ok(profile)
-	}
-
-	/// Creates a new device ID for the profile
-	pub fn generate_devid(&mut self) -> RandomID {
-
-		let id = RandomID::generate();
-		self.devid = Some(id.clone());
-		id
 	}
 
 	/// Connects the profile to its associated database, initializing it if necessary.
@@ -544,19 +536,26 @@ impl ProfileManager {
 		}
 
 		let mut profile = Profile {
-			name: String::from(name_squashed),
+			name: name_squashed.clone(),
 			path: new_profile_path,
 			is_default: false,
 			uid: None,
 			wid: None,
 			domain: None,
-			devid: None,
+			devid: Some(RandomID::generate()),
 			config: Config::new(),
 		};
 
 		if self.count_profiles() == 0 {
 			profile.is_default = true;
 			self.default_index = 1;
+			
+			let mut defaultpath = PathBuf::from(&self.profile_folder);
+			defaultpath.push(&name_squashed);
+			defaultpath.push("default.txt");
+			if !defaultpath.exists() {
+				let _ = fs::File::create(defaultpath)?;
+			}
 		}
 		
 		profile.reset_db()?;
