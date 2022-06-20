@@ -19,7 +19,7 @@ impl AppConfig {
 	-> Result<(), MensagoError> {
 	
 		// TODO: Implement AppConfig::load_from_db()
-		Err(MensagoError::ErrUnimplemented)
+		Ok(())
 	}
 
 	/// Saves all fields to the database
@@ -27,35 +27,35 @@ impl AppConfig {
 	-> Result<(), MensagoError> {
 	
 		// TODO: Implement AppConfig::save_to_db()
-		Err(MensagoError::ErrUnimplemented)
+		Ok(())
 	}
 
 	/// Sets a field value
 	pub fn set(_field: &str, _value: &str) -> Result<(), MensagoError> {
 
 		// TODO: Implement AppConfig::set()
-		Err(MensagoError::ErrUnimplemented)
+		Ok(())
 	}
 
 	/// Gets a field value
 	pub fn get(_field: &str) -> Result<String, MensagoError> {
 
 		// TODO: Implement AppConfig::get()
-		Err(MensagoError::ErrUnimplemented)
+		Ok(String::new())
 	}
 
 	/// Sets an integer field value
 	pub fn set_int(_field: &str, _value: isize) -> Result<(), MensagoError> {
 
 		// TODO: Implement AppConfig::set_int()
-		Err(MensagoError::ErrUnimplemented)
+		Ok(())
 	}
 
 	/// Gets a field value
 	pub fn get_int(_field: &str) -> Result<isize, MensagoError> {
 
 		// TODO: Implement AppConfig::get_int()
-		Err(MensagoError::ErrUnimplemented)
+		Ok(0)
 	}
 }
 
