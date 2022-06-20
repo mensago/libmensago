@@ -168,21 +168,15 @@ impl Profile {
 			profile.is_default = true;
 		}
 
-		match profile.load_config() {
-			Ok(_) => {
-				if profile.devid == None {
-					profile.devid = Some(RandomID::generate());
-				}
-			},
-			Err(_) => {
-				if profile.devid == None {
-					profile.devid = Some(RandomID::generate());
-				}
-				profile.save_config()?
-			}
-		}
-		
 		Ok(profile)
+	}
+
+	/// Creates a new device ID for the profile
+	pub fn generate_devid(&mut self) -> RandomID {
+
+		let id = RandomID::generate();
+		self.devid = Some(id.clone());
+		id
 	}
 
 	/// Connects the profile to its associated database, initializing it if necessary.
@@ -205,22 +199,6 @@ impl Profile {
 		}
 
 		self.reset_db()
-	}
-
-	/// Loads the config file for the profile
-	pub fn load_config(&mut self) -> Result<(), MensagoError> {
-
-		// TODO: Implement Profile::load_config()
-
-		Ok(())
-	}
-
-	/// Saves the config file for the profile
-	pub fn save_config(&mut self) -> Result<(), MensagoError> {
-
-		// TODO: Implement Profile::save_config()
-
-		Ok(())
 	}
 
 	/// Sets the profile's internal flag that it is the default profile
