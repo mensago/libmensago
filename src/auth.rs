@@ -204,7 +204,7 @@ pub fn get_session_keypair(conn: &rusqlite::Connection, waddr: WAddress)
 pub fn add_keypair(conn: &rusqlite::Connection, waddr: &WAddress, pubkey: &CryptoString,
 	privkey: &CryptoString, keytype: &KeyType, category: &KeyCategory) -> Result<(), MensagoError> {
 	
-	let pubhash = match eznacl::get_hash("blake3-128", pubkey.as_bytes()) {
+	let pubhash = match eznacl::get_hash("blake3-256", pubkey.as_bytes()) {
 		Ok(v) => v,
 		Err(e) => {
 			return Err(MensagoError::ErrProgramException(String::from(e.to_string())));
@@ -279,7 +279,7 @@ pub fn add_keypair(conn: &rusqlite::Connection, waddr: &WAddress, pubkey: &Crypt
 pub fn add_key(conn: &rusqlite::Connection, waddr: &WAddress, key: &CryptoString, 
 	category: &KeyCategory) -> Result<(), MensagoError> {
 	
-	let keyhash = match eznacl::get_hash("blake3-128", key.as_bytes()) {
+	let keyhash = match eznacl::get_hash("blake3-256", key.as_bytes()) {
 		Ok(v) => v,
 		Err(e) => {
 			return Err(MensagoError::ErrProgramException(String::from(e.to_string())));
@@ -330,7 +330,7 @@ pub fn add_key(conn: &rusqlite::Connection, waddr: &WAddress, key: &CryptoString
 }
 
 /// Deletes a cryptography key from a workspace. Note that the algorithm must match, i.e. if a key
-/// is stored using a BLAKE2B-256 hash, passing a BLAKE3-128 hash of the exact same key will result
+/// is stored using a BLAKE2B-256 hash, passing a BLAKE3-256 hash of the exact same key will result
 /// in a ErrNotFound error.
 pub fn remove_key(conn: &rusqlite::Connection, keyhash: &CryptoString) -> Result<(), MensagoError> {
 
