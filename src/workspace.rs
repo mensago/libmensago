@@ -22,11 +22,17 @@ pub struct Workspace {
 impl Workspace {
 
 	/// Creates a new, uninitialized Workspace object
-	pub fn new(dbpath: &PathBuf, secretspath: &PathBuf, path: &PathBuf) -> Workspace {
+	pub fn new(path: &PathBuf) -> Workspace {
 
+		let mut storage = path.clone();
+		storage.push("storage.db");
+
+		let mut secrets = path.clone();
+		secrets.push("secrets.db");
+		
 		return Workspace{
-			dbpath: dbpath.clone(),
-			secretspath: secretspath.clone(),
+			dbpath: storage,
+			secretspath: secrets,
 			path: path.clone(),
 			uid: None,
 			wid: None,
@@ -547,5 +553,75 @@ impl Workspace {
 			Some(v) => return Ok(v.clone()),
 			None => return Err(MensagoError::ErrEmptyData)
 		}
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use crate::*;
+	use libkeycard::*;
+	use std::env;
+	use std::fs;
+	use std::path::PathBuf;
+	use std::str::FromStr;
+
+	// Sets up the path to contain the profile tests
+	fn setup_test(name: &str) -> PathBuf {
+		if name.len() < 1 {
+			panic!("Invalid name {} in setup_test", name);
+		}
+		let args: Vec<String> = env::args().collect();
+		let test_path = PathBuf::from_str(&args[0]).unwrap();
+		let mut test_path = test_path.parent().unwrap().to_path_buf();
+		test_path.push("testfiles");
+		test_path.push(name);
+
+		if test_path.exists() {
+			fs::remove_dir_all(&test_path).unwrap();
+		}
+		fs::create_dir_all(&test_path).unwrap();
+
+		test_path
+	}
+
+	#[test]
+	fn workspace_generate() -> Result<(), MensagoError> {
+
+		let testname = String::from("workspace_generate");
+		let test_path = setup_test(&testname);
+
+		 let mut profman = ProfileManager::new(&test_path);
+		 let mut profile = match profman.create_profile("Primary") {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error creating profile 'Primary': {}", testname, e.to_string())))
+			}
+		 };
+
+		profile.wid = RandomID::from("b5a9367e-680d-46c0-bb2c-73932a6d4007");
+		profile.domain = Domain::from("example.com");
+		match profile.activate() {
+			Ok(_) => (),
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error activating profile 'Primary': {}", testname, e.to_string())))
+			}
+		}
+
+		// Hash of "CheeseCustomerSmugnessDelegatorGenericUnaudited"
+		let pw = String::from("$argon2id$v=19$m=1048576,t=1,p=2$jc/H+Cn1NwJBJOTmFqAdlA$\
+			b2zoU9ZNhHlo/ZYuSJwoqUAXEdf1cbN3fxmbQhP0zJc");
+
+		let mut w = Workspace::new(&profile.path);
+		match w.generate(&UserID::from("testname").unwrap(), profile.domain.as_ref().unwrap(),
+			profile.wid.as_ref().unwrap(), &pw) {
+			Ok(v) => (),
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error generating workspace: {}", testname, e.to_string())))
+			}
+		}
+		Ok(())
 	}
 }

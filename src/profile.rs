@@ -9,7 +9,8 @@ use crate::workspace::*;
 
 // String for initializing a new profile database
 static STORAGE_DB_SETUP_COMMANDS: &str = "
-	CREATE TABLE workspaces (
+	BEGIN;
+	CREATE TABLE 'workspaces' (
 		'wid' TEXT NOT NULL UNIQUE,
 		'userid' TEXT,
 		'domain' TEXT,
@@ -77,7 +78,7 @@ static STORAGE_DB_SETUP_COMMANDS: &str = "
 		'type' TEXT NOT NULL,
 		'data' TEXT NOT NULL,
 		'time' TEXT NOT NULL
-	);''','''
+	);
 	CREATE TABLE 'photos' (
 		'id' TEXT NOT NULL,
 		'type' TEXT NOT NULL,
@@ -101,10 +102,12 @@ static STORAGE_DB_SETUP_COMMANDS: &str = "
 		'name'	TEXT NOT NULL,
 		'type'	TEXT NOT NULL,
 		'path'	TEXT NOT NULL
-	);";
+	);
+	COMMIT;";
 
 static SECRETS_DB_SETUP_COMMANDS: &str = "
-	CREATE table 'keys'(
+	BEGIN;
+	CREATE table 'keys' (
 		'keyid' TEXT NOT NULL UNIQUE,
 		'address' TEXT NOT NULL,
 		'type' TEXT NOT NULL,
@@ -113,6 +116,7 @@ static SECRETS_DB_SETUP_COMMANDS: &str = "
 		'public' TEXT,
 		'timestamp' TEXT NOT NULL
 	);
+	COMMIT;
 ";
 
 
@@ -385,7 +389,7 @@ impl Profile {
 					}
 				};
 	
-				match conn.execute(s.1, []) {
+				match conn.execute_batch(s.1) {
 					Ok(_) => (),
 					Err(e) => {
 						return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())));
@@ -513,7 +517,7 @@ impl ProfileManager {
 	/// spaces and special characters, as the name will be used as the profile's directory name in the
 	/// filesystem. The name 'default' is reserved and may not be used. Note that the profile name is
 	/// not case-sensitive and as such capitalization will be squashed when passed to this function.
-	pub fn create_profile(&mut self, name: &str) -> Result<&Profile, MensagoError> {
+	pub fn create_profile(&mut self, name: &str) -> Result<&mut Profile, MensagoError> {
 
 		if name.len() == 0 {
 			return Err(MensagoError::ErrEmptyData)
@@ -561,7 +565,8 @@ impl ProfileManager {
 		profile.reset_db()?;
 		self.profiles.push(profile);
 
-		Ok(self.profiles.get(self.profiles.len()-1).unwrap())
+		let length = self.profiles.len() - 1;
+		Ok(self.profiles.get_mut(length).unwrap())
 	}
 
 	/// Deletes the named profile and all files on disk contained in it.
