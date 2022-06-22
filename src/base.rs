@@ -73,8 +73,10 @@ pub fn get_string_from_db(conn: &rusqlite::Connection, query: &str, params: &Vec
 		}
 	};
 
-	// Query unwrapping complete. Start extracting the data
-	let row = option_row.unwrap();
+	let row = match option_row {
+		Some(v) => v,
+		None => { return Err(MensagoError::ErrNotFound) },
+	};
 
 	let out = match &row.get::<usize,String>(0) {
 		Ok(v) => String::from(v),

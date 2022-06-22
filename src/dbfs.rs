@@ -86,7 +86,7 @@ impl DBPath {
 			return Err(MensagoError::ErrBadValue)
 		}
 
-		self.path = format!("/{}/{}", self.path, trimmed);
+		self.path = format!("/{}", trimmed);
 		Ok(())
 	}
 }

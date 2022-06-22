@@ -118,7 +118,7 @@ impl Workspace {
 				address: waddr.clone(),
 				keyid: fkeyhash.clone(),
 				path: DBPath::from(folder).unwrap(),
-				permissions: String::from(""),
+				permissions: String::from("admin"),
 			})?;
 		}
 
@@ -250,7 +250,7 @@ impl Workspace {
 		match get_string_from_db(&conn,
 			"SELECT wid FROM workspaces WHERE type = 'identity'", &params) {
 			Ok(_) => { return Err(MensagoError::ErrExists) },
-			Err(_) => { /* continue on */ }
+			Err(_) => (),
 		}
 
 		let uidstr = match &self.uid {
@@ -587,6 +587,12 @@ mod tests {
 	#[test]
 	fn workspace_generate() -> Result<(), MensagoError> {
 
+		// Because so much is needed to just set up a workspace test, we'll do a few tests in this
+		// function:
+		// - generate()
+		// - add_to_db()
+		// - remove_from_db()
+
 		let testname = String::from("workspace_generate");
 		let test_path = setup_test(&testname);
 
@@ -616,12 +622,22 @@ mod tests {
 		let mut w = Workspace::new(&profile.path);
 		match w.generate(&UserID::from("testname").unwrap(), profile.domain.as_ref().unwrap(),
 			profile.wid.as_ref().unwrap(), &pw) {
-			Ok(v) => (),
+			Ok(_) => (),
 			Err(e) => {
 				return Err(MensagoError::ErrProgramException(
 					format!("{}: error generating workspace: {}", testname, e.to_string())))
 			}
 		}
+
+		let pwhash = ArgonHash::from_hashstr(&pw);
+		match w.add_to_db(&pwhash) {
+			Ok(_) => (),
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error adding workspace to db: {}", testname, e.to_string())))
+			}
+		}
+
 		Ok(())
 	}
 }
