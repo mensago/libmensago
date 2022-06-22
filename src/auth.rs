@@ -85,7 +85,7 @@ pub fn add_device_session(conn: &rusqlite::Connection, waddr: &WAddress, devid: 
 			Ok(optrow) => {
 				match optrow {
 					Some(_) => { return Err(MensagoError::ErrExists) },
-					None => { /* Do nothing. No existing session. */ }
+					None => (),
 				}
 			},
 			Err(e) => {
@@ -134,7 +134,7 @@ pub fn remove_device_session(conn: &rusqlite::Connection, devid: &RandomID) -> R
 			match optrow {
 				// This means that the device ID wasn't found
 				None => { return Err(MensagoError::ErrNotFound) },
-				Some(_) => { /* Do nothing. The device exists. */ }
+				Some(_) => (),
 			}
 		},
 		Err(e) => {
@@ -231,7 +231,7 @@ pub fn add_keypair(conn: &rusqlite::Connection, waddr: &WAddress, pubkey: &Crypt
 			Ok(optrow) => {
 				match optrow {
 					Some(_) => { return Err(MensagoError::ErrExists) },
-					None => { /* Do nothing. No existing session. */ }
+					None => (),
 				}
 			},
 			Err(e) => {
@@ -306,7 +306,7 @@ pub fn add_key(conn: &rusqlite::Connection, waddr: &WAddress, key: &CryptoString
 			Ok(optrow) => {
 				match optrow {
 					Some(_) => { return Err(MensagoError::ErrExists) },
-					None => { /* Do nothing. No existing session. */ }
+					None => (),
 				}
 			},
 			Err(e) => {
@@ -354,7 +354,7 @@ pub fn remove_key(conn: &rusqlite::Connection, keyhash: &CryptoString) -> Result
 			match optrow {
 				// This means that the key hash wasn't found
 				None => { return Err(MensagoError::ErrNotFound) },
-				Some(_) => { /* Do nothing. The device exists. */ }
+				Some(_) => (),
 			}
 		},
 		Err(e) => {
@@ -537,7 +537,7 @@ fn check_workspace_exists(conn: &rusqlite::Connection, waddr: &WAddress)
 			match optrow {
 				// This means that the workspace ID wasn't found
 				None => { return Err(MensagoError::ErrNotFound) },
-				Some(_) => { /* Do nothing. The workspace exists. */ }
+				Some(_) => (),
 			}
 		},
 		Err(e) => {

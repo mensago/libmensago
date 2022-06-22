@@ -499,7 +499,7 @@ impl ProfileManager {
 
 		// Force loading of basic identity info if it hasn't already been done
 		match self.profiles[active_index as usize].get_identity() {
-			Ok(_) => { /* */ },
+			Ok(_) => (),
 			Err(_) => {
 				// We ignore errors because uninitialized profiles won't have any identity info
 			},
@@ -536,7 +536,7 @@ impl ProfileManager {
 		new_profile_path.push(&name_squashed);
 		match fs::DirBuilder::new().recursive(true).create(new_profile_path.as_path()) {
 			Err(_) => return Err(MensagoError::ErrFilesytemError),
-			Ok(_) => { /* do nothing */ }
+			Ok(_) => (),
 		}
 
 		let mut profile = Profile {
@@ -593,7 +593,7 @@ impl ProfileManager {
 
 		if profile.is_default() && self.profiles.len() > 0 {
 			match self.profiles[0].set_default(true) {
-				Ok(_) => { /* Do nothing */ },
+				Ok(_) => (),
 				Err(e) => return Err(e)
 			}
 		}
@@ -841,7 +841,7 @@ mod tests {
 			Err(e) => { return Err(format!("{}: {}", testname, e.to_string())) }
 		};
 		match p.reset_db() {
-			Ok(_) => { /* */ },
+			Ok(_) => (),
 			Err(e) => { return Err(format!("{}: {}", testname, e.to_string())) }
 		}
 		
@@ -866,7 +866,7 @@ mod tests {
 		let test_path = setup_test(&testname);
 		let mut pm = ProfileManager::new(&test_path);
 		match pm.load_profiles(Some(&test_path)) {
-			Ok(_) => { /* */ },
+			Ok(_) => (),
 			Err(e) => { return Err(format!("{}: {}", testname, e.to_string())) }
 		}
 
@@ -880,7 +880,7 @@ mod tests {
 		let test_path = setup_test(&testname);
 		let mut pm = ProfileManager::new(&test_path);
 		match pm.load_profiles(Some(&test_path)) {
-			Ok(_) => { /* */ },
+			Ok(_) => (),
 			Err(e) => {
 				return Err(format!("{} failed to load profiles: {}", testname, e.to_string())) 
 			},
@@ -890,11 +890,11 @@ mod tests {
 			Ok(_) => {
 				return Err(format!("{}: create failed to handle empty string", testname)) 
 			},
-			Err(_) => { /* */ }
+			Err(_) => (),
 		}
 
 		match pm.create_profile("secondary") {
-			Ok(_) => { /* */ },
+			Ok(_) => (),
 			Err(e) => {
 				return Err(format!("{} failed to create profile: {}", testname, e.to_string())) 
 			},
@@ -904,11 +904,11 @@ mod tests {
 			Ok(_) => {
 				return Err(format!("{}: delete failed to handle empty string", testname)) 
 			},
-			Err(_) => { /* */ }
+			Err(_) => (),
 		}
 
 		match pm.delete_profile("secondary") {
-			Ok(_) => { /* */ },
+			Ok(_) => (),
 			Err(e) => {
 				return Err(format!("{} failed to delete profile: {}", testname, e.to_string())) 
 			},
@@ -918,7 +918,7 @@ mod tests {
 			Ok(_) => {
 				return Err(format!("{}: delete failed to handle nonexistent profile", testname)) 
 			},
-			Err(_) => { /* */ }
+			Err(_) => (),
 		}
 
 		Ok(())
@@ -934,7 +934,7 @@ mod tests {
 		let test_path = setup_test(&testname);
 		let mut pm = ProfileManager::new(&test_path);
 		match pm.load_profiles(Some(&test_path)) {
-			Ok(_) => { /* */ },
+			Ok(_) => (),
 			Err(e) => {
 				return Err(format!("{} failed to load profiles: {}", testname, e.to_string())) 
 			},
@@ -944,25 +944,25 @@ mod tests {
 			Ok(_) => {
 				return Err(format!("{}: rename failed to handle empty old name", testname)) 
 			},
-			Err(_) => { /* */ }
+			Err(_) => (),
 		}
 
 		match pm.rename_profile("foo", "") {
 			Ok(_) => {
 				return Err(format!("{}: rename failed to handle empty new name", testname))
 			},
-			Err(_) => { /* */ }
+			Err(_) => (),
 		}
 
 		match pm.rename_profile("secondary", "secondary") {
 			Ok(_) => {
 				return Err(format!("{}: rename failed to handle rename to self", testname))
 			},
-			Err(_) => { /* */ }
+			Err(_) => (),
 		}
 
 		match pm.create_profile("foo") {
-			Ok(_) => { /* */ },
+			Ok(_) => (),
 			Err(e) => {
 				return Err(format!("{} failed to create test profile: {}", testname, e.to_string())) 
 			},
@@ -972,11 +972,11 @@ mod tests {
 			Ok(_) => {
 				return Err(format!("{}: rename failed to handle existing new profile name", testname))
 			},
-			Err(_) => { /* */ }
+			Err(_) => (),
 		}
 		
 		match pm.rename_profile("foo", "secondary") {
-			Ok(_) => { /* */ },
+			Ok(_) => (),
 			Err(e) => {
 				return Err(format!("{} failed to rename profile: {}", testname, e.to_string())) 
 			},
@@ -992,14 +992,14 @@ mod tests {
 		let test_path = setup_test(&testname);
 		let mut pm = ProfileManager::new(&test_path);
 		match pm.load_profiles(Some(&test_path)) {
-			Ok(_) => { /* */ },
+			Ok(_) => (),
 			Err(e) => {
 				return Err(format!("{} failed to load profiles: {}", testname, e.to_string())) 
 			},
 		}
 
 		match pm.create_profile("secondary") {
-			Ok(_) => { /* */ },
+			Ok(_) => (),
 			Err(e) => {
 				return Err(format!("{} failed to create test profile: {}", testname, e.to_string())) 
 			},
@@ -1009,18 +1009,18 @@ mod tests {
 			Ok(_) => {
 				return Err(format!("{}: failed to handle empty string", testname)) 
 			},
-			Err(_) => { /* */ }
+			Err(_) => (),
 		}
 
 		match pm.activate_profile("foo") {
 			Ok(_) => {
 				return Err(format!("{}: failed to handle nonexistent profile", testname)) 
 			},
-			Err(_) => { /* */ }
+			Err(_) => (),
 		}
 
 		match pm.activate_profile("secondary") {
-			Ok(_) => { /* */ },
+			Ok(_) => (),
 			Err(e) => {
 				return Err(format!("{} failed to activate test profile: {}", testname, e.to_string())) 
 			},
@@ -1036,21 +1036,21 @@ mod tests {
 		let test_path = setup_test(&testname);
 		let mut pm = ProfileManager::new(&test_path);
 		match pm.load_profiles(Some(&test_path)) {
-			Ok(_) => { /* */ },
+			Ok(_) => (),
 			Err(e) => {
 				return Err(format!("{} failed to load profiles: {}", testname, e.to_string())) 
 			},
 		}
 
 		match pm.create_profile("secondary") {
-			Ok(_) => { /* */ },
+			Ok(_) => (),
 			Err(e) => {
 				return Err(format!("{} failed to create test profile: {}", testname, e.to_string())) 
 			},
 		}
 
 		match pm.activate_profile("secondary") {
-			Ok(_) => { /* */ },
+			Ok(_) => (),
 			Err(e) => {
 				return Err(format!(
 					"{} failed to activate secondary profile: {}", testname, e.to_string())) 
@@ -1058,7 +1058,7 @@ mod tests {
 		}
 
 		match pm.set_default_profile("secondary") {
-			Ok(_) => { /* */ },
+			Ok(_) => (),
 			Err(e) => {
 				return Err(format!(
 					"{} failed to secondary profile as default: {}", testname, e.to_string())) 
@@ -1066,7 +1066,7 @@ mod tests {
 		}
 
 		match pm.rename_profile("primary", "trash") {
-			Ok(_) => { /* */ },
+			Ok(_) => (),
 			Err(e) => {
 				return Err(format!(
 					"{} failed to rename primary profile to trash: {}", testname, e.to_string()))
@@ -1074,7 +1074,7 @@ mod tests {
 		}
 
 		match pm.delete_profile("trash") {
-			Ok(_) => { /* */ },
+			Ok(_) => (),
 			Err(e) => {
 				return Err(format!(
 					"{} failed to delete trash profile: {}", testname, e.to_string())) 

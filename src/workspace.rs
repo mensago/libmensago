@@ -300,12 +300,12 @@ impl Workspace {
 		match get_string_from_db(&conn,
 			"SELECT wid FROM workspaces WHERE wid=?1 AND domain=?2", &params) {
 			Ok(_) => { return Err(MensagoError::ErrExists) },
-			Err(_) => { /* continue on */ }
+			Err(_) => (),
 		}
 
 		match conn.execute("DELETE FROM workspaces WHERE wid=?1 AND domain=?2)",
 			&[self.wid.as_ref().unwrap().as_string(), self.domain.as_ref().unwrap().as_string()]) {
-			Ok(_) => { /*  */ },
+			Ok(_) => (),
 			Err(e) => {
 				return Err(MensagoError::ErrDatabaseException(e.to_string()))
 			}
@@ -318,7 +318,7 @@ impl Workspace {
 
 			match conn.execute(&format!("DELETE FROM {} WHERE address=?1)", table_name),
 				[address.as_string()]) {
-				Ok(_) => { /*  */ },
+				Ok(_) => (),
 				Err(e) => {
 					return Err(MensagoError::ErrDatabaseException(e.to_string()))
 				}
@@ -346,12 +346,12 @@ impl Workspace {
 		match get_string_from_db(&conn,
 			"SELECT wid FROM workspaces WHERE wid=?1 AND domain=?2", &params) {
 			Ok(_) => { return Err(MensagoError::ErrExists) },
-			Err(_) => { /* continue on */ }
+			Err(_) => (),
 		}
 
 		match conn.execute("DELETE FROM workspaces WHERE wid=?1 AND domain=?2)",
 			&[self.wid.as_ref().unwrap().as_string(), self.domain.as_ref().unwrap().as_string()]) {
-			Ok(_) => { /*  */ },
+			Ok(_) => (),
 			Err(e) => {
 				return Err(MensagoError::ErrDatabaseException(e.to_string()))
 			}
@@ -536,7 +536,7 @@ impl Workspace {
 		match conn.execute("UPDATE workspaces SET userid=?1 WHERE wid=?2 AND domain=?3",
 			&[uid.as_string(), self.wid.as_ref().unwrap().as_string(),
 			self.domain.as_ref().unwrap().as_string()]) {
-			Ok(_) => { /*  */ },
+			Ok(_) => (),
 			Err(e) => {
 				return Err(MensagoError::ErrDatabaseException(e.to_string()))
 			}
