@@ -286,38 +286,59 @@ impl Workspace {
 	/// evidence that a particular workspace ever existed.
 	pub fn remove_from_db(&self) -> Result<(), MensagoError> {
 
-		let conn = match rusqlite::Connection::open_with_flags(&self.dbpath,
-			rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE) {
-				Ok(v) => v,
-				Err(e) => {
-					return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())));
-				}
-			};
-		
-		let mut params = Vec::<String>::new();
-		params.push(self.wid.as_ref().unwrap().to_string().clone());
-		params.push(self.domain.as_ref().unwrap().to_string().clone());
-		match get_string_from_db(&conn,
-			"SELECT wid FROM workspaces WHERE wid=?1 AND domain=?2", &params) {
-			Ok(_) => { return Err(MensagoError::ErrExists) },
-			Err(_) => (),
-		}
+		let address = WAddress::from_parts(self.wid.as_ref().unwrap(),
+		&self.domain.as_ref().unwrap());
 
-		match conn.execute("DELETE FROM workspaces WHERE wid=?1 AND domain=?2)",
-			&[self.wid.as_ref().unwrap().as_string(), self.domain.as_ref().unwrap().as_string()]) {
-			Ok(_) => (),
-			Err(e) => {
-				return Err(MensagoError::ErrDatabaseException(e.to_string()))
+		// Clear out storage database
+		{
+			let conn = match rusqlite::Connection::open_with_flags(&self.dbpath,
+				rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE) {
+					Ok(v) => v,
+					Err(e) => {
+						return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())));
+					}
+				};
+			
+			let mut params = Vec::<String>::new();
+			params.push(self.wid.as_ref().unwrap().to_string().clone());
+			params.push(self.domain.as_ref().unwrap().to_string().clone());
+			match get_string_from_db(&conn,
+				"SELECT wid FROM workspaces WHERE wid=?1 AND domain=?2", &params) {
+				Ok(_) => (),
+				Err(_) => { return Err(MensagoError::ErrNotFound) },
+			}
+
+			match conn.execute("DELETE FROM workspaces WHERE wid=?1 AND domain=?2",
+				&[self.wid.as_ref().unwrap().as_string(), self.domain.as_ref().unwrap().as_string()]) {
+				Ok(_) => (),
+				Err(e) => {
+					return Err(MensagoError::ErrDatabaseException(e.to_string()))
+				}
+			}
+
+			for table_name in ["folders", "sessions", "messages", "notes"] {
+
+				match conn.execute(&format!("DELETE FROM {} WHERE address=?1", table_name),
+					[address.as_string()]) {
+					Ok(_) => (),
+					Err(e) => {
+						return Err(MensagoError::ErrDatabaseException(e.to_string()))
+					}
+				}
 			}
 		}
 
-		let address = WAddress::from_parts(self.wid.as_ref().unwrap(),
-			&self.domain.as_ref().unwrap());
-		
-		for table_name in ["folders", "sessions", "keys", "messages", "notes"] {
+		// Clear out secrets database
+		{
+			let conn = match rusqlite::Connection::open_with_flags(&self.secretspath,
+				rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE) {
+					Ok(v) => v,
+					Err(e) => {
+						return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())));
+					}
+				};
 
-			match conn.execute(&format!("DELETE FROM {} WHERE address=?1)", table_name),
-				[address.as_string()]) {
+			match conn.execute("DELETE FROM keys WHERE address=?1", [address.as_string()]) {
 				Ok(_) => (),
 				Err(e) => {
 					return Err(MensagoError::ErrDatabaseException(e.to_string()))
@@ -345,11 +366,11 @@ impl Workspace {
 		params.push(self.domain.as_ref().unwrap().to_string().clone());
 		match get_string_from_db(&conn,
 			"SELECT wid FROM workspaces WHERE wid=?1 AND domain=?2", &params) {
-			Ok(_) => { return Err(MensagoError::ErrExists) },
-			Err(_) => (),
+			Ok(_) => (),
+			Err(_) => { return Err(MensagoError::ErrNotFound) },
 		}
 
-		match conn.execute("DELETE FROM workspaces WHERE wid=?1 AND domain=?2)",
+		match conn.execute("DELETE FROM workspaces WHERE wid=?1 AND domain=?2",
 			&[self.wid.as_ref().unwrap().as_string(), self.domain.as_ref().unwrap().as_string()]) {
 			Ok(_) => (),
 			Err(e) => {
@@ -592,6 +613,7 @@ mod tests {
 		// - generate()
 		// - add_to_db()
 		// - remove_from_db()
+		// - remove_workspace_entry()
 
 		let testname = String::from("workspace_generate");
 		let test_path = setup_test(&testname);
@@ -635,6 +657,31 @@ mod tests {
 			Err(e) => {
 				return Err(MensagoError::ErrProgramException(
 					format!("{}: error adding workspace to db: {}", testname, e.to_string())))
+			}
+		}
+
+		match w.remove_from_db() {
+			Ok(_) => (),
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error removing workspace from db: {}", testname, e.to_string())))
+			}
+		}
+
+		// Add again to test remove_workspace_entry()
+		match w.add_to_db(&pwhash) {
+			Ok(_) => (),
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error re-adding workspace to db: {}", testname, e.to_string())))
+			}
+		}
+
+		match w.remove_workspace_entry() {
+			Ok(_) => (),
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error removing workspace entry: {}", testname, e.to_string())))
 			}
 		}
 
