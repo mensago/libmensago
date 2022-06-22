@@ -533,7 +533,7 @@ impl Workspace {
 				}
 			};
 		
-		match conn.execute("UPDATE workspaces SET userid=?1 WHERE wid=?2 AND domain=?3)",
+		match conn.execute("UPDATE workspaces SET userid=?1 WHERE wid=?2 AND domain=?3",
 			&[uid.as_string(), self.wid.as_ref().unwrap().as_string(),
 			self.domain.as_ref().unwrap().as_string()]) {
 			Ok(_) => { /*  */ },
