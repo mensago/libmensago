@@ -102,3 +102,29 @@ pub struct FolderMap {
 }
 
 // TODO: Finish implementing the DBFS
+
+#[cfg(test)]
+mod tests {
+	use crate::*;
+
+	#[test]
+	fn test_dbpath() -> Result<(), MensagoError> {
+
+		let p = match DBPath::from("test") {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(format!(
+					"test_dbpath failed to pass valid data: {}", e.to_string())))
+			},
+		};
+		let expected = String::from("/test");
+		if p.to_string() != expected {
+			return Err(MensagoError::ErrProgramException(format!(
+					"test_dbpath: wanted {}, got {}", expected, &p.to_string())))
+		}
+
+		// TODO: Finish DBPath tests
+		
+		Ok(())
+	}
+}
