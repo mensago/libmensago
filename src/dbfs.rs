@@ -110,7 +110,8 @@ mod tests {
 	#[test]
 	fn test_dbpath() -> Result<(), MensagoError> {
 
-		let p = match DBPath::from("test") {
+		// Case #1: Instantiate from valid data
+		let mut p = match DBPath::from("test") {
 			Ok(v) => v,
 			Err(e) => {
 				return Err(MensagoError::ErrProgramException(format!(
@@ -123,8 +124,49 @@ mod tests {
 					"test_dbpath: wanted {}, got {}", expected, &p.to_string())))
 		}
 
-		// TODO: Finish DBPath tests
-		
+		// Case #2: Instantiate from valid data with leading and trailing slashes
+		match p.set("/foo/") {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(format!(
+					"test_dbpath case #2 failed to pass valid data: {}", e.to_string())))
+			},
+		};
+		let expected = String::from("/foo");
+		if p.to_string() != expected {
+			return Err(MensagoError::ErrProgramException(format!(
+					"test_dbpath: case #2 wanted {}, got {}", expected, &p.to_string())))
+		}
+
+		// Case #3: Test push()
+		match p.push("/bar/baz/") {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(format!(
+					"test_dbpath case #3 failed to pass valid data: {}", e.to_string())))
+			},
+		};
+		let expected = String::from("/foo/bar/baz");
+		if p.to_string() != expected {
+			return Err(MensagoError::ErrProgramException(format!(
+					"test_dbpath: case #3 wanted {}, got {}", expected, &p.to_string())))
+		}
+
+		let expected = String::from("baz");
+		if p.basename() != expected {
+			return Err(MensagoError::ErrProgramException(format!(
+					"test_dbpath: case #4 wanted {}, got {}", expected, &p.to_string())))
+		}
+
+		// Case #5: Set with illegal characters
+		match p.set(r"\foo") {
+			Ok(_) => {
+				return Err(MensagoError::ErrProgramException(
+					String::from("test_dbpath case #5 passed invalid data")))
+			},
+			Err(_) => (),
+		};
+
 		Ok(())
 	}
 }
