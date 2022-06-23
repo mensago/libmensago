@@ -756,19 +756,29 @@ mod tests {
 					return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())));
 				}
 		};
-		// Check address
-		match get_string_from_db(&conn,
-			"SELECT address FROM folders WHERE fid=?1", &vec![foldermap.fid.to_string()]) {
-			Ok(v) => {
-				if v != foldermap.address.to_string() {
-					return Err(MensagoError::ErrProgramException(format!(
-						"test_dbpath: wanted {}, got {}", foldermap.address.to_string(), v)))
+
+		let fields = [
+			(String::from("address"), foldermap.address.to_string()),
+			(String::from("keyid"), fkeyhash.clone().to_string()),
+			(String::from("path"), String::from("/files/attachments")),
+			(String::from("name"), String::from("attachments")),
+			(String::from("permissions"), String::from("admin")),
+		];
+		// Check all fields
+		for pair in fields {
+			match get_string_from_db(&conn, "SELECT ?1 FROM folders WHERE fid=?2",
+				&vec![pair.0.clone(), foldermap.fid.to_string()]) {
+				Ok(v) => {
+					if v != pair.1 {
+						return Err(MensagoError::ErrProgramException(format!(
+							"test_dbpath: wanted {} for {}, got {}", &pair.1, &pair.0, v)))
+					}
+				},
+				Err(e) => {
+					return Err(MensagoError::ErrProgramException(
+						format!("{}: error get folder mapping field {}: {}",
+							 testname, &pair.0, e.to_string())))
 				}
-			},
-			Err(e) => {
-				return Err(MensagoError::ErrProgramException(
-					format!("{}: error get folder mapping '/files/attachments': {}",
-						 testname, e.to_string())))
 			}
 		}
 
