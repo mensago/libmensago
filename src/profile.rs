@@ -614,6 +614,19 @@ impl ProfileManager {
 		}
 	}
 
+	/// Returns the active profile
+	pub fn get_active_profile_mut(&mut self) -> Option<&mut Profile> {
+
+		match self.active_index {
+			v if v >=0 => {
+				self.profiles.get_mut(self.active_index as usize)
+			},
+			_ => {
+				None
+			},
+		}
+	}
+
 	/// Returns the default profile
 	pub fn get_default_profile(&self) -> Option<&Profile> {
 
@@ -625,6 +638,16 @@ impl ProfileManager {
 				None
 			},
 		}
+	}
+	
+	/// Returns the specified profile
+	pub fn get_profile(&self, index: usize) -> Option<&Profile> {
+		self.profiles.get(index)
+	}
+
+	/// Returns the specified profile as mutable
+	pub fn get_profile_mut(&mut self, index: usize) -> Option<&mut Profile> {
+		self.profiles.get_mut(index)
 	}
 
 	/// Returns a Vec of all available profiles
