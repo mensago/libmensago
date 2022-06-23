@@ -580,6 +580,7 @@ impl Workspace {
 #[cfg(test)]
 mod tests {
 	use crate::*;
+	use eznacl::*;
 	use libkeycard::*;
 	use std::env;
 	use std::fs;
@@ -605,8 +606,32 @@ mod tests {
 		test_path
 	}
 
+	fn setup_profile(testname: &str, path: &PathBuf) -> Result<ProfileManager, MensagoError> {
+
+		 let mut profman = ProfileManager::new(&path);
+		 let mut profile = match profman.create_profile("Primary") {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error creating profile 'Primary': {}", testname, e.to_string())))
+			}
+		 };
+
+		profile.wid = RandomID::from("b5a9367e-680d-46c0-bb2c-73932a6d4007");
+		profile.domain = Domain::from("example.com");
+		match profile.activate() {
+			Ok(_) => (),
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error activating profile 'Primary': {}", testname, e.to_string())))
+			}
+		}
+
+		Ok(profman)
+	}
+
 	#[test]
-	fn workspace_generate() -> Result<(), MensagoError> {
+	fn workspace_generate_and_db() -> Result<(), MensagoError> {
 
 		// Because so much is needed to just set up a workspace test, we'll do a few tests in this
 		// function:
@@ -615,17 +640,11 @@ mod tests {
 		// - remove_from_db()
 		// - remove_workspace_entry()
 
-		let testname = String::from("workspace_generate");
+		let testname = String::from("workspace_generate_and_db");
 		let test_path = setup_test(&testname);
 
-		 let mut profman = ProfileManager::new(&test_path);
-		 let mut profile = match profman.create_profile("Primary") {
-			Ok(v) => v,
-			Err(e) => {
-				return Err(MensagoError::ErrProgramException(
-					format!("{}: error creating profile 'Primary': {}", testname, e.to_string())))
-			}
-		 };
+		let mut profman = setup_profile(&testname, &test_path)?;
+		let mut profile = profman.get_active_profile_mut().unwrap();
 
 		profile.wid = RandomID::from("b5a9367e-680d-46c0-bb2c-73932a6d4007");
 		profile.domain = Domain::from("example.com");
@@ -684,6 +703,76 @@ mod tests {
 					format!("{}: error removing workspace entry: {}", testname, e.to_string())))
 			}
 		}
+
+		Ok(())
+	}
+
+	#[test]
+	fn workspace_folder() -> Result<(), MensagoError> {
+
+		let testname = String::from("workspace_folder");
+		let test_path = setup_test(&testname);
+
+		let mut profman = setup_profile(&testname, &test_path)?;
+		let mut profile = profman.get_profile_mut(0).unwrap();
+
+		profile.wid = RandomID::from("b5a9367e-680d-46c0-bb2c-73932a6d4007");
+		profile.domain = Domain::from("example.com");
+		match profile.activate() {
+			Ok(_) => (),
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error activating profile 'Primary': {}", testname, e.to_string())))
+			}
+		}
+
+		let folderkey = eznacl::SecretKey::generate().unwrap();
+		let fkeyhash = get_hash("SHA-256", folderkey.get_public_str().as_bytes())?;
+		
+		let w = Workspace::new(&profile.path);
+		
+		let foldermap = FolderMap{
+			fid: RandomID::from("11111111-2222-3333-4444-555555666666").unwrap(),
+			address: WAddress::from("aaaaaaaa-bbbb-cccc-dddd-eeeeeeffffff/example.com").unwrap(),
+			keyid: fkeyhash.clone(),
+			path: DBPath::from("/files/attachments").unwrap(),
+			permissions: String::from("admin"),
+		};
+
+		// Case #1: Test add_folder
+		match w.add_folder(&foldermap) {
+			Ok(_) => (),
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error adding folder mapping '/files/attachments': {}",
+						 testname, e.to_string())))
+			}
+		}
+
+		let conn = match rusqlite::Connection::open_with_flags(&w.dbpath,
+			rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE) {
+				Ok(v) => v,
+				Err(e) => {
+					return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())));
+				}
+		};
+		// Check address
+		match get_string_from_db(&conn,
+			"SELECT address FROM folders WHERE fid=?1", &vec![foldermap.fid.to_string()]) {
+			Ok(v) => {
+				if v != foldermap.address.to_string() {
+					return Err(MensagoError::ErrProgramException(format!(
+						"test_dbpath: wanted {}, got {}", foldermap.address.to_string(), v)))
+				}
+			},
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error get folder mapping '/files/attachments': {}",
+						 testname, e.to_string())))
+			}
+		}
+
+
 
 		Ok(())
 	}
