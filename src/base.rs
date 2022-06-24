@@ -89,3 +89,75 @@ pub fn get_string_from_db(conn: &rusqlite::Connection, query: &str, params: &Vec
 
 	Ok(out)
 }
+
+#[cfg(test)]
+mod tests {
+	use crate::*;
+	use std::env;
+	use std::fs;
+	use std::path::PathBuf;
+	use std::str::FromStr;
+
+	fn setup_test(name: &str) -> PathBuf {
+		if name.len() < 1 {
+			panic!("Invalid name {} in setup_test", name);
+		}
+		let args: Vec<String> = env::args().collect();
+		let test_path = PathBuf::from_str(&args[0]).unwrap();
+		let mut test_path = test_path.parent().unwrap().to_path_buf();
+		test_path.push("testfiles");
+		test_path.push(name);
+
+		if test_path.exists() {
+			fs::remove_dir_all(&test_path).unwrap();
+		}
+		fs::create_dir_all(&test_path).unwrap();
+
+		test_path
+	}
+
+	#[test]
+	fn test_get_string_from_db() -> Result<(), MensagoError> {
+
+		let testname = String::from("get_string_from_db");
+		let mut dbpath = setup_test(&testname);
+		dbpath.push("test.db");
+
+		let conn = match rusqlite::Connection::open(&dbpath) {
+				Ok(v) => v,
+				Err(e) => {
+					return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())));
+				}
+			};
+		
+		
+		match conn.execute("CREATE table 'folders'(
+				'fid' TEXT NOT NULL UNIQUE,
+				'address' TEXT NOT NULL,
+				'keyid' TEXT NOT NULL,
+				'path' TEXT NOT NULL,
+				'name' TEXT NOT NULL,
+				'permissions' TEXT NOT NULL);", []) {
+			Ok(_) => (),
+			Err(e) => {
+				return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())));
+			}
+		}
+
+		match conn.execute("INSERT INTO folders(fid,address,keyid,path,name,permissions)
+		VALUES('11111111-2222-3333-4444-555555666666',
+			'aaaaaaaa-bbbb-cccc-dddd-eeeeeeffffff/example.com',
+			'SHA-256:R(qY?qdXsJZx#GASmI@xeV28`Os7LWAl4el)t~uG',
+			'/files/attachments',
+			'attachments',
+			'admin'
+		)", []) {
+			Ok(_) => (),
+			Err(e) => {
+				return Err(MensagoError::ErrDatabaseException(e.to_string()))
+			}
+		}
+
+		Ok(())
+	}
+}
