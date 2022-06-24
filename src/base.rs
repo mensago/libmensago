@@ -158,6 +158,49 @@ mod tests {
 			}
 		}
 
+		let v = Vec::<String>::new();
+		match get_string_from_db(&conn,
+		"SELECT address FROM folders where fid='11111111-2222-3333-4444-555555666666'", &v) {
+			Ok(v) => {
+				if v != "aaaaaaaa-bbbb-cccc-dddd-eeeeeeffffff/example.com" {
+					return Err(MensagoError::ErrProgramException(format!(
+						"test_get_string_from_db: value mismatch: got {}", v)))
+				}
+			},
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error get folder mapping field: {}", testname, e.to_string())))
+			}
+		}
+
+		let foldermap = String::from("11111111-2222-3333-4444-555555666666");
+		let fields = [
+			(String::from("address"), foldermap.clone()),
+			(String::from("keyid"), String::from("SHA-256:R(qY?qdXsJZx#GASmI@xeV28`Os7LWAl4el)t~uG")),
+			(String::from("path"), String::from("/files/attachments")),
+			(String::from("name"), String::from("attachments")),
+			(String::from("permissions"), String::from("admin")),
+		];
+		// Check all fields
+		for pair in fields {
+			match get_string_from_db(&conn, "SELECT address FROM folders WHERE fid='11111111-2222-3333-4444-555555666666'",
+				// &vec![pair.0.clone(), foldermap.clone()]) {
+				// &vec![pair.0.clone()]) {
+				&vec![]) {
+					Ok(v) => {
+					if v != pair.1 {
+						return Err(MensagoError::ErrProgramException(format!(
+							"test_dbpath: wanted {} for {}, got {}", &pair.1, &pair.0, v)))
+					}
+				},
+				Err(e) => {
+					return Err(MensagoError::ErrProgramException(
+						format!("{}: error get folder mapping field {}: {}",
+							 testname, &pair.0, e.to_string())))
+				}
+			}
+		}
+
 		Ok(())
 	}
 }
