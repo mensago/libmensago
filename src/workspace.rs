@@ -207,7 +207,7 @@ impl Workspace {
 			};
 
 		match conn.prepare("SELECT wid FROM workspaces WHERE type = 'identity'")?.exists([]) {
-			Ok(_) => { return Err(MensagoError::ErrExists) },
+			Ok(v) => { if v { return Err(MensagoError::ErrExists) } },
 			Err(_) => (),
 		};
 			
@@ -571,7 +571,7 @@ mod tests {
 	fn setup_profile(testname: &str, path: &PathBuf) -> Result<ProfileManager, MensagoError> {
 
 		 let mut profman = ProfileManager::new(&path);
-		 let mut profile = match profman.create_profile("Primary") {
+		 let _ = match profman.create_profile("Primary") {
 			Ok(v) => v,
 			Err(e) => {
 				return Err(MensagoError::ErrProgramException(
@@ -579,9 +579,9 @@ mod tests {
 			}
 		 };
 
-		profile.wid = RandomID::from("b5a9367e-680d-46c0-bb2c-73932a6d4007");
-		profile.domain = Domain::from("example.com");
-		match profile.activate() {
+		// profile.wid = RandomID::from("b5a9367e-680d-46c0-bb2c-73932a6d4007");
+		// profile.domain = Domain::from("example.com");
+		match profman.activate_profile("Primary") {
 			Ok(_) => (),
 			Err(e) => {
 				return Err(MensagoError::ErrProgramException(
@@ -606,25 +606,16 @@ mod tests {
 		let test_path = setup_test(&testname);
 
 		let mut profman = setup_profile(&testname, &test_path)?;
-		let mut profile = profman.get_active_profile_mut().unwrap();
-
-		profile.wid = RandomID::from("b5a9367e-680d-46c0-bb2c-73932a6d4007");
-		profile.domain = Domain::from("example.com");
-		match profile.activate() {
-			Ok(_) => (),
-			Err(e) => {
-				return Err(MensagoError::ErrProgramException(
-					format!("{}: error activating profile 'Primary': {}", testname, e.to_string())))
-			}
-		}
+		let profile = profman.get_active_profile_mut().unwrap();
 
 		// Hash of "CheeseCustomerSmugnessDelegatorGenericUnaudited"
 		let pw = String::from("$argon2id$v=19$m=1048576,t=1,p=2$jc/H+Cn1NwJBJOTmFqAdlA$\
 			b2zoU9ZNhHlo/ZYuSJwoqUAXEdf1cbN3fxmbQhP0zJc");
 
 		let mut w = Workspace::new(&profile.path);
-		match w.generate(&UserID::from("testname").unwrap(), profile.domain.as_ref().unwrap(),
-			profile.wid.as_ref().unwrap(), &pw) {
+		match w.generate(&UserID::from("testname").unwrap(),
+			Domain::from("example.com").as_ref().unwrap(),
+			RandomID::from("b5a9367e-680d-46c0-bb2c-73932a6d4007").as_ref().unwrap(), &pw) {
 			Ok(_) => (),
 			Err(e) => {
 				return Err(MensagoError::ErrProgramException(
