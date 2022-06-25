@@ -257,7 +257,9 @@ impl Workspace {
 					}
 				};
 			
-			match conn.prepare("SELECT wid FROM workspaces WHERE type = 'identity'")?.exists([]) {
+			match conn.prepare("SELECT wid FROM workspaces WHERE wid=?1 AND domain=?2")?
+				.exists([self.wid.as_ref().unwrap().to_string(), 
+					self.domain.as_ref().unwrap().to_string()]) {
 				Ok(v) => {
 					if !v { return Err(MensagoError::ErrNotFound) }
 				},
