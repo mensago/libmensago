@@ -51,41 +51,10 @@ pub enum MensagoError {
 pub fn get_string_from_db(conn: &rusqlite::Connection, query: &str, params: &Vec<String>)
 	-> Result<String, MensagoError> {
 
-	let mut stmt = match conn
-		.prepare(query) {
-			Ok(v) => v,
-			Err(e) => {
-				return Err(MensagoError::ErrDatabaseException(e.to_string()))
-			}
-		};
-
-	let mut rows = match stmt.query(rusqlite::params_from_iter(params.iter())) {
-		Ok(v) => v,
-		Err(e) => {
-			return Err(MensagoError::ErrDatabaseException(e.to_string()))
-		}
-	};
-
-	let option_row = match rows.next() {
-		Ok(v) => v,
-		Err(e) => {
-			return Err(MensagoError::ErrDatabaseException(e.to_string()))
-		}
-	};
-
-	let row = match option_row {
-		Some(v) => v,
-		None => { return Err(MensagoError::ErrNotFound) },
-	};
-
-	let out = match &row.get::<usize,String>(0) {
-		Ok(v) => String::from(v),
-		Err(e) => {
-			return Err(MensagoError::ErrDatabaseException(
-				String::from(format!("Error getting string in get_string_from_db(): {}", e))
-			))
-		}
-	};
+	let mut stmt = conn.prepare(query)?;
+	let out = stmt.query_row(rusqlite::params_from_iter(params.iter()), |row| {
+		row.get::<usize,String>(0)
+	})?;
 
 	Ok(out)
 }
@@ -173,9 +142,9 @@ mod tests {
 			}
 		}
 
-		let foldermap = String::from("11111111-2222-3333-4444-555555666666");
+		let fid = String::from("11111111-2222-3333-4444-555555666666");
 		let fields = [
-			(String::from("address"), foldermap.clone()),
+			(String::from("address"), String::from("aaaaaaaa-bbbb-cccc-dddd-eeeeeeffffff/example.com")),
 			(String::from("keyid"), String::from("SHA-256:R(qY?qdXsJZx#GASmI@xeV28`Os7LWAl4el)t~uG")),
 			(String::from("path"), String::from("/files/attachments")),
 			(String::from("name"), String::from("attachments")),
@@ -183,10 +152,8 @@ mod tests {
 		];
 		// Check all fields
 		for pair in fields {
-			match get_string_from_db(&conn, "SELECT address FROM folders WHERE fid='11111111-2222-3333-4444-555555666666'",
-				// &vec![pair.0.clone(), foldermap.clone()]) {
-				// &vec![pair.0.clone()]) {
-				&vec![]) {
+			match get_string_from_db(&conn, "SELECT ?1 FROM folders WHERE fid='11111111-2222-3333-4444-555555666666'",
+				&vec![pair.0.clone()]) {
 					Ok(v) => {
 					if v != pair.1 {
 						return Err(MensagoError::ErrProgramException(format!(
