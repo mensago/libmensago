@@ -667,17 +667,7 @@ mod tests {
 		let test_path = setup_test(&testname);
 
 		let mut profman = setup_profile(&testname, &test_path)?;
-		let mut profile = profman.get_profile_mut(0).unwrap();
-
-		profile.wid = RandomID::from("b5a9367e-680d-46c0-bb2c-73932a6d4007");
-		profile.domain = Domain::from("example.com");
-		match profile.activate() {
-			Ok(_) => (),
-			Err(e) => {
-				return Err(MensagoError::ErrProgramException(
-					format!("{}: error activating profile 'Primary': {}", testname, e.to_string())))
-			}
-		}
+		let profile = profman.get_profile_mut(0).unwrap();
 
 		let folderkey = eznacl::SecretKey::generate().unwrap();
 		let fkeyhash = get_hash("SHA-256", folderkey.get_public_str().as_bytes())?;
