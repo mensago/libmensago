@@ -206,13 +206,11 @@ impl Workspace {
 				}
 			};
 
-		let params = Vec::<String>::new();
-		match get_string_from_db(&conn,
-			"SELECT wid FROM workspaces WHERE type = 'identity'", &params) {
+		match conn.prepare("SELECT wid FROM workspaces WHERE type = 'identity'")?.exists([]) {
 			Ok(_) => { return Err(MensagoError::ErrExists) },
 			Err(_) => (),
-		}
-
+		};
+			
 		let uidstr = match &self.uid {
 			Some(v) => String::from(v.to_string()),
 			None => String::new(),
