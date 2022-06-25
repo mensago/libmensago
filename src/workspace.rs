@@ -257,15 +257,15 @@ impl Workspace {
 					}
 				};
 			
-			let mut params = Vec::<String>::new();
-			params.push(self.wid.as_ref().unwrap().to_string().clone());
-			params.push(self.domain.as_ref().unwrap().to_string().clone());
-			match get_string_from_db(&conn,
-				"SELECT wid FROM workspaces WHERE wid=?1 AND domain=?2", &params) {
-				Ok(_) => (),
-				Err(_) => { return Err(MensagoError::ErrNotFound) },
+			match conn.prepare("SELECT wid FROM workspaces WHERE type = 'identity'")?.exists([]) {
+				Ok(v) => {
+					if !v { return Err(MensagoError::ErrNotFound) }
+				},
+				Err(e) => {
+					return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())));
+				}
 			}
-
+			
 			match conn.execute("DELETE FROM workspaces WHERE wid=?1 AND domain=?2",
 				&[self.wid.as_ref().unwrap().as_string(), self.domain.as_ref().unwrap().as_string()]) {
 				Ok(_) => (),
