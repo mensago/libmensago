@@ -719,6 +719,18 @@ mod tests {
 				}
 		};
 
+		// The amount of work put into making this code check all fields here with a loop is
+		// stupidly *ridiculous*. Passing the tuple parameters using the recommended method,
+		// parameter binding, doesn't work.
+		//
+		// The first iteration should be
+		// "SELECT address FROM folders WHERE fid='11111111-2222-3333-4444-555555666666'". All
+		// values passed to the query are confirmed as correct using the debugger. The query itself
+		// was confirmed as correct by manually running the query using the SQLite client. YET
+		// despite the correctnes of the query itself and the values returned, column name is
+		// returned, not the correct value. ARRRRRRGH!!!
+		//
+		// Thankfully, we can hack around this and just use string subtitution and it just works.
 		let fields = [
 			(String::from("address"), foldermap.address.to_string()),
 			(String::from("keyid"), fkeyhash.clone().to_string()),
@@ -726,16 +738,18 @@ mod tests {
 			(String::from("name"), String::from("attachments")),
 			(String::from("permissions"), String::from("admin")),
 		];
-		// Check all fields
+		
 		for pair in fields {
-			match get_string_from_db(&conn, "SELECT ?1 FROM folders WHERE fid=?2",
-				&vec![pair.0.clone(), foldermap.fid.to_string()]) {
-				Ok(v) => {
-					if v != pair.1 {
-						return Err(MensagoError::ErrProgramException(format!(
-							"test_dbpath: wanted {} for {}, got {}", &pair.1, &pair.0, v)))
-					}
-				},
+			let query = format!("SELECT {} FROM folders WHERE fid='{}'", pair.0,
+				foldermap.fid.to_string());
+			match conn.prepare(&query)?.query_row([], |row| {
+					let value = row.get::<usize,String>(0)?;
+				if value != pair.1 {
+					panic!("test_dbpath: wanted {} for {}, got {}", &pair.1, &pair.0, value)
+				}
+				Ok(())
+			}) {
+				Ok(_) => (),
 				Err(e) => {
 					return Err(MensagoError::ErrProgramException(
 						format!("{}: error get folder mapping field {}: {}",
