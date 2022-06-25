@@ -152,41 +152,34 @@ impl Workspace {
 		let widstr = match wid {
 			Some(w) => { String::from(w.to_string()) },
 			None => { 
-				let params = Vec::<String>::new();
-				match get_string_from_db(&conn,
-					"SELECT wid FROM workspaces WHERE type = 'identity'", &params) {
-					Ok(v) => v,
-					Err(e) => {
-						return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())));
-					}
-				}
+				let mut stmt = conn.prepare("SELECT wid FROM workspaces WHERE type = 'identity'")?;
+				stmt.query_row([], |row| {
+					row.get::<usize,String>(0)
+				})?
 			},
 		};
 
-		let mut stmt = match conn
-			.prepare("SELECT domain,userid FROM workspaces WHERE wid = ?1") {
-				Ok(v) => v,
-				Err(e) => {
-					return Err(MensagoError::ErrDatabaseException(e.to_string()))
-				}
-			};
-		
-		let mut rows = match stmt.query([widstr.to_string()]) {
-			Ok(v) => v,
-			Err(e) => {
-				return Err(MensagoError::ErrDatabaseException(e.to_string()))
+		let mut stmt = conn.prepare("SELECT domain,userid FROM workspaces WHERE wid = ?1")?;
+		let (domstr, uidstr) = stmt.query_row([widstr.to_string()], |row| {
+			Ok((row.get::<usize,String>(0)?, row.get::<usize,String>(1)?))
+		})?;
+
+		let tempdom = match Domain::from(&domstr) {
+			Some(v) => v,
+			None => {
+				return Err(MensagoError::ErrDatabaseException(
+					String::from(format!("Bad domain {} in load_from_db()", domstr))
+				))
 			}
 		};
-
-		let option_row = match rows.next() {
-			Ok(v) => v,
-			Err(e) => {
-				return Err(MensagoError::ErrDatabaseException(e.to_string()))
+		let tempuid = match UserID::from(&uidstr) {
+			Some(v) => v,
+			None => {
+				return Err(MensagoError::ErrDatabaseException(
+					String::from(format!("Bad uid {} in load_from_db()", uidstr))
+				))
 			}
 		};
-
-		// Query unwrapping complete. Start extracting the data
-		let row = option_row.unwrap();
 
 		self.wid = match RandomID::from(&widstr.to_string()) {
 			Some(v) => Some(v),
@@ -196,41 +189,8 @@ impl Workspace {
 			},
 		};
 
-		self.domain = match &row.get::<usize,String>(0) {
-			Ok(v) => {
-				match Domain::from(v) {
-					Some(d) => Some(d),
-					None => {
-						return Err(MensagoError::ErrDatabaseException(
-							String::from(format!("Bad domain {} in load_from_db()", v))
-						))
-					}
-				}
-			},
-			Err(e) => {
-				return Err(MensagoError::ErrDatabaseException(
-					String::from(format!("Error getting domain in load_from_db(): {}", e))
-				))
-			}
-		};
-
-		self.uid = match &row.get::<usize,String>(0) {
-			Ok(v) => {
-				match UserID::from(v) {
-					Some(d) => Some(d),
-					None => {
-						return Err(MensagoError::ErrDatabaseException(
-							String::from(format!("Bad user ID {} in load_from_db()", v))
-						))
-					}
-				}
-			},
-			Err(e) => {
-				return Err(MensagoError::ErrDatabaseException(
-					String::from(format!("Error getting user ID in load_from_db(): {}", e))
-				))
-			}
-		};
+		self.domain = Some(tempdom);
+		self.uid = Some(tempuid);
 
 		Ok(())
 	}
