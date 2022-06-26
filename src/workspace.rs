@@ -119,13 +119,7 @@ impl Workspace {
 	/// Sets the human-friendly name for the workspace
 	pub fn set_userid(&mut self, uid: &UserID) -> Result<(), MensagoError> {
 
-		let conn = match rusqlite::Connection::open_with_flags(&self.dbpath,
-			rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE) {
-				Ok(v) => v,
-				Err(e) => {
-					return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())));
-				}
-			};
+		let conn = self.open_storage()?;
 		
 		match conn.execute("UPDATE workspaces SET userid=?1 WHERE wid=?2 AND domain=?3",
 			&[uid.as_string(), self.wid.as_ref().unwrap().as_string(),
@@ -153,13 +147,7 @@ impl Workspace {
 		//let address = MAddress::from_parts(&UserID::from_wid(wid), server);
 		let waddr = WAddress::from_parts(&wid, &server);
 		
-		let conn = match rusqlite::Connection::open_with_flags(&self.secretspath,
-			rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE) {
-				Ok(v) => v,
-				Err(e) => {
-					return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())));
-				}
-			};
+		let conn = self.open_secrets()?;
 		
 		// Generate and add the workspace's various crypto keys
 
@@ -224,13 +212,7 @@ impl Workspace {
 
 		// For the fully-commented version of this code, see profile::get_identity()
 
-		let conn = match rusqlite::Connection::open_with_flags(&self.dbpath,
-			rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE) {
-				Ok(v) => v,
-				Err(e) => {
-					return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())));
-				}
-			};
+		let conn = self.open_storage()?;
 		
 		let widstr = match wid {
 			Some(w) => { String::from(w.to_string()) },
@@ -278,18 +260,10 @@ impl Workspace {
 		Ok(())
 	}
 
-	// TODO: Should the password hash for a workspace go in the secrets db?
-	
 	/// Adds the workspace instance to the storage database as the profile's identity workspace
 	pub fn add_to_db(&self, pw: &ArgonHash) -> Result<(), MensagoError> {
 
-		let conn = match rusqlite::Connection::open_with_flags(&self.dbpath,
-			rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE) {
-				Ok(v) => v,
-				Err(e) => {
-					return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())));
-				}
-			};
+		let conn = self.open_storage()?;
 
 		match conn.prepare("SELECT wid FROM workspaces WHERE type = 'identity'")?.exists([]) {
 			Ok(v) => { if v { return Err(MensagoError::ErrExists) } },
@@ -334,13 +308,7 @@ impl Workspace {
 
 		// Clear out storage database
 		{
-			let conn = match rusqlite::Connection::open_with_flags(&self.dbpath,
-				rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE) {
-					Ok(v) => v,
-					Err(e) => {
-						return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())));
-					}
-				};
+			let conn = self.open_storage()?;
 			
 			match conn.prepare("SELECT wid FROM workspaces WHERE wid=?1 AND domain=?2")?
 				.exists([self.wid.as_ref().unwrap().to_string(), 
@@ -361,7 +329,7 @@ impl Workspace {
 				}
 			}
 
-			for table_name in ["folders", "sessions", "messages", "notes"] {
+			for table_name in ["folders", "messages", "notes"] {
 
 				match conn.execute(&format!("DELETE FROM {} WHERE address=?1", table_name),
 					[address.as_string()]) {
@@ -375,18 +343,16 @@ impl Workspace {
 
 		// Clear out secrets database
 		{
-			let conn = match rusqlite::Connection::open_with_flags(&self.secretspath,
-				rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE) {
-					Ok(v) => v,
-					Err(e) => {
-						return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())));
-					}
-				};
+			let conn = self.open_secrets()?;
 
-			match conn.execute("DELETE FROM keys WHERE address=?1", [address.as_string()]) {
-				Ok(_) => (),
-				Err(e) => {
-					return Err(MensagoError::ErrDatabaseException(e.to_string()))
+			for table_name in ["keys", "sessions"] {
+
+				match conn.execute(&format!("DELETE FROM {} WHERE address=?1", table_name),
+					[address.as_string()]) {
+					Ok(_) => (),
+					Err(e) => {
+						return Err(MensagoError::ErrDatabaseException(e.to_string()))
+					}
 				}
 			}
 		}
@@ -398,13 +364,7 @@ impl Workspace {
 	/// itself. It does not remove keys, sessions, or other associated data.
 	pub fn remove_workspace_entry(&self) -> Result<(), MensagoError> {
 
-		let conn = match rusqlite::Connection::open_with_flags(&self.dbpath,
-			rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE) {
-				Ok(v) => v,
-				Err(e) => {
-					return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())));
-				}
-			};
+		let conn = self.open_storage()?;
 		
 		match conn.prepare("SELECT wid FROM workspaces WHERE wid=?1 AND domain=?2")?
 			.exists([self.wid.as_ref().unwrap().to_string(), 

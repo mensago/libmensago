@@ -26,14 +26,6 @@ static STORAGE_DB_SETUP_COMMANDS: &str = "
 		'name' TEXT NOT NULL,
 		'permissions' TEXT NOT NULL
 	);
-	CREATE table 'sessions'(
-		'address' TEXT NOT NULL,
-		'devid' TEXT NOT NULL,
-		'devname' TEXT NOT NULL,
-		'public_key' TEXT NOT NULL,
-		'private_key' TEXT NOT NULL,
-		'os' TEXT NOT NULL
-	);
 	CREATE table 'keycards'(
 		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
 		'owner' TEXT NOT NULL,
@@ -115,6 +107,14 @@ static SECRETS_DB_SETUP_COMMANDS: &str = "
 		'private' TEXT NOT NULL,
 		'public' TEXT,
 		'timestamp' TEXT NOT NULL
+	);
+	CREATE table 'sessions'(
+		'address' TEXT NOT NULL,
+		'devid' TEXT NOT NULL,
+		'devname' TEXT NOT NULL,
+		'public_key' TEXT NOT NULL,
+		'private_key' TEXT NOT NULL,
+		'os' TEXT NOT NULL
 	);
 	COMMIT;
 ";
