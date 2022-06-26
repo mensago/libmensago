@@ -596,6 +596,7 @@ mod tests {
 			}
 		}
 
+		// Case #1: successful add
 		let pwhash = ArgonHash::from_hashstr(&pw);
 		match w.add_to_db(&pwhash) {
 			Ok(_) => (),
@@ -605,6 +606,16 @@ mod tests {
 			}
 		}
 
+		// Case #2: try to add when already in db
+		match w.add_to_db(&pwhash) {
+			Ok(_) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: failed to catch double adding workspace to db", testname)))
+			},
+			Err(_) => (),
+		}
+
+		// Case #3: successful remove from db
 		match w.remove_from_db() {
 			Ok(_) => (),
 			Err(e) => {
@@ -613,7 +624,35 @@ mod tests {
 			}
 		}
 
-		// Add again to test remove_workspace_entry()
+		// Case #4: try to remove nonexistent
+		match w.remove_from_db() {
+			Ok(_) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: failed to catch removing nonexistent workspace from db", testname)))
+			},
+			Err(_) => (),
+		}
+
+		// Case #4: try to load nonexistent identity
+		let mut testw = Workspace::new(&profile.path);
+		match testw.load_from_db(None) {
+			Ok(_) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: failed to catch loading nonexistent identity from db", testname)))
+			},
+			Err(_) => (),
+		}
+
+		// Case #5: try to load other nonexistent workspace
+		match testw.load_from_db(RandomID::from("00000000-0000-0000-0000-000000000000")) {
+			Ok(_) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: failed to catch loading nonexistent identity from db", testname)))
+			},
+			Err(_) => (),
+		}
+
+		// Add again to test load_from_db and remove_workspace_entry()
 		match w.add_to_db(&pwhash) {
 			Ok(_) => (),
 			Err(e) => {
@@ -622,6 +661,24 @@ mod tests {
 			}
 		}
 
+		// Case #6: successful load
+		match testw.load_from_db(None) {
+			Ok(_) => {
+				// load_from_db doesn't get the password hash, so we'll just add it here to make
+				// the comparison code simpler
+				testw.pw = pw.clone();
+				if testw != w {
+					return Err(MensagoError::ErrProgramException(
+						format!("{}: data mismatch", testname)))
+				}
+			},
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error loading workspace from db: {}", testname, e.to_string())))
+			}
+		};
+
+		// Case #7: successful remove_entry
 		match w.remove_workspace_entry() {
 			Ok(_) => (),
 			Err(e) => {
@@ -737,7 +794,8 @@ mod tests {
 				if v.fid != foldermap.fid || v.address != foldermap.address ||
 					v.keyid != v.keyid || v.path != foldermap.path ||
 					v.permissions != foldermap.permissions {
-
+					return Err(MensagoError::ErrProgramException(
+						format!("{}: data mismatch", testname)))
 				}
 			}
 			Err(e) => {
