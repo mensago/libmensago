@@ -355,33 +355,13 @@ impl Workspace {
 				}
 		};
 
-		{
-			let mut stmt = match conn.prepare("SELECT fid FROM folders WHERE fid=?1") {
-				Ok(v) => v,
-				Err(e) => {
-					return Err(MensagoError::ErrDatabaseException(e.to_string()))
-				}
-			};
-				
-			let mut rows = match stmt.query([fmap.fid.as_string()]) {
-				Ok(v) => v,
-				Err(e) => {
-					return Err(MensagoError::ErrDatabaseException(e.to_string()))
-				}
-			};
-	
-			match rows.next() {
-				Ok(optrow) => {
-					match optrow {
-						Some(_) => { return Err(MensagoError::ErrExists) },
-						None => (),
-					}
-				},
-				Err(e) => {
-					return Err(MensagoError::ErrDatabaseException(e.to_string()))
-				}
-			};
-		}
+		let mut stmt = conn.prepare("SELECT fid FROM folders WHERE fid=?1")?;
+		match stmt.exists([fmap.fid.as_string()]) {
+			Ok(v) => { if v { return Err(MensagoError::ErrExists) } },
+			Err(e) => {
+				return Err(MensagoError::ErrDatabaseException(e.to_string()))
+			}
+		};
 	
 		match conn.execute("INSERT INTO folders(fid,address,keyid,path,name,permissions)
 			VALUES(?1,?2,?3,?4,?5,?6)",
@@ -407,7 +387,7 @@ impl Workspace {
 		};
 
 		// Check to see if the folder ID passed to the function exists
-		let mut stmt = match conn.prepare("SELECT fid FROM sessions WHERE fid=?1") {
+		let mut stmt = match conn.prepare("SELECT fid FROM folders WHERE fid=?1") {
 			Ok(v) => v,
 			Err(e) => {
 				return Err(MensagoError::ErrDatabaseException(e.to_string()))
@@ -434,7 +414,7 @@ impl Workspace {
 			}
 		};
 
-		match conn.execute("DELETE FROM folders WHERE fid=?1)", [fid.as_string()]) {
+		match conn.execute("DELETE FROM folders WHERE fid=?1", [fid.as_string()]) {
 			
 			Ok(_) => { return Ok(()) },
 			Err(e) => {
@@ -444,7 +424,7 @@ impl Workspace {
 	}
 	
 	/// Gets the specified folder mapping.
-	pub fn get_folder(self, fid: &RandomID) -> Result<FolderMap, MensagoError> {
+	pub fn get_folder(&self, fid: &RandomID) -> Result<FolderMap, MensagoError> {
 
 		let conn = match rusqlite::Connection::open_with_flags(&self.dbpath,
 			rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE) {
@@ -455,20 +435,10 @@ impl Workspace {
 		};
 			
 		// For the fully-commented version of this query, see profile::get_identity()
-		let mut stmt = match conn
-			.prepare("SELECT address,keyid,path,permissions FROM folders WHERE fid=?1") {
-				Ok(v) => v,
-				Err(e) => {
-					return Err(MensagoError::ErrDatabaseException(e.to_string()))
-				}
-			};
+		let mut stmt = conn
+			.prepare("SELECT address,keyid,path,permissions FROM folders WHERE fid=?1")?;
 		
-		let mut rows = match stmt.query([fid.as_string()]) {
-			Ok(v) => v,
-			Err(e) => {
-				return Err(MensagoError::ErrDatabaseException(e.to_string()))
-			}
-		};
+		let mut rows = stmt.query([fid.as_string()])?;
 
 		let option_row = match rows.next() {
 			Ok(v) => v,
@@ -478,7 +448,12 @@ impl Workspace {
 		};
 
 		// Query unwrapping complete. Start extracting the data
-		let row = option_row.unwrap();
+		let row = match option_row  {
+			Some(v) => v,
+			None => {
+				return Err(MensagoError::ErrNotFound)
+			}
+		};
 
 		let waddr = match WAddress::from(&row.get::<usize,String>(0).unwrap()) {
 			Some(v) => v,
@@ -579,8 +554,6 @@ mod tests {
 			}
 		 };
 
-		// profile.wid = RandomID::from("b5a9367e-680d-46c0-bb2c-73932a6d4007");
-		// profile.domain = Domain::from("example.com");
 		match profman.activate_profile("Primary") {
 			Ok(_) => (),
 			Err(e) => {
@@ -669,10 +642,20 @@ mod tests {
 		let mut profman = setup_profile(&testname, &test_path)?;
 		let profile = profman.get_profile_mut(0).unwrap();
 
-		let folderkey = eznacl::SecretKey::generate().unwrap();
+		let folderkey = SecretKey::from_string("XSALSA20:TF_`Q2kZO;nUb(wWm1{P=_BmVe6rEK<GkITq@T|l")
+			.unwrap();
 		let fkeyhash = get_hash("SHA-256", folderkey.get_public_str().as_bytes())?;
-		
+
 		let w = Workspace::new(&profile.path);
+
+		// Case #1: Trying to get a non-existent folder mapping
+		match w.get_folder(&RandomID::from("11111111-2222-3333-4444-555555666666").unwrap()) {
+			Ok(_) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: failed to catch nonexistent folder mapping", testname)))
+			}
+			Err(_) => (),
+		}
 		
 		let foldermap = FolderMap{
 			fid: RandomID::from("11111111-2222-3333-4444-555555666666").unwrap(),
@@ -682,7 +665,7 @@ mod tests {
 			permissions: String::from("admin"),
 		};
 
-		// Case #1: Test add_folder
+		// Case #2: Test add_folder
 		match w.add_folder(&foldermap) {
 			Ok(_) => (),
 			Err(e) => {
@@ -735,10 +718,60 @@ mod tests {
 					return Err(MensagoError::ErrProgramException(
 						format!("{}: error get folder mapping field {}: {}",
 							 testname, &pair.0, e.to_string())))
+				},
+			}
+		}
+		
+		// Case #3: trying to add a folder again
+		match w.add_folder(&foldermap) {
+			Ok(_) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: failed to catch duplicate folder mapping", testname)))
+			}
+			Err(_) => (),
+		}
+
+		// Case #4: successful get_folder()
+		match w.get_folder(&foldermap.fid) {
+			Ok(v) => {
+				if v.fid != foldermap.fid || v.address != foldermap.address ||
+					v.keyid != v.keyid || v.path != foldermap.path ||
+					v.permissions != foldermap.permissions {
+
 				}
 			}
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error getting folder mapping: {}", testname, e.to_string())))
+			},
+		}
+
+		// Case #5: successful remove_folder()
+		match w.remove_folder(&foldermap.fid) {
+			Ok(_) => {
+				match w.get_folder(&foldermap.fid) {
+					Ok(_) => {
+						return Err(MensagoError::ErrProgramException(
+							format!("{}: remove_folder failed to remove db entry", testname)))
+					}
+					Err(_) => (),
+				}
+			}
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error removing folder mapping: {}", testname, e.to_string())))
+			},
+		}
+
+		// Case #6: try to remove nonexistent folder
+		match w.remove_folder(&foldermap.fid) {
+			Ok(_) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: failed to catch removing nonexistent folder mapping", testname)))
+			},
+			Err(_) => (),
 		}
 
 		Ok(())
-	}
+	}		
 }

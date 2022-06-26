@@ -23,7 +23,7 @@ lazy_static! {
 /// characters. Trailing slashes and leading and trailing whitespace are stripped to avoid problems.
 /// A folder path could look like '/Inbox/Bills' and a file or message could be something like
 /// '/Archive/Bills/a2de7cd4-deee-4a61-aef2-71785ab0d339'.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct DBPath {
 	path: String,
 }
