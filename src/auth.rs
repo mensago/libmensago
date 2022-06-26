@@ -9,35 +9,14 @@ use crate::types::*;
 pub fn get_credentials(conn: &rusqlite::Connection, waddr: &WAddress)
 		-> Result<ArgonHash, MensagoError> {
 	
-	// For the fully-commented version of this query, see profile::get_identity()
-	let mut stmt = match conn
-		.prepare("SELECT password,pwhashtype FROM workspaces WHERE wid=?1 AND domain=?2") {
-			Ok(v) => v,
-			Err(e) => {
-				return Err(MensagoError::ErrDatabaseException(e.to_string()))
-			}
-		};
+	let mut stmt = conn.prepare("SELECT password FROM workspaces WHERE wid=?1 AND domain=?2")?;
 	
-	let mut rows = match stmt.query([waddr.get_wid().as_string(),
-		waddr.get_domain().as_string()]) {
-		Ok(v) => v,
-		Err(e) => {
-			return Err(MensagoError::ErrDatabaseException(e.to_string()))
-		}
-	};
+	let pwstr = stmt.query_row([waddr.get_wid().as_string(), waddr.get_domain().as_string()],
+	|row| {
+		Ok(row.get::<usize,String>(0).unwrap())
+	})?;
 
-	let option_row = match rows.next() {
-		Ok(v) => v,
-		Err(e) => {
-			return Err(MensagoError::ErrDatabaseException(e.to_string()))
-		}
-	};
-
-	// Query unwrapping complete. Start extracting the data
-	let row = option_row.unwrap();
-	let passhash = ArgonHash::from_hashstr(&row.get::<usize,String>(0).unwrap());
-	
-	Ok(passhash)
+	Ok(ArgonHash::from_hashstr(&pwstr))
 }
 
 /// Sets the password and hash type for the specified workspace
