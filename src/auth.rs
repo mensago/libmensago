@@ -564,3 +564,127 @@ fn make_device_name() -> String {
 
 	format!("{}-{}",hostname, osname)
 }
+
+#[cfg(test)]
+mod tests {
+	use crate::*;
+	use libkeycard::*;
+	use std::env;
+	use std::fs;
+	use std::path::PathBuf;
+	use std::str::FromStr;
+
+	// Sets up the path to contain the profile tests
+	fn setup_test(name: &str) -> PathBuf {
+		if name.len() < 1 {
+			panic!("Invalid name {} in setup_test", name);
+		}
+		let args: Vec<String> = env::args().collect();
+		let test_path = PathBuf::from_str(&args[0]).unwrap();
+		let mut test_path = test_path.parent().unwrap().to_path_buf();
+		test_path.push("testfiles");
+		test_path.push(name);
+
+		if test_path.exists() {
+			fs::remove_dir_all(&test_path).unwrap();
+		}
+		fs::create_dir_all(&test_path).unwrap();
+
+		test_path
+	}
+
+	fn setup_profile(testname: &str, path: &PathBuf) -> Result<ProfileManager, MensagoError> {
+
+		 let mut profman = ProfileManager::new(&path);
+		 let _ = match profman.create_profile("Primary") {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error creating profile 'Primary': {}", testname, e.to_string())))
+			}
+		 };
+
+		match profman.activate_profile("Primary") {
+			Ok(_) => (),
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error activating profile 'Primary': {}", testname, e.to_string())))
+			}
+		}
+
+		Ok(profman)
+	}
+
+	fn setup_workspace(testname: &str, profpath: &PathBuf) -> Result<Workspace, MensagoError> {
+
+		// Hash of "CheeseCustomerSmugnessDelegatorGenericUnaudited"
+		let pw = String::from("$argon2id$v=19$m=1048576,t=1,p=2$jc/H+Cn1NwJBJOTmFqAdlA$\
+			b2zoU9ZNhHlo/ZYuSJwoqUAXEdf1cbN3fxmbQhP0zJc");
+
+		let mut w = Workspace::new(profpath);
+		match w.generate(&UserID::from("csimons").unwrap(),
+			Domain::from("example.com").as_ref().unwrap(),
+			RandomID::from("b5a9367e-680d-46c0-bb2c-73932a6d4007").as_ref().unwrap(), &pw) {
+			Ok(_) => (),
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error generating workspace: {}", testname, e.to_string())))
+			}
+		}
+
+		let pwhash = ArgonHash::from_hashstr(&pw);
+		match w.add_to_db(&pwhash) {
+			Ok(_) => (),
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error adding workspace to db: {}", testname, e.to_string())))
+			}
+		}
+
+		Ok(w)
+	}
+
+
+	#[test]
+	fn get_set_credentials() -> Result<(), MensagoError> {
+
+		let testname = String::from("get_set_credentials");
+		let test_path = setup_test(&testname);
+
+		let _ = setup_profile(&testname, &test_path)?;
+
+		let mut profile_path = test_path.clone();
+		profile_path.push("primary");
+		let w = setup_workspace(&testname, &profile_path)?;
+
+		let conn = match w.open_storage() {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error connecting to workspace db: {}", testname, e.to_string())))
+			}
+		};
+
+		// Case #1: get credentials
+		match get_credentials(&conn, &w.get_waddress().unwrap()) {
+			Ok(v) => {
+				let pwhash = ArgonHash::from_hashstr("$argon2id$v=19$m=1048576,t=1,p=2\
+				$jc/H+Cn1NwJBJOTmFqAdlA$b2zoU9ZNhHlo/ZYuSJwoqUAXEdf1cbN3fxmbQhP0zJc");
+
+				if v != pwhash {
+					println!("Wanted:\n{}-----\nGot:\n{}", pwhash, v);
+					return Err(MensagoError::ErrProgramException(
+						format!("{}: credential mismatch", testname)))
+				}
+			},
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error getting credentials: {}", testname, e.to_string())))
+			}
+		};		
+
+		Ok(())
+	}
+}
+
+// TODO: Finish tests for auth module
