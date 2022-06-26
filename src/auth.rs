@@ -6,6 +6,7 @@ use rusqlite;
 use crate::base::*;
 use crate::types::*;
 
+/// Gets the password hash for the workspace
 pub fn get_credentials(conn: &rusqlite::Connection, waddr: &WAddress)
 		-> Result<ArgonHash, MensagoError> {
 	
@@ -16,20 +17,37 @@ pub fn get_credentials(conn: &rusqlite::Connection, waddr: &WAddress)
 		Ok(row.get::<usize,String>(0).unwrap())
 	})?;
 
+	if pwstr.len() == 0 { return Err(MensagoError::ErrNotFound) }
+
 	Ok(ArgonHash::from_hashstr(&pwstr))
 }
 
 /// Sets the password and hash type for the specified workspace
-pub fn set_credentials(conn: &rusqlite::Connection, waddr: &WAddress, pwh: &ArgonHash) -> Result<(),MensagoError> {
+pub fn set_credentials(conn: &rusqlite::Connection, waddr: &WAddress, pwh: Option<&ArgonHash>)
+-> Result<(),MensagoError> {
 
 	check_workspace_exists(&conn, waddr)?;
-
-	match conn.execute("UPDATE workspaces SET password=?1,pwhashtype=?2 WHERE wid=?3 AND domain=?4",
-			&[pwh.get_hash(), pwh.get_hashtype(), waddr.get_wid().as_string(),
-			waddr.get_domain().as_string()]) {
-		Ok(_) => { return Ok(()) },
-		Err(e) => {
-			return Err(MensagoError::ErrDatabaseException(e.to_string()))
+	match pwh {
+		Some(v) => {
+			match conn.execute(
+				"UPDATE workspaces SET password=?1,pwhashtype=?2 WHERE wid=?3 AND domain=?4",
+				&[v.get_hash(), v.get_hashtype(), waddr.get_wid().as_string(),
+					waddr.get_domain().as_string()]) {
+				Ok(_) => Ok(()),
+				Err(e) => {
+					Err(MensagoError::ErrDatabaseException(e.to_string()))
+				}
+			}
+		},
+		None => {
+			match conn.execute(
+				"UPDATE workspaces SET password='',pwhashtype='' WHERE wid=?1 AND domain=?2",
+				&[waddr.get_wid().as_string(), waddr.get_domain().as_string()]) {
+				Ok(_) => Ok(()),
+				Err(e) => {
+					Err(MensagoError::ErrDatabaseException(e.to_string()))
+				}
+			}
 		}
 	}
 }
@@ -660,7 +678,53 @@ mod tests {
 				return Err(MensagoError::ErrProgramException(
 					format!("{}: error getting credentials: {}", testname, e.to_string())))
 			}
-		};		
+		};
+
+		// Case #2: set credentials
+		
+		// Hash of "GloriousBroadlyBackerOverloadBoxcarBrittle"
+		let newpw = String::from("$argon2id$v=19$m=1048576,t=1,p=2\
+		$46qy9bqnd0CBmq82X01Xjw$+VUx+mkUvFxDE0aum/h6sGA92JeB7CxZolNAoK8iUOY");
+		let newhash = ArgonHash::from_hashstr(&newpw);
+
+		match set_credentials(&conn, &w.get_waddress().unwrap(), Some(&newhash)) {
+			Ok(_) => {
+				match get_credentials(&conn, &w.get_waddress().unwrap()) {
+					Ok(v) => {
+						if v != newhash {
+							println!("Wanted:\n{}-----\nGot:\n{}", newhash, v);
+							return Err(MensagoError::ErrProgramException(
+								format!("{}: set_credentials value mismatch", testname)))
+						}
+					},
+					Err(e) => {
+						return Err(MensagoError::ErrProgramException(
+							format!("{}: error getting credentials: {}", testname, e.to_string())))
+					},
+				};
+			},
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error setting credentials: {}", testname, e.to_string())))
+			}
+		}
+
+		// Case #3: clearing credentials
+		match set_credentials(&conn, &w.get_waddress().unwrap(), None) {
+			Ok(_) => {
+				match get_credentials(&conn, &w.get_waddress().unwrap()) {
+					Ok(_) => {
+						return Err(MensagoError::ErrProgramException(
+							format!("{}: failed to clear credentials", testname)))
+					},
+					Err(_) => (),
+				};
+			},
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error setting credentials: {}", testname, e.to_string())))
+			}
+		}
 
 		Ok(())
 	}
