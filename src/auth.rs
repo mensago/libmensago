@@ -56,40 +56,14 @@ pub fn set_credentials(conn: &rusqlite::Connection, waddr: &WAddress, pwh: Optio
 pub fn add_device_session(conn: &rusqlite::Connection, waddr: &WAddress, devid: &RandomID, 
 	devpair: &EncryptionPair, devname: Option<&str>) -> Result<(),MensagoError> {
 
-	if devpair.get_algorithm() != "CURVE25519" {
-		return Err(MensagoError::ErrUnsupportedAlgorithm)
-	}
-	
 	check_workspace_exists(&conn, waddr)?;
 	
 	// Can't have a session on that specified server already
-	{
-		let mut stmt = match conn.prepare("SELECT address FROM sessions WHERE address=?1") {
-			Ok(v) => v,
-			Err(e) => {
-				return Err(MensagoError::ErrDatabaseException(e.to_string()))
-			}
-		};
-			
-		let mut rows = match stmt.query([waddr.get_wid().as_string()]) {
-			Ok(v) => v,
-			Err(e) => {
-				return Err(MensagoError::ErrDatabaseException(e.to_string()))
-			}
-		};
-
-		match rows.next() {
-			Ok(optrow) => {
-				match optrow {
-					Some(_) => { return Err(MensagoError::ErrExists) },
-					None => (),
-				}
-			},
-			Err(e) => {
-				return Err(MensagoError::ErrDatabaseException(e.to_string()))
-			}
-		};
-	}
+	let mut stmt = conn.prepare("SELECT address FROM sessions WHERE address=?1")?;
+	match stmt.exists([waddr.get_wid().as_string()]) {
+		Ok(v) => { if v { return Err(MensagoError::ErrExists) }	},
+		Err(e) => { return Err(MensagoError::ErrDatabaseException(e.to_string())) },
+	};
 
 	let realname = match devname {
 		Some(v) => { String::from(v) },
@@ -101,50 +75,28 @@ pub fn add_device_session(conn: &rusqlite::Connection, waddr: &WAddress, devid: 
 		[waddr.to_string(), devid.to_string(), realname, devpair.get_public_str(),
 		devpair.get_private_str(), os_info::get().os_type().to_string().to_lowercase()]) {
 		
-		Ok(_) => { return Ok(()) },
+		Ok(_) => Ok(()),
 		Err(e) => {
-			return Err(MensagoError::ErrDatabaseException(e.to_string()))
-		}
+			Err(MensagoError::ErrDatabaseException(e.to_string()))
+		},
 	}
 }
 
 /// Removes an authorized device from the workspace
-pub fn remove_device_session(conn: &rusqlite::Connection, devid: &RandomID) -> Result<(),MensagoError> {
+pub fn remove_device_session(conn: &rusqlite::Connection, devid: &RandomID)
+-> Result<(),MensagoError> {
 
-	// Check to see if the device ID passed to the function exists
-	let mut stmt = match conn.prepare("SELECT devid FROM sessions WHERE devid=?1") {
-		Ok(v) => v,
-		Err(e) => {
-			return Err(MensagoError::ErrDatabaseException(e.to_string()))
-		}
+	let mut stmt = conn.prepare("SELECT devid FROM sessions WHERE devid=?1")?;
+	match stmt.exists([devid.as_string()]) {
+		Ok(v) => { if v { return Err(MensagoError::ErrExists) }	},
+		Err(e) => { return Err(MensagoError::ErrDatabaseException(e.to_string())) },
 	};
 		
-	let mut rows = match stmt.query([devid.as_string()]) {
-		Ok(v) => v,
+	match conn.execute("DELETE FROM sessions WHERE devid=?1", [devid.as_string()]) {
+		Ok(_) => Ok(()),
 		Err(e) => {
-			return Err(MensagoError::ErrDatabaseException(e.to_string()))
-		}
-	};
-
-	match rows.next() {
-		Ok(optrow) => {
-			match optrow {
-				// This means that the device ID wasn't found
-				None => { return Err(MensagoError::ErrNotFound) },
-				Some(_) => (),
-			}
+			Err(MensagoError::ErrDatabaseException(e.to_string()))
 		},
-		Err(e) => {
-			return Err(MensagoError::ErrDatabaseException(e.to_string()))
-		}
-	};
-
-	match conn.execute("DELETE FROM sessions WHERE devid=?1)", [devid.as_string()]) {
-		
-		Ok(_) => { return Ok(()) },
-		Err(e) => {
-			return Err(MensagoError::ErrDatabaseException(e.to_string()))
-		}
 	}
 }
 
@@ -152,90 +104,35 @@ pub fn remove_device_session(conn: &rusqlite::Connection, devid: &RandomID) -> R
 pub fn get_session_keypair(conn: &rusqlite::Connection, waddr: WAddress)
 		-> Result<EncryptionPair, MensagoError> {
 	
-	let out: EncryptionPair;
-	{	// Begin Query
-		// For the fully-commented version of this code, see profile::get_identity()
-	
-		let mut stmt = match conn
-			.prepare("SELECT public_key,private_key FROM sessions WHERE address=?1") {
-				Ok(v) => v,
-				Err(e) => {
-					return Err(MensagoError::ErrDatabaseException(e.to_string()))
-				}
-			};
-		
-		let mut rows = match stmt.query([waddr.as_string()]) {
-			Ok(v) => v,
-			Err(e) => {
-				return Err(MensagoError::ErrDatabaseException(e.to_string()))
-			}
-		};
+	let mut stmt = conn.prepare("SELECT public_key,private_key FROM sessions WHERE address=?1")?;
+	let (pubstr, privstr) = stmt.query_row([waddr.as_string()], |row| {
+		Ok((row.get::<usize,String>(0).unwrap(), row.get::<usize,String>(1).unwrap()))
+	})?;
 
-		let option_row = match rows.next() {
-			Ok(v) => v,
-			Err(e) => {
-				return Err(MensagoError::ErrDatabaseException(e.to_string()))
-			}
-		};
-
-		// Query unwrapping complete. Start extracting the data
-		let row = option_row.unwrap();
-		out = match EncryptionPair::from_strings(
-			&row.get::<usize,String>(0).unwrap(),
-			&row.get::<usize,String>(1).unwrap()) {
-			
-			Some(v) => v,
-			None => { 
-				return Err(MensagoError::ErrProgramException(
-					String::from("Error obtaining encryption pair from database")
-				));
-			}
+	match EncryptionPair::from_strings(&pubstr, &privstr) {
+		Some(v) => Ok(v),
+		None => { Err(MensagoError::ErrProgramException(
+					String::from("Error obtaining encryption pair from database")))
 		}
-
-	}	// End Query
-
-	Ok(out)
+	}
 }
 
 /// Adds a key pair to a workspace.
 pub fn add_keypair(conn: &rusqlite::Connection, waddr: &WAddress, pubkey: &CryptoString,
 	privkey: &CryptoString, keytype: &KeyType, category: &KeyCategory) -> Result<(), MensagoError> {
 	
-	let pubhash = match eznacl::get_hash("blake3-256", pubkey.as_bytes()) {
+	let pubhash = match eznacl::get_hash("sha-256", pubkey.as_bytes()) {
 		Ok(v) => v,
 		Err(e) => {
 			return Err(MensagoError::ErrProgramException(String::from(e.to_string())));
 		}
 	};
 
-	// Can't add the same keypair twice
-	{
-		let mut stmt = match conn.prepare("SELECT keyid FROM keys WHERE keyid=?1") {
-			Ok(v) => v,
-			Err(e) => {
-				return Err(MensagoError::ErrDatabaseException(e.to_string()))
-			}
-		};
-			
-		let mut rows = match stmt.query([pubhash.as_str()]) {
-			Ok(v) => v,
-			Err(e) => {
-				return Err(MensagoError::ErrDatabaseException(e.to_string()))
-			}
-		};
-
-		match rows.next() {
-			Ok(optrow) => {
-				match optrow {
-					Some(_) => { return Err(MensagoError::ErrExists) },
-					None => (),
-				}
-			},
-			Err(e) => {
-				return Err(MensagoError::ErrDatabaseException(e.to_string()))
-			}
-		};
-	}
+	let mut stmt = conn.prepare("SELECT keyid FROM keys WHERE keyid=?1")?;
+	match stmt.exists([pubhash.as_str()]) {
+		Ok(v) => { if v { return Err(MensagoError::ErrExists) }	},
+		Err(e) => { return Err(MensagoError::ErrDatabaseException(e.to_string())) },
+	};
 
 	let timestamp = get_timestamp();
 
@@ -276,42 +173,19 @@ pub fn add_keypair(conn: &rusqlite::Connection, waddr: &WAddress, pubkey: &Crypt
 pub fn add_key(conn: &rusqlite::Connection, waddr: &WAddress, key: &CryptoString, 
 	category: &KeyCategory) -> Result<(), MensagoError> {
 	
-	let keyhash = match eznacl::get_hash("blake3-256", key.as_bytes()) {
+	let keyhash = match eznacl::get_hash("sha-256", key.as_bytes()) {
 		Ok(v) => v,
 		Err(e) => {
 			return Err(MensagoError::ErrProgramException(String::from(e.to_string())));
 		}
 	};
 
-	// Can't add the same keypair twice
-	{
-		let mut stmt = match conn.prepare("SELECT keyid FROM keys WHERE keyid=?1") {
-			Ok(v) => v,
-			Err(e) => {
-				return Err(MensagoError::ErrDatabaseException(e.to_string()))
-			}
-		};
-			
-		let mut rows = match stmt.query([keyhash.as_str()]) {
-			Ok(v) => v,
-			Err(e) => {
-				return Err(MensagoError::ErrDatabaseException(e.to_string()))
-			}
-		};
-
-		match rows.next() {
-			Ok(optrow) => {
-				match optrow {
-					Some(_) => { return Err(MensagoError::ErrExists) },
-					None => (),
-				}
-			},
-			Err(e) => {
-				return Err(MensagoError::ErrDatabaseException(e.to_string()))
-			}
-		};
-	}
-
+	let mut stmt = conn.prepare("SELECT keyid FROM keys WHERE keyid=?1")?;
+	match stmt.exists([keyhash.as_str()]) {
+		Ok(v) => { if v { return Err(MensagoError::ErrExists) }	},
+		Err(e) => { return Err(MensagoError::ErrDatabaseException(e.to_string())) },
+	};
+	
 	let timestamp = get_timestamp();
 
 	match conn.execute("INSERT INTO keys(keyid,address,type,category,private,public,timestamp)
@@ -331,32 +205,10 @@ pub fn add_key(conn: &rusqlite::Connection, waddr: &WAddress, key: &CryptoString
 /// in a ErrNotFound error.
 pub fn remove_key(conn: &rusqlite::Connection, keyhash: &CryptoString) -> Result<(), MensagoError> {
 
-	// Check to see if the key hash passed to the function exists
-	let mut stmt = match conn.prepare("SELECT keyid FROM keys WHERE keyid=?1") {
-		Ok(v) => v,
-		Err(e) => {
-			return Err(MensagoError::ErrDatabaseException(e.to_string()))
-		}
-	};
-		
-	let mut rows = match stmt.query([keyhash.as_str()]) {
-		Ok(v) => v,
-		Err(e) => {
-			return Err(MensagoError::ErrDatabaseException(e.to_string()))
-		}
-	};
-
-	match rows.next() {
-		Ok(optrow) => {
-			match optrow {
-				// This means that the key hash wasn't found
-				None => { return Err(MensagoError::ErrNotFound) },
-				Some(_) => (),
-			}
-		},
-		Err(e) => {
-			return Err(MensagoError::ErrDatabaseException(e.to_string()))
-		}
+	let mut stmt = conn.prepare("SELECT keyid FROM keys WHERE keyid=?1")?;
+	match stmt.exists([keyhash.as_str()]) {
+		Ok(v) => { if !v { return Err(MensagoError::ErrNotFound) }	},
+		Err(e) => { return Err(MensagoError::ErrDatabaseException(e.to_string())) },
 	};
 
 	match conn.execute("DELETE FROM keys WHERE keyid=?1)", [keyhash.as_str()]) {
@@ -374,173 +226,62 @@ pub fn remove_key(conn: &rusqlite::Connection, keyhash: &CryptoString) -> Result
 pub fn get_keypair(conn: &rusqlite::Connection, keyhash: &CryptoString)
 	-> Result<[CryptoString; 2], MensagoError> {
 
-	// For the fully-commented version of this code, see profile::get_identity()
+	let mut stmt = conn.prepare("SELECT public,private FROM keys WHERE keyid=?1")?;
+	let (pubstr, privstr) = stmt.query_row([keyhash.as_str()], |row| {
+		Ok((row.get::<usize,String>(0).unwrap(), row.get::<usize,String>(1).unwrap()))
+	})?;
 
-	let mut stmt = match conn
-		.prepare("SELECT public,private FROM keys WHERE keyid=?1") {
-			Ok(v) => v,
-			Err(e) => {
-				return Err(MensagoError::ErrDatabaseException(e.to_string()))
-			}
-		};
-	
-	let mut rows = match stmt.query([keyhash.as_str()]) {
-		Ok(v) => v,
-		Err(e) => {
-			return Err(MensagoError::ErrDatabaseException(e.to_string()))
-		}
-	};
+	if pubstr.len() == 0 || privstr.len() == 0 {
+		return Err(MensagoError::ErrEmptyData)
+	}
 
-	let option_row = match rows.next() {
-		Ok(v) => v,
-		Err(e) => {
-			return Err(MensagoError::ErrDatabaseException(e.to_string()))
-		}
-	};
+	let pubcs = CryptoString::from(&pubstr);
+	let privcs = CryptoString::from(&privstr);
 
-	// Query unwrapping complete. Start extracting the data
-	let row = option_row.unwrap();
+	if pubcs.is_none() || privcs.is_none() {
+		return Err(MensagoError::ErrDatabaseException(
+			String::from("Bad key value in database in get_keypair()")
+		))
+	}
 
-	let pubcs = match &row.get::<usize,String>(0) {
-		Ok(v) => {
-			match eznacl::CryptoString::from(v) {
-				Some(cs) => cs,
-				None => {
-					return Err(MensagoError::ErrDatabaseException(
-						String::from(format!("Bad public key {} in get_key()", v))
-					))
-				}
-			}
-		},
-		Err(e) => {
-			return Err(MensagoError::ErrDatabaseException(
-				String::from(format!("Error getting public key in get_key(): {}", e))
-			))
-		}
-	};
-
-	let privcs = match &row.get::<usize,String>(1) {
-		Ok(v) => {
-			match eznacl::CryptoString::from(v) {
-				Some(cs) => cs,
-				None => {
-					return Err(MensagoError::ErrDatabaseException(
-						String::from(format!("Bad private key {} in get_key()", v))
-					))
-				}
-			}
-		},
-		Err(e) => {
-			return Err(MensagoError::ErrDatabaseException(
-				String::from(format!("Error getting private key in get_key(): {}", e))
-			))
-		}
-	};
-
-	Ok([pubcs, privcs])
+	Ok([pubcs.unwrap(), privcs.unwrap()])
 }
 
 /// Returns a keypair based on its category
 pub fn get_key_by_category(conn: &rusqlite::Connection, category: &KeyCategory)
 	-> Result<[CryptoString; 2], MensagoError> {
 
-	// For the fully-commented version of this code, see profile::get_identity()
+	let mut stmt = conn.prepare("SELECT public,private FROM keys WHERE category=?1")?;
+	let (pubstr, privstr) = stmt.query_row([category.to_string()], |row| {
+		Ok((row.get::<usize,String>(0).unwrap(), row.get::<usize,String>(1).unwrap()))
+	})?;
 
-	let mut stmt = match conn
-		.prepare("SELECT public,private FROM keys WHERE category=?1") {
-			Ok(v) => v,
-			Err(e) => {
-				return Err(MensagoError::ErrDatabaseException(e.to_string()))
-			}
-		};
-	
-	let mut rows = match stmt.query([category.to_string()]) {
-		Ok(v) => v,
-		Err(e) => {
-			return Err(MensagoError::ErrDatabaseException(e.to_string()))
-		}
-	};
+	if pubstr.len() == 0 || privstr.len() == 0 {
+		return Err(MensagoError::ErrEmptyData)
+	}
 
-	let option_row = match rows.next() {
-		Ok(v) => v,
-		Err(e) => {
-			return Err(MensagoError::ErrDatabaseException(e.to_string()))
-		}
-	};
+	let pubcs = CryptoString::from(&pubstr);
+	let privcs = CryptoString::from(&privstr);
 
-	// Query unwrapping complete. Start extracting the data
-	let row = option_row.unwrap();
+	if pubcs.is_none() || privcs.is_none() {
+		return Err(MensagoError::ErrDatabaseException(
+			String::from("Bad key value in database in get_keypair()")
+		))
+	}
 
-	let pubcs = match &row.get::<usize,String>(0) {
-		Ok(v) => {
-			match eznacl::CryptoString::from(v) {
-				Some(cs) => cs,
-				None => {
-					return Err(MensagoError::ErrDatabaseException(
-						String::from(format!("Bad public key {} in get_key()", v))
-					))
-				}
-			}
-		},
-		Err(e) => {
-			return Err(MensagoError::ErrDatabaseException(
-				String::from(format!("Error getting public key in get_key(): {}", e))
-			))
-		}
-	};
-
-	let privcs = match &row.get::<usize,String>(1) {
-		Ok(v) => {
-			match eznacl::CryptoString::from(v) {
-				Some(cs) => cs,
-				None => {
-					return Err(MensagoError::ErrDatabaseException(
-						String::from(format!("Bad private key {} in get_key()", v))
-					))
-				}
-			}
-		},
-		Err(e) => {
-			return Err(MensagoError::ErrDatabaseException(
-				String::from(format!("Error getting private key in get_key(): {}", e))
-			))
-		}
-	};
-
-	Ok([pubcs, privcs])
+	Ok([pubcs.unwrap(), privcs.unwrap()])
 }
 
 /// Utility function that just checks to see if a specific workspace exists in the database
 fn check_workspace_exists(conn: &rusqlite::Connection, waddr: &WAddress)
 	-> Result<(),MensagoError> {
-	
-	// Check to see if the workspace address passed to the function exists
-	let mut stmt = match conn.prepare("SELECT wid FROM workspaces WHERE wid=?1 AND domain=?2") {
-		Ok(v) => v,
-		Err(e) => {
-			return Err(MensagoError::ErrDatabaseException(e.to_string()))
-		}
-	};
-		
-	let mut rows = match stmt.query([waddr.get_wid().as_string(), waddr.get_domain().as_string()]) {
-		Ok(v) => v,
-		Err(e) => {
-			return Err(MensagoError::ErrDatabaseException(e.to_string()))
-		}
-	};
 
-	match rows.next() {
-		Ok(optrow) => {
-			match optrow {
-				// This means that the workspace ID wasn't found
-				None => { return Err(MensagoError::ErrNotFound) },
-				Some(_) => (),
-			}
-		},
-		Err(e) => {
-			return Err(MensagoError::ErrDatabaseException(e.to_string()))
-		}
+	let mut stmt = conn.prepare("SELECT wid FROM workspaces WHERE wid=?1 AND domain=?2")?;
+	match stmt.exists([waddr.get_wid().as_string(), waddr.get_domain().as_string()]) {
+		Ok(v) => { if !v { return Err(MensagoError::ErrNotFound) }	},
+		Err(e) => { return Err(MensagoError::ErrDatabaseException(e.to_string())) },
 	};
+	
 	Ok(())
 }
 
