@@ -42,6 +42,29 @@ impl Workspace {
 		}
 	}
 
+	/// Returns a connection to the workspace's storage database
+	pub fn open_storage(&self) -> Result<rusqlite::Connection, MensagoError> {
+		match rusqlite::Connection::open_with_flags(&self.dbpath,
+			rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE) {
+				Ok(v) => Ok(v),
+				Err(e) => {
+					return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())));
+				}
+		}
+	}
+
+	/// Returns a connection to the workspace's secrets database, which houses keys, password
+	/// hashes, and similar sensitive information
+	pub fn open_secrets(&self) -> Result<rusqlite::Connection, MensagoError> {
+		match rusqlite::Connection::open_with_flags(&self.secretspath,
+			rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE) {
+				Ok(v) => Ok(v),
+				Err(e) => {
+					return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())));
+				}
+		}
+	}
+
 	/// Returns the workspace ID of the workspace, assuming one has been set
 	pub fn get_wid(&self) -> Option<RandomID> {
 		self.wid.clone()
@@ -55,6 +78,66 @@ impl Workspace {
 	/// Returns the domain of the workspace, assuming one has been set
 	pub fn get_domain(&self) -> Option<Domain> {
 		self.domain.clone()
+	}
+
+	/// Returns the workspace's address
+	pub fn get_waddress(&self) -> Option<WAddress> {
+		if self.domain.is_none() || self.wid.is_none() {
+			return None
+		}
+
+		Some(WAddress::from_parts(&self.wid.as_ref().unwrap(), &self.domain.as_ref().unwrap()))
+	}
+	
+	/// Returns the workspace's Mensago address. Note that if the workspace does not have a UserID
+	/// assigned, then this method will return a MAddress containing the workspace's regular
+	/// address
+	pub fn get_maddress(&self) -> Option<MAddress> {
+		if self.domain.is_none() {
+			return None
+		}
+
+		if self.uid.is_none() {
+			if self.wid.is_none() {
+				return None
+			}
+			return Some(MAddress::from_parts(&UserID::from_wid(self.wid.as_ref().unwrap()),
+				&self.domain.as_ref().unwrap()))	
+		}
+		Some(MAddress::from_parts(&self.uid.as_ref().unwrap(), &self.domain.as_ref().unwrap()))
+	}
+	
+	/// Gets the human-friendly name for the workspace
+	pub fn get_userid(&self) -> Result<UserID, MensagoError> {
+
+		match self.uid.as_ref() {
+			Some(v) => return Ok(v.clone()),
+			None => return Err(MensagoError::ErrEmptyData)
+		}
+	}
+
+	/// Sets the human-friendly name for the workspace
+	pub fn set_userid(&mut self, uid: &UserID) -> Result<(), MensagoError> {
+
+		let conn = match rusqlite::Connection::open_with_flags(&self.dbpath,
+			rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE) {
+				Ok(v) => v,
+				Err(e) => {
+					return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())));
+				}
+			};
+		
+		match conn.execute("UPDATE workspaces SET userid=?1 WHERE wid=?2 AND domain=?3",
+			&[uid.as_string(), self.wid.as_ref().unwrap().as_string(),
+			self.domain.as_ref().unwrap().as_string()]) {
+			Ok(_) => (),
+			Err(e) => {
+				return Err(MensagoError::ErrDatabaseException(e.to_string()))
+			}
+		}
+		self.uid = Some(uid.clone());
+
+		Ok(())
 	}
 
 	/// Creates all the data needed for an individual workspace account
@@ -195,6 +278,8 @@ impl Workspace {
 		Ok(())
 	}
 
+	// TODO: Should the password hash for a workspace go in the secrets db?
+	
 	/// Adds the workspace instance to the storage database as the profile's identity workspace
 	pub fn add_to_db(&self, pw: &ArgonHash) -> Result<(), MensagoError> {
 
@@ -478,39 +563,6 @@ impl Workspace {
 		};
 		
 		Ok(fmap)
-	}
-	
-	/// Sets the human-friendly name for the workspace
-	pub fn set_userid(&mut self, uid: &UserID) -> Result<(), MensagoError> {
-
-		let conn = match rusqlite::Connection::open_with_flags(&self.dbpath,
-			rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE) {
-				Ok(v) => v,
-				Err(e) => {
-					return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())));
-				}
-			};
-		
-		match conn.execute("UPDATE workspaces SET userid=?1 WHERE wid=?2 AND domain=?3",
-			&[uid.as_string(), self.wid.as_ref().unwrap().as_string(),
-			self.domain.as_ref().unwrap().as_string()]) {
-			Ok(_) => (),
-			Err(e) => {
-				return Err(MensagoError::ErrDatabaseException(e.to_string()))
-			}
-		}
-		self.uid = Some(uid.clone());
-
-		Ok(())
-	}
-
-	/// Gets the human-friendly name for the workspace
-	pub fn get_userid(&self) -> Result<UserID, MensagoError> {
-
-		match self.uid.as_ref() {
-			Some(v) => return Ok(v.clone()),
-			None => return Err(MensagoError::ErrEmptyData)
-		}
 	}
 }
 
