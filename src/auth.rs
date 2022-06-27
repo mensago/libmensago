@@ -56,11 +56,9 @@ pub fn set_credentials(conn: &rusqlite::Connection, waddr: &WAddress, pwh: Optio
 pub fn add_device_session(conn: &rusqlite::Connection, waddr: &WAddress, devid: &RandomID, 
 	devpair: &EncryptionPair, devname: Option<&str>) -> Result<(),MensagoError> {
 
-	check_workspace_exists(&conn, waddr)?;
-	
 	// Can't have a session on that specified server already
 	let mut stmt = conn.prepare("SELECT address FROM sessions WHERE address=?1")?;
-	match stmt.exists([waddr.get_wid().as_string()]) {
+	match stmt.exists([waddr.as_string()]) {
 		Ok(v) => { if v { return Err(MensagoError::ErrExists) }	},
 		Err(e) => { return Err(MensagoError::ErrDatabaseException(e.to_string())) },
 	};
@@ -88,7 +86,7 @@ pub fn remove_device_session(conn: &rusqlite::Connection, devid: &RandomID)
 
 	let mut stmt = conn.prepare("SELECT devid FROM sessions WHERE devid=?1")?;
 	match stmt.exists([devid.as_string()]) {
-		Ok(v) => { if v { return Err(MensagoError::ErrExists) }	},
+		Ok(v) => { if !v { return Err(MensagoError::ErrNotFound) }	},
 		Err(e) => { return Err(MensagoError::ErrDatabaseException(e.to_string())) },
 	};
 		
@@ -101,7 +99,7 @@ pub fn remove_device_session(conn: &rusqlite::Connection, devid: &RandomID)
 }
 
 /// Returns the device key for a server session
-pub fn get_session_keypair(conn: &rusqlite::Connection, waddr: WAddress)
+pub fn get_session_keypair(conn: &rusqlite::Connection, waddr: &WAddress)
 		-> Result<EncryptionPair, MensagoError> {
 	
 	let mut stmt = conn.prepare("SELECT public_key,private_key FROM sessions WHERE address=?1")?;
@@ -306,6 +304,7 @@ fn make_device_name() -> String {
 #[cfg(test)]
 mod tests {
 	use crate::*;
+	use eznacl::*;
 	use libkeycard::*;
 	use std::env;
 	use std::fs;
@@ -465,6 +464,99 @@ mod tests {
 				return Err(MensagoError::ErrProgramException(
 					format!("{}: error setting credentials: {}", testname, e.to_string())))
 			}
+		}
+
+		Ok(())
+	}
+
+	#[test]
+	fn add_remove_get_session() -> Result<(), MensagoError> {
+
+		let testname = String::from("add_remove_session");
+		let test_path = setup_test(&testname);
+
+		let _ = setup_profile(&testname, &test_path)?;
+
+		let mut profile_path = test_path.clone();
+		profile_path.push("primary");
+		let w = setup_workspace(&testname, &profile_path)?;
+
+		let conn = match w.open_secrets() {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error connecting to workspace secrets db: {}", testname,
+						e.to_string())))
+			}
+		};
+
+		// Case #1: add session
+		let waddr = w.get_waddress().unwrap();
+		let devid = RandomID::from("00000000-2222-5555-7777-888888888888").unwrap();
+		let devpair = EncryptionPair::from_strings(
+			"CURVE25519:^EHgs?Mj1StVPg0&^rOSUeOnLw?g90b+~tplT~aQ",
+			"CURVE25519:9>z?R9M+X%RX&4lMnUEx)~oMV6-{X{^nuhm9v%x<")
+			.unwrap();
+		let devname = String::from("mypc");
+		
+		match add_device_session(&conn, &waddr, &devid, &devpair, Some(&devname)) {
+			Ok(_) => (),
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error adding device session: {}", testname, e.to_string())))
+			}
+		}
+
+		// Case #2: try to add duplicate
+		match add_device_session(&conn, &waddr, &devid, &devpair, Some(&devname)) {
+			Ok(_) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error failed to catch adding duplicate device session", testname)))
+			},
+			Err(_) => (),
+		}
+
+		// Case #3: get session keypair
+		match get_session_keypair(&conn, &waddr) {
+			Ok(v) => {
+				if v.get_public_str() != devpair.get_public_str() ||
+					v.get_private_str() != devpair.get_private_str() {
+					
+					return Err(MensagoError::ErrProgramException(
+						format!("{}: session keypair mismatch", testname)))
+				}
+			},
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error getting session keypair: {}", testname, e.to_string())))
+			}
+		}
+
+		// Case #4: remove session keypair
+		match remove_device_session(&conn, &devid) {
+			Ok(_) => (),
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error removing device session: {}", testname, e.to_string())))
+			}
+		}
+
+		// Case #5: remove nonexistent keypair
+		match remove_device_session(&conn, &devid) {
+			Ok(_) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error failed to catch removing nonexistent device session", testname)))
+			},
+			Err(_) => (),
+		}
+
+		// Case #6: get nonexistent keypair
+		match get_session_keypair(&conn, &waddr) {
+			Ok(_) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error failed to catch getting nonexistent device session", testname)))
+			},
+			Err(_) => (),
 		}
 
 		Ok(())
