@@ -1,3 +1,27 @@
+// Keys used in the various tests
+
+// THESE KEYS ARE PUBLICLY ACCESSIBLE! DO NOT USE THESE FOR ANYTHING EXCEPT UNIT TESTS!!
+
+// User Verification Key: ED25519:6|HBWrxMY6-?r&Sm)_^PLPerpqOj#b&x#N_#C3}p
+// User Signing Key: ED25519:p;XXU0XF#UO^}vKbC-wS(#5W6=OEIFmR2z`rS1j+
+
+// User Contact Request Verification Key: ED25519:d0-oQb;{QxwnO{=!|^62+E=UYk2Y3mr2?XKScF4D
+// User Contact Request Signing Key: ED25519:ip52{ps^jH)t$k-9bc_RzkegpIW?}FFe~BX&<V}9
+
+// User Contact Request Encryption Key: CURVE25519:j(IBzX*F%OZF;g77O8jrVjM1a`Y<6-ehe{S;{gph
+// User Contact Request Decryption Key: CURVE25519:55t6A0y%S?{7c47p(R@C*X#at9Y`q5(Rc#YBS;r}
+
+// User Primary Encryption Key: CURVE25519:nSRso=K(WF{P+4x5S*5?Da-rseY-^>S8VN#v+)IN
+// User Primary Decryption Key: CURVE25519:4A!nTPZSVD#tm78d=-?1OIQ43{ipSpE;@il{lYkg
+
+// Session #1 Encryption Key: CURVE25519:^EHgs?Mj1StVPg0&^rOSUeOnLw?g90b+~tplT~aQ
+// Session #1 Decryption Key: CURVE25519:9>z?R9M+X%RX&4lMnUEx)~oMV6-{X{^nuhm9v%x<
+
+// Folder Key: XSALSA20:TF_`Q2kZO;nUb(wWm1{P=_BmVe6rEK<GkITq@T|l
+// Storage Key: XSALSA20:L_fPZVo1rGPozl^N)bm2$Dc%xyihXmzV}7w^d0xm
+
+// THESE KEYS ARE PUBLICLY ACCESSIBLE! DO NOT USE THESE FOR ANYTHING EXCEPT UNIT TESTS!!
+
 use eznacl::*;
 use libkeycard::*;
 use sys_info;
@@ -165,6 +189,11 @@ pub fn add_keypair(conn: &rusqlite::Connection, waddr: &WAddress, pubkey: &Crypt
 			return Err(MensagoError::ErrDatabaseException(e.to_string()))
 		}
 	}
+}
+
+/// Deletes a cryptography keypair from a workspace.
+pub fn remove_keypair(conn: &rusqlite::Connection, keyhash: &CryptoString) -> Result<(), MensagoError> {
+	remove_key(&conn, &keyhash)
 }
 
 /// Adds a single symmetric key to a workspace.
@@ -558,6 +587,48 @@ mod tests {
 			},
 			Err(_) => (),
 		}
+
+		Ok(())
+	}
+
+	#[test]
+	fn add_remove_get_key() -> Result<(), MensagoError> {
+
+		let testname = String::from("add_remove_get_key");
+		let test_path = setup_test(&testname);
+
+		let _ = setup_profile(&testname, &test_path)?;
+
+		let mut profile_path = test_path.clone();
+		profile_path.push("primary");
+		let w = setup_workspace(&testname, &profile_path)?;
+
+		let conn = match w.open_secrets() {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error connecting to workspace secrets db: {}", testname,
+						e.to_string())))
+			}
+		};
+
+		// Case #1: add keypair
+		let waddr = w.get_waddress().unwrap();
+		let crvkey = CryptoString::from("ED25519:d0-oQb;{QxwnO{=!|^62+E=UYk2Y3mr2?XKScF4D")
+			.unwrap();
+		let crskey = CryptoString::from("ED25519:ip52{ps^jH)t$k-9bc_RzkegpIW?}FFe~BX&<V}9")
+			.unwrap();
+		
+		match add_keypair(&conn, &waddr, &crvkey, &crskey, &KeyType::SigningKey, 
+			&KeyCategory::ConReqSigning) {
+			Ok(_) => (),
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error adding CR signing pair: {}", testname, e.to_string())))
+			}
+		}
+
+		// TODO: Finish add_remove_get_key() test cases
 
 		Ok(())
 	}
