@@ -144,13 +144,10 @@ pub fn add_keypair(conn: &rusqlite::Connection, waddr: &WAddress, pubkey: &Crypt
 	privkey: &CryptoString, hashtype: &str, keytype: &KeyType, category: &KeyCategory)
 	-> Result<CryptoString, MensagoError> {
 	
-	let pubhash = eznacl::get_hash(hashtype, pubkey.as_bytes())?;
+	conn.execute("DELETE FROM keys WHERE address=?1 AND category=?2",
+		[&waddr.to_string(), &category.to_string()])?;
 
-	let mut stmt = conn.prepare("SELECT keyid FROM keys WHERE keyid=?1")?;
-	match stmt.exists([pubhash.as_str()]) {
-		Ok(v) => { if v { return Err(MensagoError::ErrExists) }	},
-		Err(e) => { return Err(MensagoError::ErrDatabaseException(e.to_string())) },
-	};
+	let pubhash = eznacl::get_hash(hashtype, pubkey.as_bytes())?;
 
 	let timestamp = get_timestamp();
 
@@ -164,23 +161,12 @@ pub fn add_keypair(conn: &rusqlite::Connection, waddr: &WAddress, pubkey: &Crypt
 		},
 	};
 
-	let category_string = match category {
-		KeyCategory::ConReqEncryption => "crencryption",
-		KeyCategory::ConReqSigning => "crsigning",
-		KeyCategory::Encryption => "encryption",
-		KeyCategory::Signing => "signing",
-		KeyCategory::Folder => "folder",
-		KeyCategory::PrimarySigning => "orgsigning",
-		KeyCategory::SecondarySigning => "altorgsigning",
-		KeyCategory::Storage => "storage",
-	};
-
 	match conn.execute("INSERT INTO keys(keyid,address,type,category,private,public,timestamp)
-		VALUES(?1,?2,?3,?4,?5,?6,?7)",
-		[pubhash.as_str(), &waddr.to_string(), type_string, category_string, privkey.as_str(), 
-		pubkey.as_str(), &timestamp]) {
-		
-		Ok(_) => { return Ok(pubhash) },
+	VALUES(?1,?2,?3,?4,?5,?6,?7)",
+	[pubhash.as_str(), &waddr.to_string(), type_string, &category.to_string(), privkey.as_str(), 
+	pubkey.as_str(), &timestamp]) {
+	
+		Ok(_) => Ok(pubhash),
 		Err(e) => {
 			return Err(MensagoError::ErrDatabaseException(e.to_string()))
 		}
@@ -199,11 +185,8 @@ pub fn add_key(conn: &rusqlite::Connection, waddr: &WAddress, key: &CryptoString
 	
 	let keyhash = eznacl::get_hash(hashtype, key.as_bytes())?;
 
-	let mut stmt = conn.prepare("SELECT keyid FROM keys WHERE keyid=?1")?;
-	match stmt.exists([keyhash.as_str()]) {
-		Ok(v) => { if v { return Err(MensagoError::ErrExists) }	},
-		Err(e) => { return Err(MensagoError::ErrDatabaseException(e.to_string())) },
-	};
+	conn.execute("DELETE FROM keys WHERE address=?1 AND category=?2",
+		[&waddr.to_string(), &category.to_string()])?;
 	
 	let timestamp = get_timestamp();
 
@@ -620,17 +603,7 @@ mod tests {
 			}
 		};
 
-		// Case #2: try to add a duplicate keypair
-		match add_keypair(&conn, &waddr, &crvkey, &crskey, "blake2b-256",
-			&KeyType::SigningKey, &KeyCategory::ConReqSigning) {
-			Ok(_) => {
-				return Err(MensagoError::ErrProgramException(
-					format!("{}: failed to catch adding duplicate CR signing pair", testname)))
-			},
-			Err(_) => (),
-		}
-
-		// Case #3: get keypair
+		// Case #2: get keypair
 		match get_keypair(&conn, &keyhash) {
 			Ok(v) => {
 				if v[0] != crvkey || v[1] != crskey {
@@ -643,6 +616,21 @@ mod tests {
 					format!("{}: error adding CR signing pair: {}", testname, e.to_string())))
 			}
 		}
+
+		// Case #3: get key by category
+		match get_key_by_category(&conn, &KeyCategory::ConReqSigning) {
+			Ok(v) => {
+				if v[0] != crvkey || v[1] != crskey {
+					return Err(MensagoError::ErrProgramException(
+						format!("{}: get_keypair value mismatch", testname)))
+				}
+			},
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error adding CR signing pair: {}", testname, e.to_string())))
+			}
+		}
+
 
 
 		// TODO: Finish add_remove_get_key() test cases
