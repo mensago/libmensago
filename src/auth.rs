@@ -141,14 +141,10 @@ pub fn get_session_keypair(conn: &rusqlite::Connection, waddr: &WAddress)
 
 /// Adds a key pair to a workspace.
 pub fn add_keypair(conn: &rusqlite::Connection, waddr: &WAddress, pubkey: &CryptoString,
-	privkey: &CryptoString, keytype: &KeyType, category: &KeyCategory) -> Result<(), MensagoError> {
+	privkey: &CryptoString, hashtype: &str, keytype: &KeyType, category: &KeyCategory)
+	-> Result<CryptoString, MensagoError> {
 	
-	let pubhash = match eznacl::get_hash("sha-256", pubkey.as_bytes()) {
-		Ok(v) => v,
-		Err(e) => {
-			return Err(MensagoError::ErrProgramException(String::from(e.to_string())));
-		}
-	};
+	let pubhash = eznacl::get_hash(hashtype, pubkey.as_bytes())?;
 
 	let mut stmt = conn.prepare("SELECT keyid FROM keys WHERE keyid=?1")?;
 	match stmt.exists([pubhash.as_str()]) {
@@ -184,7 +180,7 @@ pub fn add_keypair(conn: &rusqlite::Connection, waddr: &WAddress, pubkey: &Crypt
 		[pubhash.as_str(), &waddr.to_string(), type_string, category_string, privkey.as_str(), 
 		pubkey.as_str(), &timestamp]) {
 		
-		Ok(_) => { return Ok(()) },
+		Ok(_) => { return Ok(pubhash) },
 		Err(e) => {
 			return Err(MensagoError::ErrDatabaseException(e.to_string()))
 		}
@@ -196,16 +192,12 @@ pub fn remove_keypair(conn: &rusqlite::Connection, keyhash: &CryptoString) -> Re
 	remove_key(&conn, &keyhash)
 }
 
-/// Adds a single symmetric key to a workspace.
-pub fn add_key(conn: &rusqlite::Connection, waddr: &WAddress, key: &CryptoString, 
-	category: &KeyCategory) -> Result<(), MensagoError> {
+/// Adds a single symmetric key to a workspace. It also creates a hash of the Base85-encoded
+/// public key using the requested algorithm and adds it to the database
+pub fn add_key(conn: &rusqlite::Connection, waddr: &WAddress, key: &CryptoString, hashtype: &str, 
+	category: &KeyCategory) -> Result<CryptoString, MensagoError> {
 	
-	let keyhash = match eznacl::get_hash("sha-256", key.as_bytes()) {
-		Ok(v) => v,
-		Err(e) => {
-			return Err(MensagoError::ErrProgramException(String::from(e.to_string())));
-		}
-	};
+	let keyhash = eznacl::get_hash(hashtype, key.as_bytes())?;
 
 	let mut stmt = conn.prepare("SELECT keyid FROM keys WHERE keyid=?1")?;
 	match stmt.exists([keyhash.as_str()]) {
@@ -220,7 +212,7 @@ pub fn add_key(conn: &rusqlite::Connection, waddr: &WAddress, key: &CryptoString
 		[keyhash.as_str(), &waddr.to_string(), "symmetric", &category.to_string(), key.as_str(), 
 		key.as_str(), &timestamp]) {
 		
-		Ok(_) => { return Ok(()) },
+		Ok(_) => { return Ok(keyhash) },
 		Err(e) => {
 			return Err(MensagoError::ErrDatabaseException(e.to_string()))
 		}
@@ -619,14 +611,39 @@ mod tests {
 		let crskey = CryptoString::from("ED25519:ip52{ps^jH)t$k-9bc_RzkegpIW?}FFe~BX&<V}9")
 			.unwrap();
 		
-		match add_keypair(&conn, &waddr, &crvkey, &crskey, &KeyType::SigningKey, 
-			&KeyCategory::ConReqSigning) {
-			Ok(_) => (),
+		let keyhash = match add_keypair(&conn, &waddr, &crvkey, &crskey, "blake2b-256",
+			&KeyType::SigningKey, &KeyCategory::ConReqSigning) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error adding CR signing pair: {}", testname, e.to_string())))
+			}
+		};
+
+		// Case #2: try to add a duplicate keypair
+		match add_keypair(&conn, &waddr, &crvkey, &crskey, "blake2b-256",
+			&KeyType::SigningKey, &KeyCategory::ConReqSigning) {
+			Ok(_) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: failed to catch adding duplicate CR signing pair", testname)))
+			},
+			Err(_) => (),
+		}
+
+		// Case #3: get keypair
+		match get_keypair(&conn, &keyhash) {
+			Ok(v) => {
+				if v[0] != crvkey || v[1] != crskey {
+					return Err(MensagoError::ErrProgramException(
+						format!("{}: get_keypair value mismatch", testname)))
+				}
+			},
 			Err(e) => {
 				return Err(MensagoError::ErrProgramException(
 					format!("{}: error adding CR signing pair: {}", testname, e.to_string())))
 			}
 		}
+
 
 		// TODO: Finish add_remove_get_key() test cases
 
