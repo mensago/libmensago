@@ -365,6 +365,7 @@ mod tests {
 	use std::fs;
 	use std::path::PathBuf;
 	use std::str::FromStr;
+	use super::check_workspace_exists;
 
 	// Sets up the path to contain the profile tests
 	fn setup_test(name: &str) -> PathBuf {
@@ -754,6 +755,46 @@ mod tests {
 
 		Ok(())
 	}
-}
 
-// TODO: Finish tests for auth module
+	#[test]
+	fn test_utility() -> Result<(), MensagoError> {
+
+		let testname = String::from("test_utility");
+		let test_path = setup_test(&testname);
+
+		let _ = setup_profile(&testname, &test_path)?;
+
+		let mut profile_path = test_path.clone();
+		profile_path.push("primary");
+		let w = setup_workspace(&testname, &profile_path)?;
+
+		let conn = match w.open_storage() {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error connecting to workspace storage db: {}", testname,
+						e.to_string())))
+			}
+		};
+
+		match check_workspace_exists(&conn, &w.get_waddress().unwrap()) {
+			Ok(_) => (),
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: failed to find existing workspace: {}", testname,
+						e.to_string())))
+			}
+		};
+
+		match check_workspace_exists(&conn, 
+			&WAddress::from("12345678-1234-5678-4321-abcdefabcdef/example.com").unwrap()) {
+			Ok(_) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: passed a nonexistent workspace", testname)))
+			},
+			Err(_) => (),
+		};
+
+		Ok(())
+	}
+}
