@@ -3,7 +3,32 @@
 
 use rusqlite;
 use std::collections::HashMap;
+use std::fmt;
 use crate::base::*;
+
+/// ConfigScope defines the scope of a configuration setting.
+/// - Global: Setting which applies to the application as a whole, regardless of platform or architecture. A lot of user preferences will go here, such as the theme.
+/// - Platform: A setting which is specific to the operating system. Settings in this scope are usually platform-specific, such as the preferred download location for files
+/// - Architecture: Settings in this scope are specific to the platform *and* processor architecture, such as Linux on AMD64 vs Linux on ARM or RISC-V. This scope is not generally used.
+/// - Local: Settings in this scope are specific to the device, and unlike the other scopes, will not be synchronized across devices.
+#[derive(Debug, PartialEq, PartialOrd, Clone, Copy)]
+pub enum ConfigScope {
+	Global,
+	Platform,
+	Architecture,
+	Local,
+}
+
+impl fmt::Display for ConfigScope {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			ConfigScope::Global => write!(f, "global"),
+			ConfigScope::Platform => write!(f, "platform"),
+			ConfigScope::Architecture => write!(f, "architecture"),
+			ConfigScope::Local => write!(f, "local"),
+		}
+	}
+}
 
 /// The AppConfig class is just a hash map for holding strings containing app configuration
 /// information with some methods to make usage easier
