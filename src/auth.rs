@@ -178,6 +178,58 @@ pub fn remove_keypair(conn: &rusqlite::Connection, keyhash: &CryptoString) -> Re
 	remove_key(&conn, &keyhash)
 }
 
+/// Returns a pair of CryptoStrings, where the public key is in element 0 and the private key is in
+/// element 1. This is to accommodate retrieval of all key types. If a symmetric key is obtained
+/// through this call, the public and private key values will be the same.
+pub fn get_keypair(conn: &rusqlite::Connection, keyhash: &CryptoString)
+	-> Result<[CryptoString; 2], MensagoError> {
+
+	let mut stmt = conn.prepare("SELECT public,private FROM keys WHERE keyid=?1")?;
+	let (pubstr, privstr) = stmt.query_row([keyhash.as_str()], |row| {
+		Ok((row.get::<usize,String>(0).unwrap(), row.get::<usize,String>(1).unwrap()))
+	})?;
+
+	if pubstr.len() == 0 || privstr.len() == 0 {
+		return Err(MensagoError::ErrEmptyData)
+	}
+
+	let pubcs = CryptoString::from(&pubstr);
+	let privcs = CryptoString::from(&privstr);
+
+	if pubcs.is_none() || privcs.is_none() {
+		return Err(MensagoError::ErrDatabaseException(
+			String::from("Bad key value in database in get_keypair()")
+		))
+	}
+
+	Ok([pubcs.unwrap(), privcs.unwrap()])
+}
+
+/// Returns a keypair based on its category
+pub fn get_keypair_by_category(conn: &rusqlite::Connection, category: &KeyCategory)
+	-> Result<[CryptoString; 2], MensagoError> {
+
+	let mut stmt = conn.prepare("SELECT public,private FROM keys WHERE category=?1")?;
+	let (pubstr, privstr) = stmt.query_row([category.to_string()], |row| {
+		Ok((row.get::<usize,String>(0).unwrap(), row.get::<usize,String>(1).unwrap()))
+	})?;
+
+	if pubstr.len() == 0 || privstr.len() == 0 {
+		return Err(MensagoError::ErrEmptyData)
+	}
+
+	let pubcs = CryptoString::from(&pubstr);
+	let privcs = CryptoString::from(&privstr);
+
+	if pubcs.is_none() || privcs.is_none() {
+		return Err(MensagoError::ErrDatabaseException(
+			String::from("Bad key value in database in get_keypair()")
+		))
+	}
+
+	Ok([pubcs.unwrap(), privcs.unwrap()])
+}
+
 /// Adds a single symmetric key to a workspace. It also creates a hash of the Base85-encoded
 /// public key using the requested algorithm and adds it to the database
 pub fn add_key(conn: &rusqlite::Connection, waddr: &WAddress, key: &CryptoString, hashtype: &str, 
@@ -222,56 +274,55 @@ pub fn remove_key(conn: &rusqlite::Connection, keyhash: &CryptoString) -> Result
 	}
 }
 
-/// Returns a pair of CryptoStrings, where the public key is in element 0 and the private key is in
-/// element 1. This is to accommodate retrieval of all key types. If a symmetric key is obtained
-/// through this call, the public and private key values will be the same.
-pub fn get_keypair(conn: &rusqlite::Connection, keyhash: &CryptoString)
-	-> Result<[CryptoString; 2], MensagoError> {
+/// Gets a key given its hash. As with get_keypair(), if the hash given does not use the
+/// same algorithm, this function will not find the key.
+pub fn get_key(conn: &rusqlite::Connection, keyhash: &CryptoString)
+-> Result<CryptoString, MensagoError> {
 
-	let mut stmt = conn.prepare("SELECT public,private FROM keys WHERE keyid=?1")?;
-	let (pubstr, privstr) = stmt.query_row([keyhash.as_str()], |row| {
-		Ok((row.get::<usize,String>(0).unwrap(), row.get::<usize,String>(1).unwrap()))
+	let mut stmt = conn.prepare("SELECT public FROM keys WHERE keyid=?1")?;
+	let pubstr = stmt.query_row([keyhash.to_string()], |row| {
+		Ok(row.get::<usize,String>(0).unwrap())
 	})?;
 
-	if pubstr.len() == 0 || privstr.len() == 0 {
+	if pubstr.len() == 0 {
 		return Err(MensagoError::ErrEmptyData)
 	}
 
 	let pubcs = CryptoString::from(&pubstr);
-	let privcs = CryptoString::from(&privstr);
 
-	if pubcs.is_none() || privcs.is_none() {
+	if pubcs.is_none() {
 		return Err(MensagoError::ErrDatabaseException(
-			String::from("Bad key value in database in get_keypair()")
+			String::from("Bad key value in database in get_key()")
 		))
 	}
 
-	Ok([pubcs.unwrap(), privcs.unwrap()])
+	Ok(pubcs.unwrap())
 }
 
-/// Returns a keypair based on its category
-pub fn get_key_by_category(conn: &rusqlite::Connection, category: &KeyCategory)
-	-> Result<[CryptoString; 2], MensagoError> {
 
-	let mut stmt = conn.prepare("SELECT public,private FROM keys WHERE category=?1")?;
-	let (pubstr, privstr) = stmt.query_row([category.to_string()], |row| {
-		Ok((row.get::<usize,String>(0).unwrap(), row.get::<usize,String>(1).unwrap()))
+/// Returns a key based on its category. If the category given uses a pair of keys, the public key
+/// is returned.
+pub fn get_key_by_category(conn: &rusqlite::Connection, category: &KeyCategory)
+	-> Result<CryptoString, MensagoError> {
+
+	let mut stmt = conn.prepare("SELECT public FROM keys WHERE category=?1")?;
+	let pubstr = stmt.query_row([category.to_string()], |row| {
+		Ok(row.get::<usize,String>(0).unwrap())
 	})?;
 
-	if pubstr.len() == 0 || privstr.len() == 0 {
+	if pubstr.len() == 0 {
 		return Err(MensagoError::ErrEmptyData)
 	}
 
 	let pubcs = CryptoString::from(&pubstr);
-	let privcs = CryptoString::from(&privstr);
 
-	if pubcs.is_none() || privcs.is_none() {
+	if pubcs.is_none() {
 		return Err(MensagoError::ErrDatabaseException(
-			String::from("Bad key value in database in get_keypair()")
+			String::from("Bad key value in database in get_key_by_category()")
 		))
 	}
 
-	Ok([pubcs.unwrap(), privcs.unwrap()])
+	Ok(pubcs.unwrap())
 }
 
 /// Utility function that just checks to see if a specific workspace exists in the database
@@ -567,9 +618,9 @@ mod tests {
 	}
 
 	#[test]
-	fn add_remove_get_key() -> Result<(), MensagoError> {
+	fn add_remove_get_keypair() -> Result<(), MensagoError> {
 
-		let testname = String::from("add_remove_get_key");
+		let testname = String::from("add_remove_get_keypair");
 		let test_path = setup_test(&testname);
 
 		let _ = setup_profile(&testname, &test_path)?;
@@ -587,13 +638,13 @@ mod tests {
 			}
 		};
 
-		// Case #1: add keypair
 		let waddr = w.get_waddress().unwrap();
 		let crvkey = CryptoString::from("ED25519:d0-oQb;{QxwnO{=!|^62+E=UYk2Y3mr2?XKScF4D")
 			.unwrap();
 		let crskey = CryptoString::from("ED25519:ip52{ps^jH)t$k-9bc_RzkegpIW?}FFe~BX&<V}9")
 			.unwrap();
-		
+
+		// Case #1: add keypair
 		let keyhash = match add_keypair(&conn, &waddr, &crvkey, &crskey, "blake2b-256",
 			&KeyType::SigningKey, &KeyCategory::ConReqSigning) {
 			Ok(v) => v,
@@ -617,8 +668,8 @@ mod tests {
 			}
 		}
 
-		// Case #3: get key by category
-		match get_key_by_category(&conn, &KeyCategory::ConReqSigning) {
+		// Case #3: get keypair by category
+		match get_keypair_by_category(&conn, &KeyCategory::ConReqSigning) {
 			Ok(v) => {
 				if v[0] != crvkey || v[1] != crskey {
 					return Err(MensagoError::ErrProgramException(
@@ -631,6 +682,61 @@ mod tests {
 			}
 		}
 
+		// TODO: Finish add_remove_get_keypair() test cases
+
+		Ok(())
+	}
+
+	#[test]
+	fn add_remove_get_key() -> Result<(), MensagoError> {
+
+		let testname = String::from("add_remove_get_key");
+		let test_path = setup_test(&testname);
+
+		let _ = setup_profile(&testname, &test_path)?;
+
+		let mut profile_path = test_path.clone();
+		profile_path.push("primary");
+		let w = setup_workspace(&testname, &profile_path)?;
+
+		let conn = match w.open_secrets() {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error connecting to workspace secrets db: {}", testname,
+						e.to_string())))
+			}
+		};
+
+		let waddr = w.get_waddress().unwrap();
+			
+		// Case #1: add symmetric key
+		let storagekey = CryptoString::from("XSALSA20:L_fPZVo1rGPozl^N)bm2$Dc%xyihXmzV}7w^d0xm")
+			.unwrap();
+		
+		let keyhash = match add_key(&conn, &waddr, &storagekey, "blake2b-256",
+			&KeyCategory::Storage) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error adding replacement storage key: {}", testname,
+						e.to_string())))
+			}
+		};
+
+		// Case #2: get symmetric key
+		match get_key(&conn, &keyhash) {
+			Ok(v) => {
+				if v != storagekey {
+					return Err(MensagoError::ErrProgramException(
+						format!("{}: get_key value mismatch", testname)))
+				}
+			},
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error getting storage key: {}", testname, e.to_string())))
+			}
+		}
 
 
 		// TODO: Finish add_remove_get_key() test cases
