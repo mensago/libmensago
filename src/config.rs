@@ -30,11 +30,12 @@ impl fmt::Display for ConfigScope {
 	}
 }
 
-/// The AppConfig class is just a hash map for holding strings containing app configuration
+/// The Config class is just a hash map for holding strings containing app configuration
 /// information with some methods to make usage easier
 #[derive(Debug)]
 pub struct Config {
-	pub data: HashMap::<String, String>,
+	data: HashMap::<String, String>,
+	modified: Vec::<String>,
 }
 
 impl Config {
@@ -43,6 +44,7 @@ impl Config {
 	pub fn new() -> Config {
 		Config {
 			data: HashMap::<String, String>::new(),
+			modified: Vec::<String>::new(),
 		}
 	}
 
@@ -52,63 +54,43 @@ impl Config {
 	-> Result<(), MensagoError> {
 	
 		// Regardless of the outcome, we need to have a nice clean start
-		self.data = HashMap::<String, String>::new();
+		self.data.clear();
+		self.modified.clear();
 		
 		// Check to see if the table exists in the database
 
-		let mut stmt = match conn
-			.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='appconfig'") {
-				Ok(v) => v,
-				Err(e) => {
-					return Err(MensagoError::ErrDatabaseException(e.to_string()))
-				}
-			};
+		let mut stmt = conn
+			.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='appconfig'")?;
 		
-		let mut rows = match stmt.query([]) {
-			Ok(v) => v,
-			Err(e) => {
-				return Err(MensagoError::ErrDatabaseException(e.to_string()))
-			}
-		};
-
-		let option_row = match rows.next() {
-			Ok(v) => v,
-			Err(e) => {
-				return Err(MensagoError::ErrDatabaseException(e.to_string()))
-			}
-		};
-
 		// If the row is None, then the table doesn't exist. Create it and move on.
-		if option_row.is_none() {
-			return match conn.execute(
-				"CREATE TABLE 'appconfig'('fname' TEXT NOT NULL UNIQUE, 'fvalue' TEXT);", []) {
-				Ok(_) => Ok(()),
-				Err(e) => {
-					Err(MensagoError::ErrDatabaseException(String::from(e.to_string())))
+		match stmt.exists([]) {
+			Ok(v) => {
+				if v {
+					match conn.execute(
+						"CREATE TABLE 'appconfig'('fname' TEXT NOT NULL UNIQUE, 'fvalue' TEXT);",
+							[]) {
+						Ok(_) => (),
+						Err(e) => {
+							return Err(MensagoError::ErrDatabaseException(
+								String::from(e.to_string())))
+						}
+					}
 				}
-			}
+			},
+			Err(e) => { return Err(MensagoError::ErrDatabaseException(e.to_string())) }
 		}
 
 		// The table exists, so load up all values from it
-		let mut stmt = match conn.prepare("SELECT fname,fvalue FROM appconfig") {
-			Ok(v) => v,
-			Err(e) => {
-				return Err(MensagoError::ErrDatabaseException(e.to_string()))
-			}
-		};
+		let mut stmt = conn.prepare("SELECT fname,fvalue FROM appconfig")?;
 		
 		let mut rows = match stmt.query([]) {
 			Ok(v) => v,
-			Err(e) => {
-				return Err(MensagoError::ErrDatabaseException(e.to_string()))
-			}
+			Err(e) => { return Err(MensagoError::ErrDatabaseException(e.to_string())) }
 		};
 
 		let mut option_row = match rows.next() {
 			Ok(v) => v,
-			Err(e) => {
-				return Err(MensagoError::ErrDatabaseException(e.to_string()))
-			}
+			Err(e) => { return Err(MensagoError::ErrDatabaseException(e.to_string())) }
 		};
 
 		while option_row.is_some() {
@@ -117,47 +99,41 @@ impl Config {
 				String::from(&row.get::<usize,String>(1).unwrap()));
 			option_row = match rows.next() {
 				Ok(v) => v,
-				Err(e) => {
-					return Err(MensagoError::ErrDatabaseException(e.to_string()))
-				}
+				Err(e) => { return Err(MensagoError::ErrDatabaseException(e.to_string())) }
 			};
 		}
 
 		Ok(())
 	}
 
-	/// Saves all fields to the database
-	pub fn save_to_db(&self, conn: &rusqlite::Connection)
+	/// Saves all fields to the database. NOTE: this will completely clear the existing table of
+	/// configuration in the database backend, so be sure you have everything the way you want it
+	/// before calling this.
+	pub fn save_to_db(&mut self, conn: &rusqlite::Connection)
 	-> Result<(), MensagoError> {
-	
-		// Check to see if the table exists in the database
-
-		let mut stmt = match conn
-			.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='appconfig'") {
-				Ok(v) => v,
-				Err(e) => {
-					return Err(MensagoError::ErrDatabaseException(e.to_string()))
-				}
-			};
 		
-		let mut rows = match stmt.query([]) {
-			Ok(v) => v,
+		match conn.execute("DROP TABLE IF EXISTS appconfig", []) {
+			Ok(_) => (),
 			Err(e) => {
-				return Err(MensagoError::ErrDatabaseException(e.to_string()))
+				return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())))
 			}
-		};
+		}
 
-		let option_row = match rows.next() {
-			Ok(v) => v,
+		match conn.execute(
+			"CREATE TABLE 'appconfig'('fname' TEXT NOT NULL UNIQUE, 'fvalue' TEXT);", []) {
+			Ok(_) => (),
 			Err(e) => {
-				return Err(MensagoError::ErrDatabaseException(e.to_string()))
+				return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())))
 			}
-		};
+		}
 
-		// If the row is None, then the table doesn't exist. Create it and move on.
-		if option_row.is_none() {
+		// Save all values to the table. Unfortunately, this isn't as fast as it could be because
+		// we can't validate the field values in any way, so we can't add all fields in batch.
+		// Thankfully, we shouldn't be dealing with more than a few dozen to a few thousand
+		// values.
+		for (fname,fvalue) in &self.data {
 			match conn.execute(
-				"CREATE TABLE 'appconfig'('fname' TEXT NOT NULL UNIQUE, 'fvalue' TEXT);", []) {
+				"INSERT INTO appconfig (fname,fvalue) VALUES(?1,?2);", [fname, fvalue]) {
 				Ok(_) => (),
 				Err(e) => {
 					return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())))
@@ -165,75 +141,41 @@ impl Config {
 			}
 		}
 
-		// Save all values to the table
-		for (fname,fvalue) in &self.data {
-
-			let mut stmt = match conn
-			.prepare("SELECT fname FROM appconfig fname=?1") {
-				Ok(v) => v,
-				Err(e) => {
-					return Err(MensagoError::ErrDatabaseException(e.to_string()))
-				}
-			};
-		
-			let mut rows = match stmt.query([fname]) {
-				Ok(v) => v,
-				Err(e) => {
-					return Err(MensagoError::ErrDatabaseException(e.to_string()))
-				}
-			};
-
-			let option_row = match rows.next() {
-				Ok(v) => v,
-				Err(e) => {
-					return Err(MensagoError::ErrDatabaseException(e.to_string()))
-				}
-			};
-
-			match option_row {
-				Some(_) => {
-					match conn.execute(
-						"UPDATE appconfig SET fvalue=?2 WHERE fname=?1;", [fname, fvalue]) {
-						Ok(_) => (),
-						Err(e) => {
-							return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())))
-						}
-					}
-				},
-				None => {
-					match conn.execute(
-						"INSERT INTO appconfig (fname,fvalue) VALUES(?1,?2);", [fname, fvalue]) {
-						Ok(_) => (),
-						Err(e) => {
-							return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())))
-						}
-					}
-				},
-			}
-		}
+		self.modified.clear();
 		
 		Ok(())
 	}
 
+	/// Saves modified values to the database. In general this should
+	pub fn update_db(&self, _conn: &rusqlite::Connection) -> Result<(), MensagoError> {
+
+		// TODO: implement Config::update_db()
+		Err(MensagoError::ErrUnimplemented)
+	}
+
 	/// Sets a field value
 	pub fn set(&mut self, field: &str, value: &str) {
-
 		self.data.insert(String::from(field), String::from(value));
+		self.modified.push(String::from(field))
 	}
 
 	/// Gets a field value
 	pub fn get(&self, field: &str) -> Result<String, MensagoError> {
-
 		match self.data.get(field) {
 			Some(v) => Ok(v.clone()),
 			None => { Err(MensagoError::ErrNotFound) }
 		}
 	}
 
+	/// Returns true if the table has a specific field
+	pub fn has(&self, field: &str) -> bool {
+		self.data.get(field).is_some()
+	}
+
 	/// Sets an integer field value
 	pub fn set_int(&mut self, field: &str, value: isize) {
-
 		self.data.insert(String::from(field), value.to_string());
+		self.modified.push(String::from(field))
 	}
 
 	/// Gets a field value
