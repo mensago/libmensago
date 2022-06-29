@@ -664,7 +664,7 @@ mod tests {
 			},
 			Err(e) => {
 				return Err(MensagoError::ErrProgramException(
-					format!("{}: error adding CR signing pair: {}", testname, e.to_string())))
+					format!("{}: error getting CR signing pair: {}", testname, e.to_string())))
 			}
 		}
 
@@ -678,11 +678,10 @@ mod tests {
 			},
 			Err(e) => {
 				return Err(MensagoError::ErrProgramException(
-					format!("{}: error adding CR signing pair: {}", testname, e.to_string())))
+					format!("{}: error getting CR signing pair by category: {}", testname,
+						e.to_string())))
 			}
 		}
-
-		// TODO: Finish add_remove_get_keypair() test cases
 
 		Ok(())
 	}
@@ -738,8 +737,20 @@ mod tests {
 			}
 		}
 
-
-		// TODO: Finish add_remove_get_key() test cases
+		// Case #3: get key by category
+		match get_key_by_category(&conn, &KeyCategory::Storage) {
+			Ok(v) => {
+				if v != storagekey {
+					return Err(MensagoError::ErrProgramException(
+						format!("{}: get_key value mismatch", testname)))
+				}
+			},
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error getting storage key by category: {}", testname,
+						e.to_string())))
+			}
+		}
 
 		Ok(())
 	}
