@@ -146,11 +146,66 @@ impl Config {
 		Ok(())
 	}
 
-	/// Saves modified values to the database. In general this should
-	pub fn update_db(&self, _conn: &rusqlite::Connection) -> Result<(), MensagoError> {
+	/// Saves modified values to the database. In general this should be faster than saving the
+	/// entire object to the database.
+	pub fn update_db(&mut self, conn: &rusqlite::Connection) -> Result<(), MensagoError> {
 
-		// TODO: implement Config::update_db()
-		Err(MensagoError::ErrUnimplemented)
+		// Check to see if the table exists in the database
+		let mut stmt = conn
+			.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='appconfig'")?;
+		
+		match stmt.exists([]) {
+			Ok(v) => {
+				if !v { return self.save_to_db(&conn) }
+			},
+			Err(e) => {
+				return Err(MensagoError::ErrDatabaseException(e.to_string()))
+			}
+		}
+
+		// Save all values to the table
+		for fname in &self.modified {
+
+			let fvalue = match self.data.get(fname) {
+				Some(v) => v,
+				None => {
+					return Err(MensagoError::ErrDatabaseException(
+						format!("BUG: modified item {} missing in database", fname)
+					))
+				}
+			};
+
+			let mut stmt = conn.prepare("SELECT fname FROM appconfig fname=?1")?;
+		
+			match stmt.exists([fname]) {
+				Ok(v) => {
+					if v {
+						match conn.execute(
+							"UPDATE appconfig SET fvalue=?2 WHERE fname=?1;", [fname, fvalue]) {
+							Ok(_) => (),
+							Err(e) => {
+								return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())))
+							}
+						}
+					} else {
+						match conn.execute(
+							"INSERT INTO appconfig (fname,fvalue) VALUES(?1,?2);", [fname, fvalue]) {
+							Ok(_) => (),
+							Err(e) => {
+								return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())))
+							}
+						}
+					}
+				},
+				Err(e) => {
+					return Err(MensagoError::ErrDatabaseException(e.to_string()))
+				}
+			}
+		}
+
+		self.modified.clear();
+		
+		Ok(())
 	}
 
 	/// Sets a field value
