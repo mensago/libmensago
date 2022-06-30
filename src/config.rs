@@ -71,13 +71,7 @@ impl Config {
 
 	pub fn set_signature(&mut self, signature: &str) {
 		self.signature = String::from(signature);
-		self.data.insert(String::from("application_signature"), 
-			ConfigField {
-				scope: ConfigScope::Global,
-				scopevalue: String::new(),
-				value: self.signature.clone(),
-		});
-		self.modified.push(String::from("application_signature"));
+		self.set("application_signature", ConfigScope::Global, "", signature)
 	}
 
 	pub fn get_signature(&self) -> String {
@@ -324,4 +318,56 @@ impl Config {
 	}
 }
 
-// TODO: Add tests to config module
+#[cfg(test)]
+mod tests {
+	use crate::*;
+
+	#[test]
+	fn field_ops() -> Result<(), MensagoError> {
+
+		let testname = String::from("field_ops");
+		let mut c = Config::new("test");
+		
+		// Case #1: set_signature / get_signature
+		c.set_signature("test-signature");
+		if c.get_signature() != "test-signature" {
+			return Err(MensagoError::ErrProgramException(
+				format!("{}: mismatch getting signature after set_signature", testname)))
+		}
+
+		// Case #2: get
+		match c.get("application_signature"){
+			Ok(v) => {
+				if v != "test-signature" {
+					return Err(MensagoError::ErrProgramException(
+						format!("{}: mismatch getting signature via get()", testname)))
+				}
+			},
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error getting signature via get(): {}", testname, e.to_string())))
+			}
+		}
+
+		// Case #3: set
+		c.set("windows-path", ConfigScope::Platform, std::env::consts::OS, r"C:\Windows");
+		match c.get("windows-path"){
+			Ok(v) => {
+				if v != r"C:\Windows" {
+					return Err(MensagoError::ErrProgramException(
+						format!("{}: mismatch getting test field 'windows-path'", testname)))
+				}
+			},
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error getting test field 'windows-path': {}", testname,
+						e.to_string())))
+			}
+		}
+
+		Ok(())
+	}
+
+}
+
+// TODO: Finish testing config module
