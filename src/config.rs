@@ -291,6 +291,16 @@ impl Config {
 		self.data.get(field).is_some()
 	}
 
+	/// Deletes the specified field
+	pub fn delete(&mut self, field: &str) -> Result<(), MensagoError> {
+		if self.has(field) {
+			self.data.remove(field);
+			Ok(())
+		} else {
+			Err(MensagoError::ErrNotFound)
+		}
+	}
+
 	/// Gets the scope of a field
 	pub fn get_scope(&self, field: &str) -> Result<(ConfigScope, &str), MensagoError> {
 
@@ -458,6 +468,12 @@ mod tests {
 		Ok(())
 	}
 
+	#[test]
+	fn field_delete_fails() -> Result<(), MensagoError> {
+
+		// TODO: implement test for set/get failure cases and delete()
+		Ok(())
+	}
 }
 
 // TODO: Finish testing config module
