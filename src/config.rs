@@ -365,6 +365,38 @@ mod tests {
 			}
 		}
 
+		// Case #4: get_int
+		c.set("some-number", ConfigScope::Architecture, std::env::consts::ARCH, r"101");
+		match c.get_int("some-number"){
+			Ok(v) => {
+				if v != 101 {
+					return Err(MensagoError::ErrProgramException(
+						format!("{}: mismatch getting int test field 'some-number'", testname)))
+				}
+			},
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error getting test int field 'some-number': {}", testname,
+						e.to_string())))
+			}
+		}
+
+		// Case #5: set_int
+		c.set_int("some-number2", ConfigScope::Local, "", 999);
+		match c.get("some-number2"){
+			Ok(v) => {
+				if v != "999" {
+					return Err(MensagoError::ErrProgramException(
+						format!("{}: mismatch setting int test field 'some-number2'", testname)))
+				}
+			},
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error setting test int field 'some-number2': {}", testname,
+						e.to_string())))
+			}
+		}
+
 		Ok(())
 	}
 
