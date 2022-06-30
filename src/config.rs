@@ -238,6 +238,14 @@ impl Config {
 		Ok(())
 	}
 
+	/// Gets a field value
+	pub fn get(&self, field: &str) -> Result<&str, MensagoError> {
+		match self.data.get(field) {
+			Some(v) => Ok(&v.value),
+			None => { Err(MensagoError::ErrNotFound) }
+		}
+	}
+
 	/// Sets a field value. Note that setting a value requires deciding what scope to which the
 	/// field belongs and setting it accordingly. See documentation on the ConfigScope structure
 	/// for more information.
@@ -247,32 +255,6 @@ impl Config {
 				scope: scope,
 				scopevalue: String::from(scopevalue),
 				value: String::from(value)
-			});
-		self.modified.push(String::from(field))
-	}
-
-	/// Gets a field value
-	pub fn get(&self, field: &str) -> Result<String, MensagoError> {
-		match self.data.get(field) {
-			Some(v) => Ok(v.value.clone()),
-			None => { Err(MensagoError::ErrNotFound) }
-		}
-	}
-
-	/// Returns true if the table has a specific field
-	pub fn has(&self, field: &str) -> bool {
-		self.data.get(field).is_some()
-	}
-
-	/// Sets an integer field value. Note that setting a value requires deciding what scope to
-	/// which the field belongs and setting it accordingly. See documentation on the ConfigScope
-	/// structure for more information.
-	pub fn set_int(&mut self, field: &str, scope: ConfigScope, scopevalue: &str, value: isize) {
-		self.data.insert(String::from(field),
-			ConfigField {
-				scope: scope,
-				scopevalue: String::from(scopevalue),
-				value: value.to_string(),
 			});
 		self.modified.push(String::from(field))
 	}
@@ -289,6 +271,51 @@ impl Config {
 			Ok(v) => Ok(v),
 			Err(_) => { Err(MensagoError::ErrTypeMismatch) },
 		}
+	}
+
+	/// Sets an integer field value. Note that setting a value requires deciding what scope to
+	/// which the field belongs and setting it accordingly. See documentation on the ConfigScope
+	/// structure for more information.
+	pub fn set_int(&mut self, field: &str, scope: ConfigScope, scopevalue: &str, value: isize) {
+		self.data.insert(String::from(field),
+			ConfigField {
+				scope: scope,
+				scopevalue: String::from(scopevalue),
+				value: value.to_string(),
+			});
+		self.modified.push(String::from(field))
+	}
+
+	/// Returns true if the table has a specific field
+	pub fn has(&self, field: &str) -> bool {
+		self.data.get(field).is_some()
+	}
+
+	/// Gets the scope of a field
+	pub fn get_scope(&self, field: &str) -> Result<(ConfigScope, &str), MensagoError> {
+
+		let f = match self.data.get(field) {
+			Some(v) => v,
+			None => { return Err(MensagoError::ErrNotFound) }
+		};
+
+		Ok((f.scope, &f.scopevalue))
+	}
+
+	/// Changes the scope of a field.
+	pub fn set_scope(&mut self, field: &str, scope: ConfigScope, scopevalue: &str)
+	-> Result<(), MensagoError> {
+
+		let mut f = match self.data.get(field) {
+			Some(v) => v.clone(),
+			None => { return Err(MensagoError::ErrNotFound) }
+		};
+
+		f.scope = scope;
+		f.scopevalue = String::from(scopevalue);
+		self.data.insert(String::from(field), f);
+
+		Ok(())
 	}
 
 	fn ensure_dbtable(&self, conn: &rusqlite::Connection) -> Result<(), MensagoError> {
@@ -323,9 +350,9 @@ mod tests {
 	use crate::*;
 
 	#[test]
-	fn field_ops() -> Result<(), MensagoError> {
+	fn field_get_set() -> Result<(), MensagoError> {
 
-		let testname = String::from("field_ops");
+		let testname = String::from("field_get_set");
 		let mut c = Config::new("test");
 		
 		// Case #1: set_signature / get_signature
@@ -346,7 +373,7 @@ mod tests {
 			Err(e) => {
 				return Err(MensagoError::ErrProgramException(
 					format!("{}: error getting signature via get(): {}", testname, e.to_string())))
-			}
+			},
 		}
 
 		// Case #3: set
@@ -362,7 +389,7 @@ mod tests {
 				return Err(MensagoError::ErrProgramException(
 					format!("{}: error getting test field 'windows-path': {}", testname,
 						e.to_string())))
-			}
+			},
 		}
 
 		// Case #4: get_int
@@ -378,7 +405,7 @@ mod tests {
 				return Err(MensagoError::ErrProgramException(
 					format!("{}: error getting test int field 'some-number': {}", testname,
 						e.to_string())))
-			}
+			},
 		}
 
 		// Case #5: set_int
@@ -394,7 +421,38 @@ mod tests {
 				return Err(MensagoError::ErrProgramException(
 					format!("{}: error setting test int field 'some-number2': {}", testname,
 						e.to_string())))
-			}
+			},
+		}
+
+		// Case #6: get_scope()
+		match c.get_scope("some-number") {
+			Ok(v) => {
+				if v != (ConfigScope::Architecture, std::env::consts::ARCH) {
+					return Err(MensagoError::ErrProgramException(
+						format!("{}: mismatch getting scope for 'some-number'", testname)))
+				}
+			},
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error getting scope for 'some-number': {}", testname,
+						e.to_string())))
+			},
+		}
+
+		// Case #7: set_scope()
+		match c.set_scope("some-number2", ConfigScope::Platform, std::env::consts::OS) {
+			Ok(_) => {
+				if c.get_scope("some-number2").unwrap() != 
+					(ConfigScope::Platform, std::env::consts::OS) {
+					return Err(MensagoError::ErrProgramException(
+						format!("{}: mismatch setting scope for 'some-number2'", testname)))
+				}
+			},
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error setting scope for 'some-number2': {}", testname,
+						e.to_string())))
+			},
 		}
 
 		Ok(())
