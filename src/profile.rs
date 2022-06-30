@@ -163,7 +163,7 @@ impl Profile {
 			wid: None,
 			domain: None,
 			devid: None,
-			config: Config::new(),
+			config: Config::new(""),
 		};
 		
 		let mut defpath = profile.path.to_path_buf();
@@ -547,7 +547,7 @@ impl ProfileManager {
 			wid: None,
 			domain: None,
 			devid: Some(RandomID::generate()),
-			config: Config::new(),
+			config: Config::new(""),
 		};
 
 		if self.count_profiles() == 0 {

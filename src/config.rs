@@ -19,6 +19,18 @@ pub enum ConfigScope {
 	Local,
 }
 
+impl ConfigScope {
+	pub fn from(s: &str) -> Option<ConfigScope> {
+		match &*s.to_lowercase() {
+			"global" => Some(ConfigScope::Global),
+			"platform" => Some(ConfigScope::Platform),
+			"architecture" => Some(ConfigScope::Architecture),
+			"local" => Some(ConfigScope::Local),
+			_ => None,
+		}
+	}
+}
+
 impl fmt::Display for ConfigScope {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match self {
@@ -30,22 +42,46 @@ impl fmt::Display for ConfigScope {
 	}
 }
 
+#[derive(Debug, PartialEq, PartialOrd, Clone)]
+struct ConfigField {
+	pub scope: ConfigScope,
+	pub scopevalue: String,
+	pub value: String,
+}
+
 /// The Config class is just a hash map for holding strings containing app configuration
 /// information with some methods to make usage easier
 #[derive(Debug)]
 pub struct Config {
-	data: HashMap::<String, String>,
+	data: HashMap::<String, ConfigField>,
 	modified: Vec::<String>,
+	signature: String,
 }
 
 impl Config {
 
 	/// Creates a new empty AppConfig instance
-	pub fn new() -> Config {
+	pub fn new(signature: &str) -> Config {
 		Config {
-			data: HashMap::<String, String>::new(),
+			data: HashMap::<String, ConfigField>::new(),
 			modified: Vec::<String>::new(),
+			signature: String::from(signature),
 		}
+	}
+
+	pub fn set_signature(&mut self, signature: &str) {
+		self.signature = String::from(signature);
+		self.data.insert(String::from("application_signature"), 
+			ConfigField {
+				scope: ConfigScope::Global,
+				scopevalue: String::new(),
+				value: self.signature.clone(),
+		});
+		self.modified.push(String::from("application_signature"));
+	}
+
+	pub fn get_signature(&self) -> String {
+		self.signature.clone()
 	}
 
 	/// Loads all fields from the database. NOTE: this call completely clears all data from the
@@ -57,31 +93,10 @@ impl Config {
 		self.data.clear();
 		self.modified.clear();
 		
-		// Check to see if the table exists in the database
-
-		let mut stmt = conn
-			.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='appconfig'")?;
-		
-		// If the row is None, then the table doesn't exist. Create it and move on.
-		match stmt.exists([]) {
-			Ok(v) => {
-				if v {
-					match conn.execute(
-						"CREATE TABLE 'appconfig'('fname' TEXT NOT NULL UNIQUE, 'fvalue' TEXT);",
-							[]) {
-						Ok(_) => (),
-						Err(e) => {
-							return Err(MensagoError::ErrDatabaseException(
-								String::from(e.to_string())))
-						}
-					}
-				}
-			},
-			Err(e) => { return Err(MensagoError::ErrDatabaseException(e.to_string())) }
-		}
+		self.ensure_dbtable(conn)?;
 
 		// The table exists, so load up all values from it
-		let mut stmt = conn.prepare("SELECT fname,fvalue FROM appconfig")?;
+		let mut stmt = conn.prepare("SELECT fname,scope,scopevalue,fvalue FROM appconfig")?;
 		
 		let mut rows = match stmt.query([]) {
 			Ok(v) => v,
@@ -95,13 +110,33 @@ impl Config {
 
 		while option_row.is_some() {
 			let row = option_row.unwrap();
+			let fscope = match ConfigScope::from(&row.get::<usize,String>(1).unwrap()) {
+				Some(v) => v,
+				None => {
+					return Err(MensagoError::ErrDatabaseException(
+						format!("Bad scope {} for field {}",
+							&row.get::<usize,String>(1).unwrap(),
+							&row.get::<usize,String>(0).unwrap())
+					))
+				},
+			};
 			self.data.insert(String::from(&row.get::<usize,String>(0).unwrap()),
-				String::from(&row.get::<usize,String>(1).unwrap()));
+				ConfigField {
+					scope: fscope,
+					scopevalue: String::from(&row.get::<usize,String>(2).unwrap()),
+					value: String::from(&row.get::<usize,String>(3).unwrap()),
+				}
+			);
 			option_row = match rows.next() {
 				Ok(v) => v,
 				Err(e) => { return Err(MensagoError::ErrDatabaseException(e.to_string())) }
 			};
 		}
+
+		self.signature = match self.data.get("application_signature") {
+			Some(v) => { v.value.clone() },
+			None => { String::new() },
+		};
 
 		Ok(())
 	}
@@ -119,21 +154,16 @@ impl Config {
 			}
 		}
 
-		match conn.execute(
-			"CREATE TABLE 'appconfig'('fname' TEXT NOT NULL UNIQUE, 'fvalue' TEXT);", []) {
-			Ok(_) => (),
-			Err(e) => {
-				return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())))
-			}
-		}
-
+		self.ensure_dbtable(conn)?;
+		
 		// Save all values to the table. Unfortunately, this isn't as fast as it could be because
 		// we can't validate the field values in any way, so we can't add all fields in batch.
 		// Thankfully, we shouldn't be dealing with more than a few dozen to a few thousand
 		// values.
-		for (fname,fvalue) in &self.data {
+		for (fname, field) in &self.data {
 			match conn.execute(
-				"INSERT INTO appconfig (fname,fvalue) VALUES(?1,?2);", [fname, fvalue]) {
+				"INSERT INTO appconfig (fname,scope,scopevalue,fvalue) VALUES(?1,?2);", 
+					[fname, &field.scope.to_string(), &field.scopevalue, &field.value]) {
 				Ok(_) => (),
 				Err(e) => {
 					return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())))
@@ -166,7 +196,7 @@ impl Config {
 		// Save all values to the table
 		for fname in &self.modified {
 
-			let fvalue = match self.data.get(fname) {
+			let field = match self.data.get(fname) {
 				Some(v) => v,
 				None => {
 					return Err(MensagoError::ErrDatabaseException(
@@ -181,18 +211,24 @@ impl Config {
 				Ok(v) => {
 					if v {
 						match conn.execute(
-							"UPDATE appconfig SET fvalue=?2 WHERE fname=?1;", [fname, fvalue]) {
+							"UPDATE appconfig SET scope=?2,scopevalue=?3,fvalue=?4 WHERE fname=?1;",
+								[fname, &field.scope.to_string(), &field.scopevalue,
+									&field.value]) {
 							Ok(_) => (),
 							Err(e) => {
-								return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())))
+								return Err(MensagoError::ErrDatabaseException(
+									String::from(e.to_string())))
 							}
 						}
 					} else {
 						match conn.execute(
-							"INSERT INTO appconfig (fname,fvalue) VALUES(?1,?2);", [fname, fvalue]) {
+							"INSERT INTO appconfig (fname,scope,scopevalue,fvalue) 
+								VALUES(?1,?2,?3,?4);", [fname, &field.scope.to_string(),
+														&field.scopevalue, &field.value]) {
 							Ok(_) => (),
 							Err(e) => {
-								return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())))
+								return Err(MensagoError::ErrDatabaseException(
+									String::from(e.to_string())))
 							}
 						}
 					}
@@ -208,16 +244,23 @@ impl Config {
 		Ok(())
 	}
 
-	/// Sets a field value
-	pub fn set(&mut self, field: &str, value: &str) {
-		self.data.insert(String::from(field), String::from(value));
+	/// Sets a field value. Note that setting a value requires deciding what scope to which the
+	/// field belongs and setting it accordingly. See documentation on the ConfigScope structure
+	/// for more information.
+	pub fn set(&mut self, field: &str, scope: ConfigScope, scopevalue: &str, value: &str) {
+		self.data.insert(String::from(field),
+			ConfigField {
+				scope: scope,
+				scopevalue: String::from(scopevalue),
+				value: String::from(value)
+			});
 		self.modified.push(String::from(field))
 	}
 
 	/// Gets a field value
 	pub fn get(&self, field: &str) -> Result<String, MensagoError> {
 		match self.data.get(field) {
-			Some(v) => Ok(v.clone()),
+			Some(v) => Ok(v.value.clone()),
 			None => { Err(MensagoError::ErrNotFound) }
 		}
 	}
@@ -227,24 +270,57 @@ impl Config {
 		self.data.get(field).is_some()
 	}
 
-	/// Sets an integer field value
-	pub fn set_int(&mut self, field: &str, value: isize) {
-		self.data.insert(String::from(field), value.to_string());
+	/// Sets an integer field value. Note that setting a value requires deciding what scope to
+	/// which the field belongs and setting it accordingly. See documentation on the ConfigScope
+	/// structure for more information.
+	pub fn set_int(&mut self, field: &str, scope: ConfigScope, scopevalue: &str, value: isize) {
+		self.data.insert(String::from(field),
+			ConfigField {
+				scope: scope,
+				scopevalue: String::from(scopevalue),
+				value: value.to_string(),
+			});
 		self.modified.push(String::from(field))
 	}
 
-	/// Gets a field value
+	/// Gets a field value.
 	pub fn get_int(&self, field: &str) -> Result<isize, MensagoError> {
 
-		let s = match self.data.get(field) {
+		let field = match self.data.get(field) {
 			Some(v) => v,
 			None => { return Err(MensagoError::ErrNotFound) }
 		};
 
-		match s.parse::<isize>() {
+		match field.value.parse::<isize>() {
 			Ok(v) => Ok(v),
 			Err(_) => { Err(MensagoError::ErrTypeMismatch) },
 		}
+	}
+
+	fn ensure_dbtable(&self, conn: &rusqlite::Connection) -> Result<(), MensagoError> {
+
+		let mut stmt = conn
+			.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='appconfig'")?;
+		
+		match stmt.exists([]) {
+			Ok(v) => {
+				if v {
+					match conn.execute(
+						"CREATE TABLE 'appconfig'('scope' TEXT NOT NULL, 'scopevalue' TEXT,
+							'fname' TEXT NOT NULL UNIQUE, 'fvalue' TEXT);",
+							[]) {
+						Ok(_) => (),
+						Err(e) => {
+							return Err(MensagoError::ErrDatabaseException(
+								String::from(e.to_string())))
+						}
+					}
+				}
+			},
+			Err(e) => { return Err(MensagoError::ErrDatabaseException(e.to_string())) }
+		}
+
+		Ok(())
 	}
 }
 
