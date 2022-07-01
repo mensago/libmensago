@@ -373,7 +373,7 @@ mod tests {
 		}
 
 		// Case #2: get
-		match c.get("application_signature"){
+		match c.get("application_signature") {
 			Ok(v) => {
 				if v != "test-signature" {
 					return Err(MensagoError::ErrProgramException(
@@ -388,7 +388,7 @@ mod tests {
 
 		// Case #3: set
 		c.set("windows-path", ConfigScope::Platform, std::env::consts::OS, r"C:\Windows");
-		match c.get("windows-path"){
+		match c.get("windows-path") {
 			Ok(v) => {
 				if v != r"C:\Windows" {
 					return Err(MensagoError::ErrProgramException(
@@ -404,7 +404,7 @@ mod tests {
 
 		// Case #4: get_int
 		c.set("some-number", ConfigScope::Architecture, std::env::consts::ARCH, r"101");
-		match c.get_int("some-number"){
+		match c.get_int("some-number") {
 			Ok(v) => {
 				if v != 101 {
 					return Err(MensagoError::ErrProgramException(
@@ -420,7 +420,7 @@ mod tests {
 
 		// Case #5: set_int
 		c.set_int("some-number2", ConfigScope::Local, "", 999);
-		match c.get("some-number2"){
+		match c.get("some-number2") {
 			Ok(v) => {
 				if v != "999" {
 					return Err(MensagoError::ErrProgramException(
@@ -471,7 +471,64 @@ mod tests {
 	#[test]
 	fn field_delete_fails() -> Result<(), MensagoError> {
 
-		// TODO: implement test for set/get failure cases and delete()
+		let testname = String::from("field_delete_fail_get_set");
+		let mut c = Config::new("test");
+
+		// Case #1: delete
+		c.set_int("some-number", ConfigScope::Local, "", 999);
+		match c.delete("some-number") {
+			Ok(_) => (),
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error deleting test int field 'some-number': {}", testname,
+						e.to_string())))
+			},
+		}
+		match c.get_int("some-number") {
+			Ok(_) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: delete() didn't actually delete test int field 'some-number'",
+						testname)))
+			},
+			Err(_) => (),
+		}
+
+		// Case #2: try to delete a non-existent field
+		match c.delete("some-number") {
+			Ok(_) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: delete() passed deleting nonexistent field test", testname)))
+			},
+			Err(_) => (),
+		}
+
+		// Case #3: try to get() a nonexistent field
+		match c.get("some-number") {
+			Ok(_) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: get() passed getting nonexistent field test", testname)))
+			},
+			Err(_) => (),
+		}
+
+		// Case #4: try to get_scope() a nonexistent field
+		match c.get_scope("some-number") {
+			Ok(_) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: get_scope() passed getting nonexistent field test", testname)))
+			},
+			Err(_) => (),
+		}
+
+		// Case #5: try to set_scope() a nonexistent field
+		match c.set_scope("some-number", ConfigScope::Platform, std::env::consts::OS) {
+			Ok(_) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: set_scope() passed getting nonexistent field test", testname)))
+			},
+			Err(_) => (),
+		}
+
 		Ok(())
 	}
 }
