@@ -531,6 +531,34 @@ mod tests {
 
 		Ok(())
 	}
-}
 
-// TODO: Finish testing config module
+	#[test]
+	fn load_db() -> Result<(), MensagoError> {
+
+		let testname = String::from("load_db");
+		let mut c = Config::new("test");
+	
+		// TODO: Implement load_db() test
+		Ok(())
+	}
+
+	#[test]
+	fn save_db() -> Result<(), MensagoError> {
+
+		let testname = String::from("save_db");
+		let mut c = Config::new("test");
+	
+		// TODO: Implement save_db() test
+		Ok(())
+	}
+
+	#[test]
+	fn update_db() -> Result<(), MensagoError> {
+
+		let testname = String::from("update_db");
+		let mut c = Config::new("test");
+	
+		// TODO: Implement update_db() test
+		Ok(())
+	}
+}
