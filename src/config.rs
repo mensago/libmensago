@@ -358,6 +358,30 @@ impl Config {
 #[cfg(test)]
 mod tests {
 	use crate::*;
+	use rusqlite;
+	use std::env;
+	use std::fs;
+	use std::path::PathBuf;
+	use std::str::FromStr;
+
+	// Sets up the path to contain the database for the db-based tests
+	fn setup_test(name: &str) -> PathBuf {
+		if name.len() < 1 {
+			panic!("Invalid name {} in setup_test", name);
+		}
+		let args: Vec<String> = env::args().collect();
+		let test_path = PathBuf::from_str(&args[0]).unwrap();
+		let mut test_path = test_path.parent().unwrap().to_path_buf();
+		test_path.push("testfiles");
+		test_path.push(name);
+
+		if test_path.exists() {
+			fs::remove_dir_all(&test_path).unwrap();
+		}
+		fs::create_dir_all(&test_path).unwrap();
+
+		test_path
+	}
 
 	#[test]
 	fn field_get_set() -> Result<(), MensagoError> {
@@ -533,9 +557,43 @@ mod tests {
 	}
 
 	#[test]
+	fn save_db() -> Result<(), MensagoError> {
+
+		let testname = String::from("config_save_db");
+		let test_path = setup_test(&testname);
+
+		let mut c = Config::new("test");
+		c.set_signature("org.mensgo.test-config_save_db");
+		c.set("field1", ConfigScope::Global, "", "This is field 1's value");
+		c.set_int("field2", ConfigScope::Platform, "windows", 10);
+		
+		let mut dbpath = test_path.clone();
+		dbpath.push("test.db");
+		let conn = match rusqlite::Connection::open(&dbpath) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())));
+			}
+		};
+
+		match c.save_to_db(&conn) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error saving database: {}", testname, e.to_string())))
+			},
+		}
+
+
+		// TODO: Implement save_db() test
+		Ok(())
+	}
+
+	#[test]
 	fn load_db() -> Result<(), MensagoError> {
 
-		let testname = String::from("load_db");
+		let testname = String::from("config_load_db");
+		let test_path = setup_test(&testname);
 		let mut c = Config::new("test");
 	
 		// TODO: Implement load_db() test
@@ -543,19 +601,10 @@ mod tests {
 	}
 
 	#[test]
-	fn save_db() -> Result<(), MensagoError> {
-
-		let testname = String::from("save_db");
-		let mut c = Config::new("test");
-	
-		// TODO: Implement save_db() test
-		Ok(())
-	}
-
-	#[test]
 	fn update_db() -> Result<(), MensagoError> {
 
-		let testname = String::from("update_db");
+		let testname = String::from("config_update_db");
+		let test_path = setup_test(&testname);
 		let mut c = Config::new("test");
 	
 		// TODO: Implement update_db() test
