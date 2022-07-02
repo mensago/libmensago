@@ -156,7 +156,7 @@ impl Config {
 		// values.
 		for (fname, field) in &self.data {
 			match conn.execute(
-				"INSERT INTO appconfig (fname,scope,scopevalue,fvalue) VALUES(?1,?2);", 
+				"INSERT INTO appconfig (fname,scope,scopevalue,fvalue) VALUES(?1,?2,?3,?4);", 
 					[fname, &field.scope.to_string(), &field.scopevalue, &field.value]) {
 				Ok(_) => (),
 				Err(e) => {
@@ -330,28 +330,15 @@ impl Config {
 
 	fn ensure_dbtable(&self, conn: &rusqlite::Connection) -> Result<(), MensagoError> {
 
-		let mut stmt = conn
-			.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='appconfig'")?;
-		
-		match stmt.exists([]) {
-			Ok(v) => {
-				if v {
-					match conn.execute(
-						"CREATE TABLE 'appconfig'('scope' TEXT NOT NULL, 'scopevalue' TEXT,
-							'fname' TEXT NOT NULL UNIQUE, 'fvalue' TEXT);",
-							[]) {
-						Ok(_) => (),
-						Err(e) => {
-							return Err(MensagoError::ErrDatabaseException(
-								String::from(e.to_string())))
-						}
-					}
-				}
-			},
-			Err(e) => { return Err(MensagoError::ErrDatabaseException(e.to_string())) }
+		match conn.execute(
+			"CREATE TABLE IF NOT EXISTS 'appconfig'('scope' TEXT NOT NULL, 
+				'scopevalue' TEXT, 'fname' TEXT NOT NULL UNIQUE, 'fvalue' TEXT);",
+				[]) {
+			Ok(_) => Ok(()),
+			Err(e) => {
+				Err(MensagoError::ErrDatabaseException(String::from(e.to_string())))
+			}
 		}
-
-		Ok(())
 	}
 }
 
@@ -585,7 +572,7 @@ mod tests {
 		}
 
 
-		// TODO: Implement save_db() test
+		// TODO: Finish implementing save_db() test
 		Ok(())
 	}
 
