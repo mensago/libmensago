@@ -69,13 +69,59 @@ impl Config {
 		}
 	}
 
-	pub fn set_signature(&mut self, signature: &str) {
-		self.signature = String::from(signature);
-		self.set("application_signature", ConfigScope::Global, "", signature)
+	/// Deletes the specified field
+	pub fn delete(&mut self, field: &str) -> Result<(), MensagoError> {
+		if self.has(field) {
+			self.data.remove(field);
+			Ok(())
+		} else {
+			Err(MensagoError::ErrNotFound)
+		}
 	}
 
+	/// Gets a field value
+	pub fn get(&self, field: &str) -> Result<&str, MensagoError> {
+		match self.data.get(field) {
+			Some(v) => Ok(&v.value),
+			None => { Err(MensagoError::ErrNotFound) }
+		}
+	}
+
+	/// Gets a field value.
+	pub fn get_int(&self, field: &str) -> Result<isize, MensagoError> {
+
+		let field = match self.data.get(field) {
+			Some(v) => v,
+			None => { return Err(MensagoError::ErrNotFound) }
+		};
+
+		match field.value.parse::<isize>() {
+			Ok(v) => Ok(v),
+			Err(_) => { Err(MensagoError::ErrTypeMismatch) },
+		}
+	}
+
+	/// Gets the scope of a field
+	pub fn get_scope(&self, field: &str) -> Result<(ConfigScope, &str), MensagoError> {
+
+		let f = match self.data.get(field) {
+			Some(v) => v,
+			None => { return Err(MensagoError::ErrNotFound) }
+		};
+
+		Ok((f.scope, &f.scopevalue))
+	}
+
+	/// Gets the application signature for the configuration
+	#[inline]
 	pub fn get_signature(&self) -> String {
 		self.signature.clone()
+	}
+
+	/// Returns true if the table has a specific field
+	#[inline]
+	pub fn has(&self, field: &str) -> bool {
+		self.data.get(field).is_some()
 	}
 
 	/// Loads all fields from the database. NOTE: this call completely clears all data from the
@@ -170,6 +216,77 @@ impl Config {
 		Ok(())
 	}
 
+	/// Sets a field value. Note that setting a value requires deciding what scope to which the
+	/// field belongs and setting it accordingly. See documentation on the ConfigScope structure
+	/// for more information.
+	pub fn set(&mut self, field: &str, scope: ConfigScope, scopevalue: &str, value: &str) {
+
+		self.data.insert(String::from(field),
+			ConfigField {
+				scope: scope,
+				scopevalue: String::from(scopevalue),
+				value: String::from(value)
+			});
+		self.modified.push(String::from(field))
+	}
+
+	/// Sets a field value only if it doesn't exist already. This call will flag the object as
+	/// modified only if it makes a change.
+	#[inline]
+	pub fn set_if_not_exist(&mut self, field: &str, scope: ConfigScope, scopevalue: &str,
+	value: &str) {
+
+		if !self.has(field) {
+			self.set(field, scope, scopevalue, value)
+		}
+	}
+
+	/// Sets an integer field value only if it doesn't exist already. This call will flag the
+	/// object as modified only if it makes a change.
+	#[inline]
+	pub fn set_int_if_not_exist(&mut self, field: &str, scope: ConfigScope, scopevalue: &str,
+	value: isize) {
+
+		if !self.has(field) {
+			self.set(field, scope, scopevalue, &value.to_string())
+		}
+	}
+
+	/// Sets an integer field value. Note that setting a value requires deciding what scope to
+	/// which the field belongs and setting it accordingly. See documentation on the ConfigScope
+	/// structure for more information.
+	pub fn set_int(&mut self, field: &str, scope: ConfigScope, scopevalue: &str, value: isize) {
+		self.data.insert(String::from(field),
+			ConfigField {
+				scope: scope,
+				scopevalue: String::from(scopevalue),
+				value: value.to_string(),
+			});
+		self.modified.push(String::from(field))
+	}
+
+	/// Changes the scope of a field.
+	pub fn set_scope(&mut self, field: &str, scope: ConfigScope, scopevalue: &str)
+	-> Result<(), MensagoError> {
+
+		let mut f = match self.data.get(field) {
+			Some(v) => v.clone(),
+			None => { return Err(MensagoError::ErrNotFound) }
+		};
+
+		f.scope = scope;
+		f.scopevalue = String::from(scopevalue);
+		self.data.insert(String::from(field), f);
+
+		Ok(())
+	}
+
+	/// Sets the application signature for the configuration
+	pub fn set_signature(&mut self, signature: &str) {
+		self.signature = String::from(signature);
+		self.set("application_signature", ConfigScope::Global, "", signature)
+	}
+
 	/// Saves modified values to the database. In general this should be faster than saving the
 	/// entire object to the database.
 	pub fn update_db(&mut self, conn: &rusqlite::Connection) -> Result<(), MensagoError> {
@@ -235,96 +352,6 @@ impl Config {
 
 		self.modified.clear();
 		
-		Ok(())
-	}
-
-	/// Gets a field value
-	pub fn get(&self, field: &str) -> Result<&str, MensagoError> {
-		match self.data.get(field) {
-			Some(v) => Ok(&v.value),
-			None => { Err(MensagoError::ErrNotFound) }
-		}
-	}
-
-	/// Sets a field value. Note that setting a value requires deciding what scope to which the
-	/// field belongs and setting it accordingly. See documentation on the ConfigScope structure
-	/// for more information.
-	pub fn set(&mut self, field: &str, scope: ConfigScope, scopevalue: &str, value: &str) {
-		self.data.insert(String::from(field),
-			ConfigField {
-				scope: scope,
-				scopevalue: String::from(scopevalue),
-				value: String::from(value)
-			});
-		self.modified.push(String::from(field))
-	}
-
-	/// Gets a field value.
-	pub fn get_int(&self, field: &str) -> Result<isize, MensagoError> {
-
-		let field = match self.data.get(field) {
-			Some(v) => v,
-			None => { return Err(MensagoError::ErrNotFound) }
-		};
-
-		match field.value.parse::<isize>() {
-			Ok(v) => Ok(v),
-			Err(_) => { Err(MensagoError::ErrTypeMismatch) },
-		}
-	}
-
-	/// Sets an integer field value. Note that setting a value requires deciding what scope to
-	/// which the field belongs and setting it accordingly. See documentation on the ConfigScope
-	/// structure for more information.
-	pub fn set_int(&mut self, field: &str, scope: ConfigScope, scopevalue: &str, value: isize) {
-		self.data.insert(String::from(field),
-			ConfigField {
-				scope: scope,
-				scopevalue: String::from(scopevalue),
-				value: value.to_string(),
-			});
-		self.modified.push(String::from(field))
-	}
-
-	/// Returns true if the table has a specific field
-	pub fn has(&self, field: &str) -> bool {
-		self.data.get(field).is_some()
-	}
-
-	/// Deletes the specified field
-	pub fn delete(&mut self, field: &str) -> Result<(), MensagoError> {
-		if self.has(field) {
-			self.data.remove(field);
-			Ok(())
-		} else {
-			Err(MensagoError::ErrNotFound)
-		}
-	}
-
-	/// Gets the scope of a field
-	pub fn get_scope(&self, field: &str) -> Result<(ConfigScope, &str), MensagoError> {
-
-		let f = match self.data.get(field) {
-			Some(v) => v,
-			None => { return Err(MensagoError::ErrNotFound) }
-		};
-
-		Ok((f.scope, &f.scopevalue))
-	}
-
-	/// Changes the scope of a field.
-	pub fn set_scope(&mut self, field: &str, scope: ConfigScope, scopevalue: &str)
-	-> Result<(), MensagoError> {
-
-		let mut f = match self.data.get(field) {
-			Some(v) => v.clone(),
-			None => { return Err(MensagoError::ErrNotFound) }
-		};
-
-		f.scope = scope;
-		f.scopevalue = String::from(scopevalue);
-		self.data.insert(String::from(field), f);
-
 		Ok(())
 	}
 
