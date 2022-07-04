@@ -131,6 +131,12 @@ impl Config {
 		self.data.get(field).is_some()
 	}
 
+	/// Returns true if the instance has been modified since the last call to save_to_db()
+	#[inline]
+	pub fn is_modified(&self) -> bool {
+		self.modified.len() > 0
+	}
+
 	/// Loads all fields from the database. NOTE: this call completely clears all data from the
 	/// object prior to loading new values
 	pub fn load_from_db(&mut self, conn: &rusqlite::Connection)
@@ -226,7 +232,12 @@ impl Config {
 	/// Sets a field value. Note that setting a value requires deciding what scope to which the
 	/// field belongs and setting it accordingly. See documentation on the ConfigScope structure
 	/// for more information.
-	pub fn set(&mut self, field: &str, scope: ConfigScope, scopevalue: &str, value: &str) {
+	pub fn set(&mut self, field: &str, scope: ConfigScope, scopevalue: &str, value: &str)
+	-> Result<(), MensagoError> {
+
+		if field.len() == 0 {
+			return Err(MensagoError::ErrEmptyData)
+		}
 
 		self.data.insert(String::from(field),
 			ConfigField {
@@ -234,16 +245,24 @@ impl Config {
 				scopevalue: String::from(scopevalue),
 				value: String::from(value)
 			});
-		self.modified.push(String::from(field))
+		self.modified.push(String::from(field));
+
+		Ok(())
 	}
 
 	/// Sets a field value only if it doesn't exist already. This call will flag the object as
 	/// modified only if it makes a change.
 	#[inline]
 	pub fn set_if_not_exist(&mut self, field: &str, scope: ConfigScope, scopevalue: &str,
-	value: &str) {
+	value: &str) -> Result<(), MensagoError> {
 
-		if !self.has(field) {
+		if field.len() == 0 {
+			return Err(MensagoError::ErrEmptyData)
+		}
+
+		if self.has(field) {
+			Ok(())
+		} else {
 			self.set(field, scope, scopevalue, value)
 		}
 	}
@@ -252,24 +271,38 @@ impl Config {
 	/// object as modified only if it makes a change.
 	#[inline]
 	pub fn set_int_if_not_exist(&mut self, field: &str, scope: ConfigScope, scopevalue: &str,
-	value: isize) {
+	value: isize) -> Result<(), MensagoError> {
 
-		if !self.has(field) {
-			self.set(field, scope, scopevalue, &value.to_string())
+		if field.len() == 0 {
+			return Err(MensagoError::ErrEmptyData)
+		}
+		
+		if self.has(field) {
+			Ok(())
+		} else {
+			self.set_int(field, scope, scopevalue, value)
 		}
 	}
 
 	/// Sets an integer field value. Note that setting a value requires deciding what scope to
 	/// which the field belongs and setting it accordingly. See documentation on the ConfigScope
 	/// structure for more information.
-	pub fn set_int(&mut self, field: &str, scope: ConfigScope, scopevalue: &str, value: isize) {
+	pub fn set_int(&mut self, field: &str, scope: ConfigScope, scopevalue: &str, value: isize)
+	-> Result<(), MensagoError> {
+
+		if field.len() == 0 {
+			return Err(MensagoError::ErrEmptyData)
+		}
+
 		self.data.insert(String::from(field),
 			ConfigField {
 				scope: scope,
 				scopevalue: String::from(scopevalue),
 				value: value.to_string(),
 			});
-		self.modified.push(String::from(field))
+		self.modified.push(String::from(field));
+		
+		Ok(())
 	}
 
 	/// Changes the scope of a field.
@@ -289,7 +322,7 @@ impl Config {
 	}
 
 	/// Sets the application signature for the configuration
-	pub fn set_signature(&mut self, signature: &str) {
+	pub fn set_signature(&mut self, signature: &str)-> Result<(), MensagoError> {
 		self.signature = String::from(signature);
 		self.set("application_signature", ConfigScope::Global, "", signature)
 	}
@@ -323,7 +356,7 @@ impl Config {
 				}
 			};
 
-			let mut stmt = conn.prepare("SELECT fname FROM appconfig fname=?1")?;
+			let mut stmt = conn.prepare("SELECT fname FROM appconfig WHERE fname=?1")?;
 		
 			match stmt.exists([fname]) {
 				Ok(v) => {
@@ -411,7 +444,7 @@ mod tests {
 		let mut c = Config::new("test");
 		
 		// Case #1: set_signature / get_signature
-		c.set_signature("test-signature");
+		c.set_signature("test-signature")?;
 		if c.get_signature() != "test-signature" {
 			return Err(MensagoError::ErrProgramException(
 				format!("{}: mismatch getting signature after set_signature", testname)))
@@ -432,7 +465,7 @@ mod tests {
 		}
 
 		// Case #3: set
-		c.set("windows-path", ConfigScope::Platform, std::env::consts::OS, r"C:\Windows");
+		c.set("windows-path", ConfigScope::Platform, std::env::consts::OS, r"C:\Windows")?;
 		match c.get("windows-path") {
 			Ok(v) => {
 				if v != r"C:\Windows" {
@@ -448,7 +481,7 @@ mod tests {
 		}
 
 		// Case #4: get_int
-		c.set("some-number", ConfigScope::Architecture, std::env::consts::ARCH, r"101");
+		c.set("some-number", ConfigScope::Architecture, std::env::consts::ARCH, r"101")?;
 		match c.get_int("some-number") {
 			Ok(v) => {
 				if v != 101 {
@@ -464,7 +497,7 @@ mod tests {
 		}
 
 		// Case #5: set_int
-		c.set_int("some-number2", ConfigScope::Local, "", 999);
+		c.set_int("some-number2", ConfigScope::Local, "", 999)?;
 		match c.get("some-number2") {
 			Ok(v) => {
 				if v != "999" {
@@ -520,7 +553,7 @@ mod tests {
 		let mut c = Config::new("test");
 
 		// Case #1: delete
-		c.set_int("some-number", ConfigScope::Local, "", 999);
+		c.set_int("some-number", ConfigScope::Local, "", 999)?;
 		match c.delete("some-number") {
 			Ok(_) => (),
 			Err(e) => {
@@ -584,9 +617,13 @@ mod tests {
 		let test_path = setup_test(&testname);
 
 		let mut c = Config::new("test");
-		c.set_signature("org.mensago.test-config_save_db");
-		c.set("field1", ConfigScope::Global, "", "This is field 1's value");
-		c.set_int("field2", ConfigScope::Platform, "windows", 10);
+		c.set("field1", ConfigScope::Global, "", "This is field 1's value")?;
+		c.set_int("field2", ConfigScope::Platform, "windows", 10)?;
+
+		if !c.is_modified() {
+			return Err(MensagoError::ErrProgramException(
+				format!("{}: incorrect modification state", testname)))
+		}
 		
 		let mut dbpath = test_path.clone();
 		dbpath.push("test.db");
@@ -597,12 +634,18 @@ mod tests {
 			}
 		};
 
+		// Case #1: Test save_db()
 		match c.save_to_db(&conn) {
 			Ok(v) => v,
 			Err(e) => {
 				return Err(MensagoError::ErrProgramException(
 					format!("{}: error saving database: {}", testname, e.to_string())))
 			},
+		}
+		
+		if c.is_modified() {
+			return Err(MensagoError::ErrProgramException(
+				format!("{}: incorrect modification state after db save", testname)))
 		}
 
 		let mut stmt = conn.prepare(
@@ -626,6 +669,44 @@ mod tests {
 			},
 		}
 
+		// Case #2: Test update_db()
+		c.set_signature("org.mensago.test-config_save_db")?;
+
+		if !c.is_modified() {
+			return Err(MensagoError::ErrProgramException(
+				format!("{}: incorrect modification state", testname)))
+		}
+
+		match c.update_db(&conn) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error updating database: {}", testname, e.to_string())))
+			},
+		}
+		
+		if c.is_modified() {
+			return Err(MensagoError::ErrProgramException(
+				format!("{}: incorrect modification state after db save", testname)))
+		}
+
+		let mut stmt = conn.prepare(
+			"SELECT fvalue FROM appconfig WHERE fname='application_signature'")?;
+		match stmt.query_row([],
+		|row| {
+			if row.get::<usize,String>(0).unwrap() != "org.mensago.test-config_save_db" {
+				return Err(rusqlite::Error::InvalidQuery)
+			}
+
+			Ok(())
+		}) {
+			Ok(_) => (),
+			Err(_) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: signature mismatch", testname)))
+			},
+		}
+		
 		Ok(())
 	}
 
@@ -670,17 +751,6 @@ mod tests {
 				format!("{}: row value mismatch", testname)))
 		}
 
-		Ok(())
-	}
-
-	#[test]
-	fn update_db() -> Result<(), MensagoError> {
-
-		let testname = String::from("config_update_db");
-		let test_path = setup_test(&testname);
-		let mut c = Config::new("test");
-	
-		// TODO: Implement update_db() test
 		Ok(())
 	}
 }
