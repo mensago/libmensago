@@ -79,6 +79,13 @@ impl Config {
 		}
 	}
 
+	/// Convenience method which instantiates a new instance and loads all values from the database
+	pub fn from_db(conn: &rusqlite::Connection) -> Result<Config, MensagoError> {
+		let mut c = Config::new("");
+		c.load_from_db(conn)?;
+		Ok(c)
+	}
+	
 	/// Gets a field value
 	pub fn get(&self, field: &str) -> Result<&str, MensagoError> {
 		match self.data.get(field) {
@@ -627,9 +634,42 @@ mod tests {
 
 		let testname = String::from("config_load_db");
 		let test_path = setup_test(&testname);
-		let mut c = Config::new("test");
 	
-		// TODO: Implement load_db() test
+		let mut dbpath = test_path.clone();
+		dbpath.push("test.db");
+		let conn = match rusqlite::Connection::open(&dbpath) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())));
+			}
+		};
+
+		conn.execute("CREATE TABLE IF NOT EXISTS 'appconfig'('scope' TEXT NOT NULL, 
+			'scopevalue' TEXT, 'fname' TEXT NOT NULL UNIQUE, 'fvalue' TEXT);", [])?;
+		conn.execute("INSERT INTO appconfig(fname,scope,scopevalue,fvalue)
+			VALUES('application_signature','global','','org.mensago.test-config_load_db')",[])?;
+		conn.execute("INSERT INTO appconfig(fname,scope,scopevalue,fvalue)
+			VALUES('field1','global','','This is field #1')",[])?;
+		conn.execute("INSERT INTO appconfig(fname,scope,scopevalue,fvalue)
+			VALUES('field2','platform','windows','10')",[])?;
+
+
+		let c = match Config::from_db(&conn) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error loading database: {}", testname, e.to_string())))
+			},
+		};
+
+		if c.get_int("field2").unwrap() != 10 ||
+			c.get_scope("field2").unwrap() != (ConfigScope::Platform, "windows") ||
+			c.get_signature() != "org.mensago.test-config_load_db" {
+
+			return Err(MensagoError::ErrProgramException(
+				format!("{}: row value mismatch", testname)))
+		}
+
 		Ok(())
 	}
 
