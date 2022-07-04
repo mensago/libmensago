@@ -577,7 +577,7 @@ mod tests {
 		let test_path = setup_test(&testname);
 
 		let mut c = Config::new("test");
-		c.set_signature("org.mensgo.test-config_save_db");
+		c.set_signature("org.mensago.test-config_save_db");
 		c.set("field1", ConfigScope::Global, "", "This is field 1's value");
 		c.set_int("field2", ConfigScope::Platform, "windows", 10);
 		
@@ -598,8 +598,27 @@ mod tests {
 			},
 		}
 
+		let mut stmt = conn.prepare(
+			"SELECT scope,scopevalue,fvalue FROM appconfig WHERE fname=?1")?;
+	
+		match stmt.query_row(["field2"],
+		|row| {
+			if row.get::<usize,String>(0).unwrap() != "platform" ||
+				row.get::<usize,String>(1).unwrap() != "windows" ||
+				row.get::<usize,String>(2).unwrap() != "10" {
+				
+				return Err(rusqlite::Error::InvalidQuery)
+			}
 
-		// TODO: Finish implementing save_db() test
+			Ok(())
+		}) {
+			Ok(_) => (),
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error saving database: {}", testname, e.to_string())))
+			},
+		}
+
 		Ok(())
 	}
 
