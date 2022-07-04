@@ -40,4 +40,18 @@ impl ServerConnection {
 
 		Ok(())
 	}
+
+	/// Returns true if connected to a server
+	#[inline]
+	pub fn is_connected(&self) -> bool {
+		self.socket.is_some()
+	}
+
+	/// Disconnects from the server by sending a QUIT command to the server and then closing the 
+	/// TCP session
+	pub fn disconnect(&mut self) -> Result<(), MensagoError> {
+
+		// TODO: implement ServerConnection::disconnect()
+		Err(MensagoError::ErrUnimplemented)
+	}
 }
