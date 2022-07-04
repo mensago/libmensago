@@ -18,6 +18,45 @@
 // were needed at some point in the future, literally the only change needed would be the type
 // codes.
 
+enum FrameType {
+	SingleFrame,
+	MultipartFrameStart,
+	MultipartFrame,
+	MultipartFrameFinal,
+	SessionSetupRequest,
+	SessionSetupResponse,
+	InvalidFrame,
+}
+
+impl FrameType {
+	
+	// Converts a frame type to the integer value sent over the wire
+	pub fn to_value(&self) -> u8 {
+		match self {
+			FrameType::SingleFrame => 50,
+			FrameType::MultipartFrameStart => 51,
+			FrameType::MultipartFrame => 52,
+			FrameType::MultipartFrameFinal => 53,
+			FrameType::SessionSetupRequest => 54,
+			FrameType::SessionSetupResponse => 55,
+			_ => 255,
+		}
+	}
+
+	// Creates a frame type from an integer value
+	pub fn from(value: u8) -> FrameType {
+		match value {
+			50 => FrameType::SingleFrame,
+			51 => FrameType::MultipartFrameStart,
+			52 => FrameType::MultipartFrame,
+			53 => FrameType::MultipartFrameFinal,
+			54 => FrameType::SessionSetupRequest,
+			55 => FrameType::SessionSetupResponse,
+			_ => FrameType::InvalidFrame,
+		}		
+	}
+}
+
 // DataFrame is a structure for the lowest layer of network interaction. It represents a segment of
 // data. Depending on the type code for the instance, it may indicate that
 // the data payload is complete -- the SingleFrame type -- or it may be part of a larger set. In
@@ -31,7 +70,7 @@ struct DataFrame {
 
 impl DataFrame {
 
-	fn new(bufferSize: usize) -> Option<DataFrame> {
+	pub fn new(bufferSize: usize) -> Option<DataFrame> {
 
 		if bufferSize < 1024 {
 			return None
@@ -41,6 +80,31 @@ impl DataFrame {
 			buffer: Vec::<u8>::new(),
 			index: 0,
 		})
+	}
+
+	pub fn get_type(&self) -> FrameType {
+		
+		if self.buffer.len() > 0 {
+			FrameType::from(self.buffer[0])
+		} else {
+			FrameType::InvalidFrame
+		}
+	}
+
+	pub fn get_size(&self) -> usize {
+		if self.buffer.len() < 4 {
+			return 0
+		}
+
+		self.buffer.len() - 3
+	}
+
+	pub fn get_payload(&self) -> &[u8] {
+		&self.buffer[3..]
+	}
+
+	pub fn get_payload_mut(&mut self) -> &[u8] {
+		&mut self.buffer[3..self.index]
 	}
 }
 

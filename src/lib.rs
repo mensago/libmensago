@@ -3,8 +3,8 @@ mod base;
 mod config;
 mod conn;
 mod dbfs;
-mod messaging;
 mod profile;
+mod servermsg;
 mod types;
 mod workspace;
 
