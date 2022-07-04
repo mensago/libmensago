@@ -22,6 +22,10 @@ pub enum MensagoError {
 	ErrUnsupportedAlgorithm,
 	#[error("Function unimplemented")]
 	ErrUnimplemented,
+	#[error("Invalid frame")]
+	ErrInvalidFrame,
+	#[error("Invalid size")]
+	ErrSize,
 	
 	// Database exceptions are *bad*. This is returned only when there is a major problem with the
 	// data in the database, such as a workspace having no identity entry.
