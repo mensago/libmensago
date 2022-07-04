@@ -17,7 +17,11 @@
 // things lightweight and eliminates all escaping. If the need to send binary data over the wire
 // were needed at some point in the future, literally the only change needed would be the type
 // codes.
+use crate::base::*;
+use std::io::Read;
+use std::net::TcpStream;
 
+#[derive(Debug, PartialEq, PartialOrd)]
 enum FrameType {
 	SingleFrame,
 	MultipartFrameStart,
@@ -105,6 +109,28 @@ impl DataFrame {
 
 	pub fn get_payload_mut(&mut self) -> &[u8] {
 		&mut self.buffer[3..self.index]
+	}
+
+	pub fn read(&mut self, conn: &mut TcpStream) -> Result<(), MensagoError> {
+
+		// Invalidate the index in case we error out
+		self.index = 0;
+
+		let bytes_read = conn.read(&mut self.buffer)?;
+		
+		if bytes_read < 4 || FrameType::from(self.buffer[0]) == FrameType::InvalidFrame {
+			return Err(MensagoError::ErrInvalidFrame)
+		}
+
+		// The size bytes are in network order (MSB), so this makes dealing with CPU architecture much
+		// less of a headache regardless of what archictecture this is compiled for.
+		let payload_size = (u16::from(self.buffer[1]) << 8) + u16::from(self.buffer[2]);
+		if bytes_read != usize::from(payload_size) + 3 {
+			return Err(MensagoError::ErrSize)
+		}
+		self.index = bytes_read;
+
+		Ok(())
 	}
 }
 
