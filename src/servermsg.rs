@@ -1,22 +1,13 @@
-// This module implements the data serialization for the client-server commands using a new
-// lightweight self-documenting binary format called JBinPack. JBinPack was inspired by the
-// Netstring format. Because Mensago communications are UTF-8 text-based, this module uses only a
-// part of the format: messages are sent as String or BigString. String supports data up to 64KiB,
-// which easily accommodates regular Mensago commands. Bulk data uploads and downloads are handled
-// with HugeString, which can accommodate individual file sizes of up to 16EiB.
-//
-// The String format consists of a 1-byte value 14, a 2-byte MSB-order length code, and the
-// data follows. The string "ABC123" would be encoded as `0e 00 06 41 42 43 31 32 33`.
-//
-// The HugeString format consists of a 1-byte value 14, an 8-byte MSB-order length code, and the
-// data follows. The string "ABC123" encoded as a HugeString would be encoded similar to the above: 
-// `10 00 00 00 00 00 00 00 06 41 42 43 31 32 33`.
-//
-// Mensago commands originally used JSON both for the command format and for the data serialization
-// format, leading to a lot of character escaping. Using JBinPack for data serialization keeps
-// things lightweight and eliminates all escaping. If the need to send binary data over the wire
-// were needed at some point in the future, literally the only change needed would be the type
-// codes.
+/// This module enables sending individual messages over a TcpStream connection. It operates under
+/// the assumption that send and receive buffers are 64KiB in size. Messages which are bigger than 
+/// this are broken up into chunks, sent to the remote host, and reassembled.
+/// 
+/// For the curious, the wire format uses a 1-byte type field and a 16-bit size field followed by
+/// up to 65532 bytes of data.
+
+/// Mensago commands originally used JSON both for the command format and for the data serialization
+/// format, leading to a lot of character escaping. THis method keeps things lightweight and
+/// eliminates all escaping.
 use crate::base::*;
 use lazy_static::lazy_static;
 use std::io::{Read, Write};
@@ -27,7 +18,7 @@ lazy_static! {
 	static ref PACKET_SESSION_TIMEOUT: Duration = Duration::from_secs(30);
 }
 
-pub const DEFAULT_BUFFER_SIZE: u16 = 65535;
+pub const MAX_MSG_SIZE: u16 = 65532;
 
 #[derive(Debug, PartialEq, PartialOrd)]
 #[repr(u8)]
@@ -140,7 +131,7 @@ impl DataFrame {
 }
 
 /// Writes a DataFrame to a network connection. The payload may not be any larger than 65532 bytes.
-pub fn write_frame(conn: &mut TcpStream, payload: &[u8]) -> Result<(), MensagoError> {
+fn write_frame(conn: &mut TcpStream, ftype: FrameType, payload: &[u8]) -> Result<(), MensagoError> {
 	
 	let paylen = payload.len() as u16;
 
@@ -148,7 +139,7 @@ pub fn write_frame(conn: &mut TcpStream, payload: &[u8]) -> Result<(), MensagoEr
 		return Err(MensagoError::ErrSize)
 	}
 	conn.write(&[
-		FrameType::SingleFrame as u8,
+		ftype as u8,
 		((paylen >> 8) & 255) as u8,
 		(paylen & 255) as u8,
 	])?;
@@ -157,7 +148,7 @@ pub fn write_frame(conn: &mut TcpStream, payload: &[u8]) -> Result<(), MensagoEr
 	Ok(())
 }
 
-/// Reads messages from a socket and 
+/// Reads an arbitrarily-sized message from a socket and returns it
 pub fn read_message(conn: &mut TcpStream) -> Result<Vec::<u8>, MensagoError> {
 
 	let mut out = Vec::<u8>::new();
@@ -217,4 +208,35 @@ pub fn read_message(conn: &mut TcpStream) -> Result<Vec::<u8>, MensagoError> {
 	Ok(out)
 }
 
+/// Writes an arbitrarily-sized message to a socket
+pub fn write_message(conn: &mut TcpStream, msg: &[u8]) -> Result<(), MensagoError> {
 
+	if msg.len() == 0 {
+		return Err(MensagoError::ErrSize)
+	}
+
+	// If the packet is small enough to fit into a single frame, just send it and be done.
+	if msg.len() < usize::from(MAX_MSG_SIZE) {
+		return write_frame(conn, FrameType::SingleFrame, msg)
+	}
+
+	// If the message is bigger than the max message length, then we will send it as a multipart
+	// message. This takes more work internally, but the benefits at the application level are
+	// worth it. By using a binary wire format, we don't have to deal with serialization, escaping
+	// and all sorts of other complications.
+
+	// The initial message indicates that it is the start of a multipart message and contains the
+	// total size in the payload as a string. All messages that follow contain the actual message
+	// data.
+
+	write_frame(conn, FrameType::MultipartFrameStart, msg.len().to_string().as_bytes())?;
+	
+	let mut index: usize = 0;
+	let maxmsgsize = usize::from(MAX_MSG_SIZE);
+	while index+maxmsgsize < msg.len() {
+		write_frame(conn, FrameType::MultipartFrame, &msg[index..index+maxmsgsize])?;
+		index += maxmsgsize;
+	}
+
+	write_frame(conn, FrameType::MultipartFrameFinal, &msg[index..])
+}
