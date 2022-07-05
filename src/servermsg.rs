@@ -77,22 +77,18 @@ impl FrameType {
 // between the local host and the remote host.
 #[derive(Debug)]
 struct DataFrame {
-	buffer: Vec::<u8>,
+	buffer: [u8; 65535],
 	index: usize,
 }
 
 impl DataFrame {
 
-	pub fn new(bufferSize: usize) -> Option<DataFrame> {
+	pub fn new() -> DataFrame {
 
-		if bufferSize < 1024 {
-			return None
-		}
-
-		Some(DataFrame {
-			buffer: Vec::<u8>::new(),
+		DataFrame {
+			buffer: [0; 65535],
 			index: 0,
-		})
+		}
 	}
 
 	pub fn get_type(&self) -> FrameType {
@@ -143,51 +139,45 @@ impl DataFrame {
 	}
 }
 
-// PacketRequester works at the lowest layer of the framework. Its job is to break arbitrary-sized
-// chunks of data into segments that fit into the network buffer on both sides of the channel.
-// It performs no encryption.
-#[derive(Debug)]
-pub struct PacketRequester {
-	socket: &'static TcpStream,
-	timeout: Duration,
-	buffersize: u16,
-}
+/// Writes a DataFrame to a network connection. The payload may not be any larger than 65532 bytes.
+pub fn write_frame(conn: &mut TcpStream, payload: &[u8]) -> Result<(), MensagoError> {
+	
+	let paylen = payload.len() as u16;
 
-impl PacketRequester {
-
-	pub fn new(conn: &'static mut TcpStream, timeout: Option<&Duration>)
-	-> Result<PacketRequester, MensagoError> {
-
-		// When we create a new PacketRequester, we negotiate with the remote endpoint what the
-		// buffer size will be. It defaults to the max of 64KiB, but the client can request smaller.
-		// This particular library is not meant for embedded systems, so we'll just go through the
-		// motions and request the max buffer size.
-		let t = match timeout {
-			Some(v) => *v,
-			None => *PACKET_SESSION_TIMEOUT,
-		};
-
-		conn.set_read_timeout(Some(t))?;
-		conn.set_write_timeout(Some(t))?;
-		
-		let mut setupbuffer: [u8; 4] = [FrameType::SessionSetupRequest as u8, 255, 255, 0];
-		let mut bytecount = conn.write(&setupbuffer)?;
-		if bytecount != 4 {
-			return Err(MensagoError::ErrSize)
-		}
-
-		bytecount = conn.read(&mut setupbuffer)?;
-		if bytecount != 4 {
-			return Err(MensagoError::ErrSize)
-		}
-
-		let listenersize = (u16::from(setupbuffer[1]) << 8) + u16::from(setupbuffer[2]);
-
-		Ok(PacketRequester {
-			socket: conn,
-			timeout: t,
-			buffersize: listenersize,
-		})
+	if payload.len() > 65532 {
+		return Err(MensagoError::ErrSize)
 	}
+	conn.write(&[
+		FrameType::SingleFrame as u8,
+		((paylen >> 8) & 255) as u8,
+		(paylen & 255) as u8,
+	])?;
+	conn.write(payload)?;
+	
+	Ok(())
 }
 
+/// Reads messages from a socket and 
+pub fn read_message(conn: &mut TcpStream) -> Result<Vec::<u8>, MensagoError> {
+
+	let mut out = Vec::<u8>::new();
+	let mut chunk = DataFrame::new();
+
+	chunk.read(conn)?;
+
+	match chunk.get_type() {
+		FrameType::SingleFrame => {
+			out.extend_from_slice(chunk.get_payload());
+			return Ok(out)
+		},
+		FrameType::MultipartFrameStart => (),
+		FrameType::MultipartFrameFinal | FrameType::MultipartFrame => {
+			return Err(MensagoError::ErrBadSession)
+		},
+		_ => {
+			return Err(MensagoError::ErrInvalidFrame)
+		}
+	}
+	
+	Ok(out)
+}
