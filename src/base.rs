@@ -26,6 +26,8 @@ pub enum MensagoError {
 	ErrInvalidFrame,
 	#[error("Invalid size")]
 	ErrSize,
+	#[error("Bad session")]
+	ErrBadSession,
 	
 	// Database exceptions are *bad*. This is returned only when there is a major problem with the
 	// data in the database, such as a workspace having no identity entry.
