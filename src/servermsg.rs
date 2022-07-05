@@ -18,18 +18,27 @@
 // were needed at some point in the future, literally the only change needed would be the type
 // codes.
 use crate::base::*;
-use std::io::Read;
-use std::net::TcpStream;
+use lazy_static::lazy_static;
+use std::io::{Read, Write};
+use std::net::{TcpStream};
+use std::time::Duration;
+
+lazy_static! {
+	static ref PACKET_SESSION_TIMEOUT: Duration = Duration::from_secs(30);
+}
+
+pub const DEFAULT_BUFFER_SIZE: u16 = 65535;
 
 #[derive(Debug, PartialEq, PartialOrd)]
+#[repr(u8)]
 enum FrameType {
-	SingleFrame,
-	MultipartFrameStart,
-	MultipartFrame,
-	MultipartFrameFinal,
-	SessionSetupRequest,
-	SessionSetupResponse,
-	InvalidFrame,
+	SingleFrame = 50,
+	MultipartFrameStart = 51,
+	MultipartFrame = 52,
+	MultipartFrameFinal = 53,
+	SessionSetupRequest = 54,
+	SessionSetupResponse = 55,
+	InvalidFrame = 255,
 }
 
 impl FrameType {
@@ -131,6 +140,54 @@ impl DataFrame {
 		self.index = bytes_read;
 
 		Ok(())
+	}
+}
+
+// PacketRequester works at the lowest layer of the framework. Its job is to break arbitrary-sized
+// chunks of data into segments that fit into the network buffer on both sides of the channel.
+// It performs no encryption.
+#[derive(Debug)]
+pub struct PacketRequester {
+	socket: &'static TcpStream,
+	timeout: Duration,
+	buffersize: u16,
+}
+
+impl PacketRequester {
+
+	pub fn new(conn: &'static mut TcpStream, timeout: Option<&Duration>)
+	-> Result<PacketRequester, MensagoError> {
+
+		// When we create a new PacketRequester, we negotiate with the remote endpoint what the
+		// buffer size will be. It defaults to the max of 64KiB, but the client can request smaller.
+		// This particular library is not meant for embedded systems, so we'll just go through the
+		// motions and request the max buffer size.
+		let t = match timeout {
+			Some(v) => *v,
+			None => *PACKET_SESSION_TIMEOUT,
+		};
+
+		conn.set_read_timeout(Some(t))?;
+		conn.set_write_timeout(Some(t))?;
+		
+		let mut setupbuffer: [u8; 4] = [FrameType::SessionSetupRequest as u8, 255, 255, 0];
+		let mut bytecount = conn.write(&setupbuffer)?;
+		if bytecount != 4 {
+			return Err(MensagoError::ErrSize)
+		}
+
+		bytecount = conn.read(&mut setupbuffer)?;
+		if bytecount != 4 {
+			return Err(MensagoError::ErrSize)
+		}
+
+		let listenersize = (u16::from(setupbuffer[1]) << 8) + u16::from(setupbuffer[2]);
+
+		Ok(PacketRequester {
+			socket: conn,
+			timeout: t,
+			buffersize: listenersize,
+		})
 	}
 }
 
