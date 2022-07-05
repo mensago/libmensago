@@ -179,5 +179,42 @@ pub fn read_message(conn: &mut TcpStream) -> Result<Vec::<u8>, MensagoError> {
 		}
 	}
 	
+	// We got this far, so we have a multipart message which we need to reassemble.
+
+	// No validity checking is performed on the actual data in a DataFrame, so we need to validate
+	// the total payload size. Note that payload of a MultipartFrameStart frame is a string which
+	// contains the size of the total payload. This seems a bit silly, but
+	let sizestr = match String::from_utf8(chunk.get_payload().to_vec()) {
+		Ok(v) => v,
+		Err(_) => {
+			return Err(MensagoError::ErrInvalidFrame)
+		}
+	};
+	let totalsize = match sizestr.parse::<usize>() {
+		Ok(v) => v,
+		Err(_) => {
+			return Err(MensagoError::ErrInvalidFrame)
+		}
+	};
+
+	
+	let mut sizeread: usize = 0;
+	while sizeread < totalsize {
+		chunk.read(conn)?;
+
+		out.extend_from_slice(chunk.get_payload());
+		sizeread += chunk.get_size();
+
+		if chunk.get_type() == FrameType::MultipartFrameFinal {
+			break
+		}
+	}
+
+	if sizeread != totalsize {
+		return Err(MensagoError::ErrSize)
+	}
+
 	Ok(out)
 }
+
+
