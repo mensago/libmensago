@@ -240,3 +240,33 @@ pub fn write_message(conn: &mut TcpStream, msg: &[u8]) -> Result<(), MensagoErro
 
 	write_frame(conn, FrameType::MultipartFrameFinal, &msg[index..])
 }
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use std::sync::{Arc,Mutex};
+	use std::thread;
+
+	// test_frame_session and its corresponding setup function cover session setup and transmitting
+	// and receiving a single frame over the wire
+	fn test_frame_session() -> Result<(), MensagoError> {
+
+		// TODO: Implement test_frame_session()
+
+		Ok(())
+	}
+
+	fn test_write_multipart_msg() -> Result<(), MensagoError> {
+
+		// TODO: Implement test_write_multipart_msg()
+
+		Ok(())
+	}
+
+	fn test_read_multipart_msg() -> Result<(), MensagoError> {
+
+		// TODO: Implement test_read_multipart_msg()
+
+		Ok(())
+	}
+}
