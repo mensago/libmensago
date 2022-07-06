@@ -100,11 +100,11 @@ impl DataFrame {
 	}
 
 	pub fn get_payload(&self) -> &[u8] {
-		&self.buffer[3..self.index]
+		&self.buffer[3..self.index+1]
 	}
 
 	pub fn get_payload_mut(&mut self) -> &[u8] {
-		&mut self.buffer[3..self.index]
+		&mut self.buffer[3..self.index+1]
 	}
 
 	pub fn read(&mut self, conn: &mut TcpStream) -> Result<(), MensagoError> {
