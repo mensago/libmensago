@@ -92,11 +92,11 @@ impl DataFrame {
 	}
 
 	pub fn get_size(&self) -> usize {
-		if self.buffer.len() < 4 {
+		if self.index < 4 {
 			return 0
 		}
 
-		self.buffer.len() - 3
+		self.index - 3
 	}
 
 	pub fn get_payload(&self) -> &[u8] {
