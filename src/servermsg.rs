@@ -100,7 +100,7 @@ impl DataFrame {
 	}
 
 	pub fn get_payload(&self) -> &[u8] {
-		&self.buffer[3..]
+		&self.buffer[3..self.index]
 	}
 
 	pub fn get_payload_mut(&mut self) -> &[u8] {
