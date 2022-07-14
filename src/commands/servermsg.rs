@@ -313,22 +313,20 @@ impl ServerResponse {
 		out
 	}
 
-	///
+	/// Reads a ServerResponse from the connection
 	pub fn receive(&self, conn: &mut TcpStream) -> Result<ServerResponse, MensagoError> {
 		
 		let rawdata = read_message(conn)?;
 		let rawjson = match String::from_utf8(rawdata) {
 			Ok(v) => v,
-			Err(e) => {
-
-				// TODO: finish ServerResponse::receive()
-
-				// This needs to be a dedicated type error
-				return Err(MensagoError::ErrBadValue)
-			}
+			Err(_) => { return Err(MensagoError::ErrBadMessage) }
+		};
+		let msg: ServerResponse = match serde_json::from_str(&rawjson) {
+			Ok(v) => v,
+			Err(_) => { return Err(MensagoError::ErrBadMessage) }
 		};
 
-		Err(MensagoError::ErrUnimplemented)
+		Ok(msg)
 	}
 }
 
