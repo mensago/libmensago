@@ -314,7 +314,7 @@ impl ServerResponse {
 	}
 
 	/// Reads a ServerResponse from the connection
-	pub fn receive(&self, conn: &mut TcpStream) -> Result<ServerResponse, MensagoError> {
+	pub fn receive(conn: &mut TcpStream) -> Result<ServerResponse, MensagoError> {
 		
 		let rawdata = read_message(conn)?;
 		let rawjson = match String::from_utf8(rawdata) {
