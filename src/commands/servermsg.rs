@@ -10,6 +10,8 @@
 /// eliminates all escaping.
 use crate::base::*;
 use lazy_static::lazy_static;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::net::{TcpStream};
 use std::time::Duration;
@@ -241,6 +243,42 @@ pub fn write_message(conn: &mut TcpStream, msg: &[u8]) -> Result<(), MensagoErro
 	write_frame(conn, FrameType::MultipartFrameFinal, &msg[index..])
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ClientRequest {
+	pub action: String,
+	pub data: HashMap<String, String>
+}
+
+impl ClientRequest {
+
+	/// Creates a new ClientRequest
+	pub fn new(action: &str) -> ClientRequest {
+		ClientRequest {
+			action: String::from(action),
+			data: HashMap::<String, String>::new(),
+		}
+	}
+
+	/// Creates a new ClientRequest and attaches some data
+	pub fn from(action: &str, data: &[(&str, &str)]) -> ClientRequest {
+		let mut out = ClientRequest::new(action);
+		for pair in data {
+			out.data.insert(String::from(pair.0), String::from(pair.1));
+		}
+
+		out
+	}
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ServerResponse {
+	pub code: u16,
+	pub status: String,
+	pub info: String,
+	pub data: HashMap<String, String>
+}
+
+
 #[cfg(test)]
 mod tests {
 	use super::*;
@@ -270,3 +308,4 @@ mod tests {
 		Ok(())
 	}
 }
+
