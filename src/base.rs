@@ -51,4 +51,7 @@ pub enum MensagoError {
 
 	#[error(transparent)]
     RusqliteError(#[from] rusqlite::Error),
+
+	#[error(transparent)]
+	SerdeError(#[from] serde_json::Error),
 }
