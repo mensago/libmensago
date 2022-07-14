@@ -10,10 +10,10 @@
 /// eliminates all escaping.
 use crate::base::*;
 use lazy_static::lazy_static;
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::net::{TcpStream};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::time::Duration;
 
 lazy_static! {
@@ -243,6 +243,9 @@ pub fn write_message(conn: &mut TcpStream, msg: &[u8]) -> Result<(), MensagoErro
 	write_frame(conn, FrameType::MultipartFrameFinal, &msg[index..])
 }
 
+/// ClientRequest is a data structure used to represent a Mensago command, such as LOGIN or GETWID.
+/// It is not part of the library's public API because the command functions are intended to
+/// provide a much better developer experience and integrate with other Rust code better.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ClientRequest {
 	pub action: String,
@@ -268,8 +271,18 @@ impl ClientRequest {
 
 		out
 	}
+
+	/// Converts the ClientRequest to JSON and sends to the server
+	pub fn send(&self, conn: &mut TcpStream) -> Result<(), MensagoError> {
+		write_message(conn, serde_json::to_string(&self)?.as_bytes())
+	}
 }
 
+/// ServerResponse holds information received as a response to a client request. The `code` field
+/// holds an integer for easy comparisons and a status string for human interpretation where
+/// required. The `info` field is used by the server to offer more insight as to why an error was
+/// received. Any return data from a command is kept in the `data` field and will be specific to
+/// the individual command.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ServerResponse {
 	pub code: u16,
@@ -278,6 +291,46 @@ pub struct ServerResponse {
 	pub data: HashMap<String, String>
 }
 
+impl ServerResponse {
+
+	/// Creates a new ServerResponse
+	pub fn new(code: u16, status: &str) -> ServerResponse {
+		ServerResponse {
+			code: code,
+			status: String::from(status),
+			info: String::new(),
+			data: HashMap::<String, String>::new(),
+		}
+	}
+
+	/// Creates a new ServerResponse and attaches some data
+	pub fn from(code: u16, status: &str, data: &[(&str, &str)]) -> ServerResponse {
+		let mut out = ServerResponse::new(code, status);
+		for pair in data {
+			out.data.insert(String::from(pair.0), String::from(pair.1));
+		}
+
+		out
+	}
+
+	///
+	pub fn receive(&self, conn: &mut TcpStream) -> Result<ServerResponse, MensagoError> {
+		
+		let rawdata = read_message(conn)?;
+		let rawjson = match String::from_utf8(rawdata) {
+			Ok(v) => v,
+			Err(e) => {
+
+				// TODO: finish ServerResponse::receive()
+
+				// This needs to be a dedicated type error
+				return Err(MensagoError::ErrBadValue)
+			}
+		};
+
+		Err(MensagoError::ErrUnimplemented)
+	}
+}
 
 #[cfg(test)]
 mod tests {
