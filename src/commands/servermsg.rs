@@ -412,14 +412,16 @@ mod tests {
 			let mut senderconn = match TcpStream::connect("127.0.0.1:2999") {
 				Ok(v) => v,
 				Err(e) => {
-					panic!(format!("{}: error creating thread socket: {}", testname, e.to_string()))
+					print!("{}: error creating thread socket: {}", testname, e.to_string());
+					panic!("")
 				}
 			};
 
 			match write_message(&mut senderconn, vec!["ThisIsATestMessage"]) {
 				Ok(_) => (),
 				Err(e) => {
-					panic!(format!("{}: error thread writing msg: {}", testname, e.to_string()))
+					print!("{}: error thread writing msg: {}", testname, e.to_string());
+					panic!("")
 				}
 			}
 

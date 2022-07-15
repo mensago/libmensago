@@ -16,11 +16,11 @@ const BUFFER_SIZE: usize = 16384;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct GreetingData {
-	Name: String,
-	Version: String,
-	Code: u16,
-	Status: String,
-	Date: String,
+	name: String,
+	version: String,
+	code: u16,
+	status: String,
+	date: String,
 }
 
 #[derive(Debug)]
@@ -54,10 +54,10 @@ impl ServerConnection {
 			Err(_) => { return Err(MensagoError::ErrBadMessage) }
 		};
 
-		if greeting.Code != 200 {
+		if greeting.code != 200 {
 			return Err(MensagoError::ErrProtocol(CmdStatus {
-				code: greeting.Code,
-				description: greeting.Status,
+				code: greeting.code,
+				description: greeting.status,
 				info: String::new(),
 			}))
 		}

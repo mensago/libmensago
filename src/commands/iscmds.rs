@@ -6,8 +6,8 @@ use std::net::TcpStream;
 pub fn getwid(conn: &mut TcpStream, uid: &UserID, domain: Option<&Domain>)
 -> Result<RandomID, MensagoError> {
 
-	let req = ClientRequest::from(
-		"GETWID", vec![
+	let mut req = ClientRequest::from(
+		"GETWID", &vec![
 			("User-ID", uid.as_string()),
 		]
 	);
@@ -22,7 +22,7 @@ pub fn getwid(conn: &mut TcpStream, uid: &UserID, domain: Option<&Domain>)
 		return Err(MensagoError::ErrProtocol(resp.status))
 	}
 	
-	if !resp.check_fields(vec![("Workspace-ID", true)]) {
+	if !resp.check_fields(&vec![("Workspace-ID", true)]) {
 		return Err(MensagoError::ErrSchemaFailure)
 	}
 	
@@ -35,9 +35,9 @@ pub fn getwid(conn: &mut TcpStream, uid: &UserID, domain: Option<&Domain>)
 pub fn iscurrent(conn: &mut TcpStream, index: usize, wid: Option<RandomID>)
 -> Result<bool, MensagoError> {
 
-	let req = ClientRequest::from(
-		"ISCURRENT", vec![
-			("Index", index.to_string()),
+	let mut req = ClientRequest::from(
+		"ISCURRENT", &vec![
+			("Index", index.to_string().as_str())
 		]
 	);
 
@@ -51,7 +51,7 @@ pub fn iscurrent(conn: &mut TcpStream, index: usize, wid: Option<RandomID>)
 		return Err(MensagoError::ErrProtocol(resp.status))
 	}
 	
-	if !resp.check_fields(vec![("Is-Current", true)]) {
+	if !resp.check_fields(&vec![("Is-Current", true)]) {
 		return Err(MensagoError::ErrSchemaFailure)
 	}
 	
