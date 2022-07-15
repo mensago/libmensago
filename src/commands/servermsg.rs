@@ -396,6 +396,7 @@ mod tests {
 
 	// test_frame_session and its corresponding setup function cover session setup and transmitting
 	// and receiving a single frame over the wire
+	#[test]
 	fn test_frame_session() -> Result<(), MensagoError> {
 		let testname = String::from("test_frame_session");
 
@@ -404,7 +405,7 @@ mod tests {
 
 		let listener = TcpListener::bind("127.0.0.1:2999")?;
 
-		let thandle = thread::spawn(|| {
+		let thandle = thread::spawn(move || {
 			let _ = receiver.recv().unwrap();
 
 			thread::sleep(Duration::from_millis(100));
@@ -412,15 +413,16 @@ mod tests {
 			let mut senderconn = match TcpStream::connect("127.0.0.1:2999") {
 				Ok(v) => v,
 				Err(e) => {
-					print!("{}: error creating thread socket: {}", testname, e.to_string());
+					print!("test_frame_session: error creating thread socket: {}", e.to_string());
 					panic!("")
 				}
 			};
 
-			match write_message(&mut senderconn, vec!["ThisIsATestMessage"]) {
+			let msg = "ThisIsATestMessage";
+			match write_message(&mut senderconn, msg.as_bytes()) {
 				Ok(_) => (),
 				Err(e) => {
-					print!("{}: error thread writing msg: {}", testname, e.to_string());
+					print!("test_frame_session: error thread writing msg: {}", e.to_string());
 					panic!("")
 				}
 			}
@@ -447,9 +449,11 @@ mod tests {
 			))
 		}
 
+		thandle.join().unwrap();
 		Ok(())
 	}
 
+	#[test]
 	fn test_write_multipart_msg() -> Result<(), MensagoError> {
 
 		// TODO: Implement test_write_multipart_msg()
@@ -457,6 +461,7 @@ mod tests {
 		Ok(())
 	}
 
+	#[test]
 	fn test_read_multipart_msg() -> Result<(), MensagoError> {
 
 		// TODO: Implement test_read_multipart_msg()
