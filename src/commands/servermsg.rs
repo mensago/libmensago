@@ -8,13 +8,15 @@
 /// Mensago commands originally used JSON both for the command format and for the data serialization
 /// format, leading to a lot of character escaping. THis method keeps things lightweight and
 /// eliminates all escaping.
-use crate::base::*;
-use lazy_static::lazy_static;
+use std::collections::HashMap;
+use std::fmt;
 use std::io::{Read, Write};
 use std::net::{TcpStream};
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::time::Duration;
+use crate::base::*;
+use lazy_static::lazy_static;
+use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
 lazy_static! {
 	static ref PACKET_SESSION_TIMEOUT: Duration = Duration::from_secs(30);
@@ -283,7 +285,7 @@ impl ClientRequest {
 /// required. The `info` field is used by the server to offer more insight as to why an error was
 /// received. Any return data from a command is kept in the `data` field and will be specific to
 /// the individual command.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Error)]
 pub struct ServerResponse {
 	pub code: u16,
 	pub status: String,
@@ -327,6 +329,16 @@ impl ServerResponse {
 		};
 
 		Ok(msg)
+	}
+}
+
+impl fmt::Display for ServerResponse {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		if self.info.len() > 0 {
+			write!(f, "{}: {} ({})", self.code, self.status, self.info)
+		} else {
+			write!(f, "{}: {}", self.code, self.status)
+		}
 	}
 }
 
