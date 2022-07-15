@@ -389,14 +389,61 @@ pub enum StatusCode {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use std::sync::{Arc,Mutex};
+	use std::net::{TcpListener,TcpStream};
+	use std::sync::mpsc::channel;
+	use std::time::Duration;
 	use std::thread;
 
 	// test_frame_session and its corresponding setup function cover session setup and transmitting
 	// and receiving a single frame over the wire
 	fn test_frame_session() -> Result<(), MensagoError> {
+		let testname = String::from("test_frame_session");
 
-		// TODO: Implement test_frame_session()
+		// Use a channel for synchronization
+		let (sender, receiver) = channel::<u8>();
+
+		let listener = TcpListener::bind("127.0.0.1:2999")?;
+
+		let thandle = thread::spawn(|| {
+			let _ = receiver.recv().unwrap();
+
+			thread::sleep(Duration::from_millis(100));
+			
+			let mut senderconn = match TcpStream::connect("127.0.0.1:2999") {
+				Ok(v) => v,
+				Err(e) => {
+					panic!(format!("{}: error creating thread socket: {}", testname, e.to_string()))
+				}
+			};
+
+			match write_message(&mut senderconn, vec!["ThisIsATestMessage"]) {
+				Ok(_) => (),
+				Err(e) => {
+					panic!(format!("{}: error thread writing msg: {}", testname, e.to_string()))
+				}
+			}
+
+		});
+		
+		// Send data over the channel to unblock the sender thread
+		match sender.send(0) {
+			Ok(_) => (),
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error unblocking sender thread: {}", testname, e.to_string())
+				))
+			}
+		}
+		
+		let (mut receiverconn, _) = listener.accept()?;
+		let rawdata = read_message(&mut receiverconn)?;
+		let msgstr = String::from_utf8(rawdata).unwrap();
+		
+		if msgstr != "ThisIsATestMessage" {
+			return Err(MensagoError::ErrProgramException(
+				format!("{}: data mismatch error: got '{}'", testname, msgstr)
+			))
+		}
 
 		Ok(())
 	}
