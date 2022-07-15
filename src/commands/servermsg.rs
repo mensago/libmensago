@@ -342,6 +342,7 @@ impl ServerResponse {
 	}
 }
 
+/// The StatusCode type maps the numeric status codes for the protocol commands
 pub enum StatusCode {
 	MsgContinue = 100,
 	MsgPending = 101,
