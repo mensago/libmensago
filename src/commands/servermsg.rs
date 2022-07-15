@@ -9,14 +9,12 @@
 /// format, leading to a lot of character escaping. THis method keeps things lightweight and
 /// eliminates all escaping.
 use std::collections::HashMap;
-use std::fmt;
 use std::io::{Read, Write};
 use std::net::{TcpStream};
 use std::time::Duration;
 use crate::base::*;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
 
 lazy_static! {
 	static ref PACKET_SESSION_TIMEOUT: Duration = Duration::from_secs(30);
@@ -285,29 +283,29 @@ impl ClientRequest {
 /// required. The `info` field is used by the server to offer more insight as to why an error was
 /// received. Any return data from a command is kept in the `data` field and will be specific to
 /// the individual command.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Error)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ServerResponse {
-	pub code: u16,
-	pub status: String,
-	pub info: String,
+	pub status: CmdStatus,
 	pub data: HashMap<String, String>
 }
 
 impl ServerResponse {
 
 	/// Creates a new ServerResponse
-	pub fn new(code: u16, status: &str) -> ServerResponse {
+	pub fn new(code: u16, status: &str, info: &str) -> ServerResponse {
 		ServerResponse {
-			code: code,
-			status: String::from(status),
-			info: String::new(),
+			status: CmdStatus{
+				code: code,
+				description: String::from(status),
+				info: String::from(info),
+			},
 			data: HashMap::<String, String>::new(),
 		}
 	}
 
 	/// Creates a new ServerResponse and attaches some data
 	pub fn from(code: u16, status: &str, data: &[(&str, &str)]) -> ServerResponse {
-		let mut out = ServerResponse::new(code, status);
+		let mut out = ServerResponse::new(code, status, "");
 		for pair in data {
 			out.data.insert(String::from(pair.0), String::from(pair.1));
 		}
@@ -332,14 +330,47 @@ impl ServerResponse {
 	}
 }
 
-impl fmt::Display for ServerResponse {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		if self.info.len() > 0 {
-			write!(f, "{}: {} ({})", self.code, self.status, self.info)
-		} else {
-			write!(f, "{}: {}", self.code, self.status)
-		}
-	}
+pub enum StatusCode {
+	MsgContinue = 100,
+	MsgPending = 101,
+	MsgItem = 102,
+	MsgUpdate = 103,
+	MsgTransfer = 104,
+
+	// Success Codes
+	MsgOK = 200,
+	MsgRegistered = 201,
+	MsgUnregistered = 202,
+
+	// Server Error Codes
+	MsgInternal = 300,
+	MsgNotImplemented = 301,
+	MsgServerMaint = 302,
+	MsgServerUnavail = 303,
+	MsgRegClosed = 304,
+	MsgInterrupted = 305,
+	MsgKeyFail = 306,
+	MsgDeliveryFailLimit = 307,
+	MsgDeliveryDelay = 308,
+	MsgAlgoNotSupported = 309,
+
+	// Client Error Codes
+	MsgBadRequest = 400,
+	MsgUnauthorized = 401,
+	MsgAuthFailure = 402,
+	MsgForbidden = 403,
+	MsgNotFound = 404,
+	MsgTerminated = 405,
+	MsgPaymentReqd = 406,
+	MsgUnavailable = 407,
+	MsgResExists = 408,
+	MsgQuotaInsuff = 409,
+	MsgHashMismatch = 410,
+	MsgBadKeycard = 411,
+	MsgNonComKeycard = 412,
+	MsgInvalidSig = 413,
+	MsgLimitReached = 414,
+	MsgExpired = 415,
 }
 
 #[cfg(test)]

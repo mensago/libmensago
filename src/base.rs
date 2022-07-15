@@ -1,4 +1,24 @@
+use std::fmt;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
+
+/// Type to hold status information from a Mensago protocol command response
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Error)]
+pub struct CmdStatus {
+	pub code: u16,
+	pub description: String,
+	pub info: String,
+}
+
+impl fmt::Display for CmdStatus {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		if self.info.len() > 0 {
+			write!(f, "{}: {} ({})", self.code, self.description, self.info)
+		} else {
+			write!(f, "{}: {}", self.code, self.description)
+		}
+	}
+}
 
 #[derive(Error, Debug)]
 pub enum MensagoError {
@@ -39,6 +59,10 @@ pub enum MensagoError {
 	// Program exceptions are also extremely bad, but also highly unlikely thanks to Rust
 	#[error("Program exception: {0}")]
 	ErrProgramException(String),
+
+	// Protocol errors
+	#[error(transparent)]
+	ProtocolError(#[from] CmdStatus),
 
 	// Passthrough errors
 
