@@ -63,6 +63,9 @@ pub enum MensagoError {
 	// Protocol errors
 	#[error(transparent)]
 	ErrProtocol(#[from] CmdStatus),
+	#[error("schema failure")]
+	ErrSchemaFailure,
+
 
 	// Passthrough errors
 
