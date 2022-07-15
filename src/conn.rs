@@ -1,8 +1,10 @@
-use crate::base::*;
-use lazy_static::lazy_static;
 use std::io::Read;
 use std::net::TcpStream;
 use std::time::Duration;
+use crate::base::*;
+use crate::commands::*;
+use lazy_static::lazy_static;
+use serde::{Deserialize, Serialize};
 
 lazy_static! {
 	// Number of seconds to wait for a client before timing out
@@ -11,6 +13,15 @@ lazy_static! {
 
 // Size, in bytes, of the read buffer
 const BUFFER_SIZE: usize = 16384;
+
+#[derive(Debug, Serialize, Deserialize)]
+struct GreetingData {
+	Name: String,
+	Version: String,
+	Code: u16,
+	Status: String,
+	Date: String,
+}
 
 #[derive(Debug)]
 pub struct ServerConnection {
@@ -34,7 +45,22 @@ impl ServerConnection {
 		// absorb the hello string for now
 		sock.read(&mut self.buffer)?;
 
-		// TODO: parse the hello string and get server version
+		let rawjson = match String::from_utf8(self.buffer.to_vec()) {
+			Ok(v) => v,
+			Err(_) => { return Err(MensagoError::ErrBadMessage) }
+		};
+		let greeting: GreetingData = match serde_json::from_str(&rawjson) {
+			Ok(v) => v,
+			Err(_) => { return Err(MensagoError::ErrBadMessage) }
+		};
+
+		if greeting.Code != 200 {
+			return Err(MensagoError::ErrProtocol(CmdStatus {
+				code: greeting.Code,
+				description: greeting.Status,
+				info: String::new(),
+			}))
+		}
 
 		self.socket = Some(sock);
 
@@ -50,8 +76,9 @@ impl ServerConnection {
 	/// Disconnects from the server by sending a QUIT command to the server and then closing the 
 	/// TCP session
 	pub fn disconnect(&mut self) -> Result<(), MensagoError> {
-
-		// TODO: implement ServerConnection::disconnect()
-		Err(MensagoError::ErrUnimplemented)
+		match self.socket {
+			Some(_) => { quit(self.socket.as_mut().unwrap()) },
+			None => Ok(()),
+		}
 	}
 }
