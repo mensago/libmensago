@@ -36,19 +36,6 @@ enum FrameType {
 
 impl FrameType {
 	
-	// Converts a frame type to the integer value sent over the wire
-	pub fn to_value(&self) -> u8 {
-		match self {
-			FrameType::SingleFrame => 50,
-			FrameType::MultipartFrameStart => 51,
-			FrameType::MultipartFrame => 52,
-			FrameType::MultipartFrameFinal => 53,
-			FrameType::SessionSetupRequest => 54,
-			FrameType::SessionSetupResponse => 55,
-			_ => 255,
-		}
-	}
-
 	// Creates a frame type from an integer value
 	pub fn from(value: u8) -> FrameType {
 		match value {
@@ -103,10 +90,6 @@ impl DataFrame {
 
 	pub fn get_payload(&self) -> &[u8] {
 		&self.buffer[3..self.index+1]
-	}
-
-	pub fn get_payload_mut(&mut self) -> &[u8] {
-		&mut self.buffer[3..self.index+1]
 	}
 
 	pub fn read(&mut self, conn: &mut TcpStream) -> Result<(), MensagoError> {
@@ -291,28 +274,6 @@ pub struct ServerResponse {
 
 impl ServerResponse {
 
-	/// Creates a new ServerResponse
-	pub fn new(code: u16, status: &str, info: &str) -> ServerResponse {
-		ServerResponse {
-			status: CmdStatus{
-				code: code,
-				description: String::from(status),
-				info: String::from(info),
-			},
-			data: HashMap::<String, String>::new(),
-		}
-	}
-
-	/// Creates a new ServerResponse and attaches some data
-	pub fn from(code: u16, status: &str, data: &[(&str, &str)]) -> ServerResponse {
-		let mut out = ServerResponse::new(code, status, "");
-		for pair in data {
-			out.data.insert(String::from(pair.0), String::from(pair.1));
-		}
-
-		out
-	}
-
 	/// Reads a ServerResponse from the connection
 	pub fn receive(conn: &mut TcpStream) -> Result<ServerResponse, MensagoError> {
 		
@@ -340,50 +301,6 @@ impl ServerResponse {
 		}
 		true
 	}
-}
-
-/// The StatusCode type maps the numeric status codes for the protocol commands
-pub enum StatusCode {
-	MsgContinue = 100,
-	MsgPending = 101,
-	MsgItem = 102,
-	MsgUpdate = 103,
-	MsgTransfer = 104,
-
-	// Success Codes
-	MsgOK = 200,
-	MsgRegistered = 201,
-	MsgUnregistered = 202,
-
-	// Server Error Codes
-	MsgInternal = 300,
-	MsgNotImplemented = 301,
-	MsgServerMaint = 302,
-	MsgServerUnavail = 303,
-	MsgRegClosed = 304,
-	MsgInterrupted = 305,
-	MsgKeyFail = 306,
-	MsgDeliveryFailLimit = 307,
-	MsgDeliveryDelay = 308,
-	MsgAlgoNotSupported = 309,
-
-	// Client Error Codes
-	MsgBadRequest = 400,
-	MsgUnauthorized = 401,
-	MsgAuthFailure = 402,
-	MsgForbidden = 403,
-	MsgNotFound = 404,
-	MsgTerminated = 405,
-	MsgPaymentReqd = 406,
-	MsgUnavailable = 407,
-	MsgResExists = 408,
-	MsgQuotaInsuff = 409,
-	MsgHashMismatch = 410,
-	MsgBadKeycard = 411,
-	MsgNonComKeycard = 412,
-	MsgInvalidSig = 413,
-	MsgLimitReached = 414,
-	MsgExpired = 415,
 }
 
 #[cfg(test)]
