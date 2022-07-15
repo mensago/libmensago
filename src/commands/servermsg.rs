@@ -328,6 +328,18 @@ impl ServerResponse {
 
 		Ok(msg)
 	}
+
+	/// Checks attached data for the requested fields in the fieldinfo tuple. The bool parameter is
+	/// for specifying if the field is required. Returns true if all required fields are present.
+	pub fn check_fields(&self, fieldinfo: &[(&str, bool)]) -> bool {
+
+		for info in fieldinfo {
+			if self.data.get(info.0).is_none() && info.1 == true {
+				return false
+			}
+		}
+		true
+	}
 }
 
 pub enum StatusCode {
