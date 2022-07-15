@@ -18,7 +18,16 @@ pub fn getwid(conn: &mut TcpStream, uid: &UserID, domain: Option<&Domain>)
 
 	let resp = ServerResponse::receive(conn)?;
 
-	// TODO: finish implementing getwid()
+	if resp.status.code != 200 {
+		return Err(MensagoError::ErrProtocol(resp.status))
+	}
 	
-	Err(MensagoError::ErrUnimplemented)
+	if !resp.check_fields(vec![("Workspace-ID", true)]) {
+		return Err(MensagoError::ErrSchemaFailure)
+	}
+	
+	match RandomID::from(resp.data.get("Workspace-ID").unwrap()) {
+		Some(v) => Ok(v),
+		None => { return Err(MensagoError::ErrBadValue) }
+	}
 }
