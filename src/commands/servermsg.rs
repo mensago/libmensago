@@ -109,7 +109,7 @@ impl DataFrame {
 		if bytes_read != usize::from(payload_size) + 3 {
 			return Err(MensagoError::ErrSize)
 		}
-		self.index = bytes_read;
+		self.index = bytes_read-1;
 
 		Ok(())
 	}
