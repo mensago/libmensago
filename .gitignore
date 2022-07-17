@@ -88,4 +88,5 @@ Cargo.lock
 
 # Added by cargo
 
-/target
+/libmensago/target
+/integration_tests/target

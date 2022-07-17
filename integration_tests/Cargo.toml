@@ -1,0 +1,11 @@
+[package]
+name = "integration_tests"
+version = "0.1.0"
+edition = "2021"
+authors = [ "Jon Yoder <jon@yoder.cloud>"]
+license = "MPL-2.0-no-copyleft-exception"
+autotests = false
+
+[[test]]
+name = "integration"
+path= "tests/lib.rs"
