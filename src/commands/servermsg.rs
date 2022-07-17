@@ -309,6 +309,28 @@ mod tests {
 	use std::sync::mpsc::channel;
 	use std::time::Duration;
 	use std::thread;
+	use iobuffer::IoBuffer;
+
+	// This method only works for frames with the type MultipartFrameStart. It returns the size of
+	// the multipart message data to follow.
+	fn get_multipart_size(frame: &DataFrame) -> Result<usize, MensagoError> {
+		if frame.get_size() < 1 {
+			return Err(MensagoError::ErrInvalidFrame)
+		}
+
+		if FrameType::from(frame.buffer[0]) != FrameType::MultipartFrameStart {
+			return Err(MensagoError::ErrTypeMismatch)
+		}
+
+		let totalsize = match String::from_utf8(frame.get_payload().to_vec())?.parse::<usize>() {
+			Ok(v) => v,
+			Err(_) => {
+				return Err(MensagoError::ErrBadValue)
+			},
+		};
+		Ok(totalsize)
+	}
+
 
 	// test_frame_session and its corresponding setup function cover session setup and transmitting
 	// and receiving a single frame over the wire
@@ -369,10 +391,46 @@ mod tests {
 		Ok(())
 	}
 
+	// This test works by creating a message that is a little bigger than 128K, forcing
+	// write_message() to create 3 frames: a start frame, a middle frame, and a final one. There is
+	// no real limit to how big of an actual message can be sent outside of physical resources, but
+	// it does have to be send in 65532-byte chunks.
 	#[test]
 	fn test_write_multipart_msg() -> Result<(), MensagoError> {
 
-		// TODO: Implement test_write_multipart_msg()
+		let testname = String::from("test_write_multipart_msg");
+
+		let mut conn = IoBuffer::new();
+		
+		let msg = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".repeat(5100);
+		match write_message(&mut conn, msg.as_bytes()) {
+			Ok(_) => (),
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error writing msg: {}", testname, e.to_string())
+				))
+			}
+		}
+
+		let mut chunk1 = DataFrame::new();
+		chunk1.read(&mut conn)?;
+
+		
+		let totalsize = match get_multipart_size(&chunk1) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error getting total size: {}", testname, e.to_string())
+				))
+			}
+		};
+		if totalsize != msg.len() {
+			return Err(MensagoError::ErrProgramException(
+				format!("{}: total size mismatch: {}", testname, totalsize)
+			))
+		}
+
+		// TODO: Finish implementing test_write_multipart_msg()
 
 		Ok(())
 	}
