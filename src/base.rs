@@ -1,4 +1,5 @@
 use std::fmt;
+use std::string;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -83,4 +84,7 @@ pub enum MensagoError {
 
 	#[error(transparent)]
 	SerdeError(#[from] serde_json::Error),
+
+	#[error(transparent)]
+	Utf8Error(#[from] string::FromUtf8Error),
 }
