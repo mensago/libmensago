@@ -79,6 +79,27 @@ impl DataFrame {
 		}
 	}
 
+	// This method only works for frames with the type MultipartFrameStart. It returns the size of
+	// the multipart message data to follow.
+	pub fn get_multipart_size(&self) -> Result<usize, MensagoError> {
+		if self.get_size() < 1 {
+			return Err(MensagoError::ErrInvalidFrame)
+		}
+
+		if FrameType::from(self.buffer[0]) != FrameType::MultipartFrameStart {
+			return Err(MensagoError::ErrTypeMismatch)
+		}
+
+		let valstring = String::from_utf8(self.get_payload().to_vec())?;
+		let totalsize = match valstring.parse::<usize>() {
+			Ok(v) => v,
+			Err(_) => {
+				return Err(MensagoError::ErrBadValue)
+			},
+		};
+		Ok(totalsize)
+	}
+
 	pub fn get_size(&self) -> usize {
 		if self.index < 4 {
 			return 0
@@ -88,7 +109,7 @@ impl DataFrame {
 	}
 
 	pub fn get_payload(&self) -> &[u8] {
-		&self.buffer[3..self.index+1]
+		&self.buffer[3..self.index]
 	}
 
 	pub fn read<R: Read>(&mut self, conn: &mut R) -> Result<(), MensagoError> {
@@ -111,7 +132,7 @@ impl DataFrame {
 		if bytes_read != usize::from(payload_size) {
 			return Err(MensagoError::ErrSize)
 		}
-		self.index = bytes_read+2;
+		self.index = bytes_read+3;
 
 		Ok(())
 	}
@@ -159,22 +180,7 @@ pub fn read_message<R: Read>(conn: &mut R) -> Result<Vec::<u8>, MensagoError> {
 	
 	// We got this far, so we have a multipart message which we need to reassemble.
 
-	// No validity checking is performed on the actual data in a DataFrame, so we need to validate
-	// the total payload size. Note that payload of a MultipartFrameStart frame is a string which
-	// contains the size of the total payload. This seems a bit silly, but
-	let sizestr = match String::from_utf8(chunk.get_payload().to_vec()) {
-		Ok(v) => v,
-		Err(_) => {
-			return Err(MensagoError::ErrInvalidFrame)
-		}
-	};
-	let totalsize = match sizestr.parse::<usize>() {
-		Ok(v) => v,
-		Err(_) => {
-			return Err(MensagoError::ErrInvalidFrame)
-		}
-	};
-
+	let totalsize = chunk.get_multipart_size()?;
 	
 	let mut sizeread: usize = 0;
 	while sizeread < totalsize {
@@ -316,27 +322,34 @@ mod tests {
 	use super::*;
 	use iobuffer::IoBuffer;
 
-	// This method only works for frames with the type MultipartFrameStart. It returns the size of
-	// the multipart message data to follow.
-	fn get_multipart_size(frame: &DataFrame) -> Result<usize, MensagoError> {
-		if frame.get_size() < 1 {
-			return Err(MensagoError::ErrInvalidFrame)
+	#[test]
+	fn test_frame_get_methods() -> Result<(), MensagoError> {
+
+		let testname = String::from("test_frame_get_methods");
+
+		let data: [u8; 7] = [50,0,4,65,66,67,68];
+
+		let mut conn = IoBuffer::new();
+		conn.write(&data)?;
+
+		let mut frame = DataFrame::new();
+		frame.read(&mut conn)?;
+
+		if frame.get_size() != 4 {
+			return Err(MensagoError::ErrProgramException(
+				format!("{}: get_size() returned {} instead of 4", testname, frame.get_size())
+			))
 		}
 
-		if FrameType::from(frame.buffer[0]) != FrameType::MultipartFrameStart {
-			return Err(MensagoError::ErrTypeMismatch)
+		let pstr = String::from_utf8(frame.get_payload().to_vec())?;
+		if pstr != "ABCD" {
+			return Err(MensagoError::ErrProgramException(
+				format!("{}: payload mismatch {} instead of 'ABCD'", testname, pstr)
+			))
 		}
 
-		let valstring = String::from_utf8(frame.get_payload().to_vec())?;
-		let totalsize = match valstring.parse::<usize>() {
-			Ok(v) => v,
-			Err(_) => {
-				return Err(MensagoError::ErrBadValue)
-			},
-		};
-		Ok(totalsize)
+		Ok(())
 	}
-
 
 	// test_frame_session and its corresponding setup function cover session setup and transmitting
 	// and receiving a single frame over the wire
@@ -392,7 +405,7 @@ mod tests {
 
 		// First, get the first data frame, which should be of type MultipartMessageStart and the 
 		// payload should contain a decimal string of the size of the complete message size.
-		let totalsize = match get_multipart_size(&frame) {
+		let totalsize = match frame.get_multipart_size() {
 			Ok(v) => v,
 			Err(e) => {
 				return Err(MensagoError::ErrProgramException(
