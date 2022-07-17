@@ -10,7 +10,6 @@
 /// eliminates all escaping.
 use std::collections::HashMap;
 use std::io::{Read, Write};
-use std::net::{TcpStream};
 use std::time::Duration;
 use crate::base::*;
 use lazy_static::lazy_static;
@@ -92,7 +91,7 @@ impl DataFrame {
 		&self.buffer[3..self.index+1]
 	}
 
-	pub fn read(&mut self, conn: &mut TcpStream) -> Result<(), MensagoError> {
+	pub fn read<R: Read>(&mut self, conn: &mut R) -> Result<(), MensagoError> {
 
 		// Invalidate the index in case we error out
 		self.index = 0;
@@ -116,7 +115,7 @@ impl DataFrame {
 }
 
 /// Writes a DataFrame to a network connection. The payload may not be any larger than 65532 bytes.
-fn write_frame(conn: &mut TcpStream, ftype: FrameType, payload: &[u8]) -> Result<(), MensagoError> {
+fn write_frame<W: Write>(conn: &mut W, ftype: FrameType, payload: &[u8]) -> Result<(), MensagoError> {
 	
 	let paylen = payload.len() as u16;
 
@@ -134,7 +133,7 @@ fn write_frame(conn: &mut TcpStream, ftype: FrameType, payload: &[u8]) -> Result
 }
 
 /// Reads an arbitrarily-sized message from a socket and returns it
-pub fn read_message(conn: &mut TcpStream) -> Result<Vec::<u8>, MensagoError> {
+pub fn read_message<R: Read>(conn: &mut R) -> Result<Vec::<u8>, MensagoError> {
 
 	let mut out = Vec::<u8>::new();
 	let mut chunk = DataFrame::new();
@@ -194,7 +193,7 @@ pub fn read_message(conn: &mut TcpStream) -> Result<Vec::<u8>, MensagoError> {
 }
 
 /// Writes an arbitrarily-sized message to a socket
-pub fn write_message(conn: &mut TcpStream, msg: &[u8]) -> Result<(), MensagoError> {
+pub fn write_message<W: Write>(conn: &mut W, msg: &[u8]) -> Result<(), MensagoError> {
 
 	if msg.len() == 0 {
 		return Err(MensagoError::ErrSize)
@@ -256,7 +255,7 @@ impl ClientRequest {
 	}
 
 	/// Converts the ClientRequest to JSON and sends to the server
-	pub fn send(&self, conn: &mut TcpStream) -> Result<(), MensagoError> {
+	pub fn send<W: Write>(&self, conn: &mut W) -> Result<(), MensagoError> {
 		write_message(conn, serde_json::to_string(&self)?.as_bytes())
 	}
 }
@@ -275,7 +274,7 @@ pub struct ServerResponse {
 impl ServerResponse {
 
 	/// Reads a ServerResponse from the connection
-	pub fn receive(conn: &mut TcpStream) -> Result<ServerResponse, MensagoError> {
+	pub fn receive<R: Read>(conn: &mut R) -> Result<ServerResponse, MensagoError> {
 		
 		let rawdata = read_message(conn)?;
 		let rawjson = match String::from_utf8(rawdata) {
