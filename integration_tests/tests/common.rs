@@ -35,11 +35,15 @@ pub fn load_server_config() -> Result<(), MensagoError> {
 	}
 
 	if config_file_path.exists() {
-		
+		// TODO: load server config file with toml crate
 	} else {
 		return Err(MensagoError::ErrNotFound)
 	}
 
+	// TODO: Finish implementing load_server_config()
 	Ok(())
 }
 
+// TODO: finish porting integration test setup code from pymensago
+
+// TODO: write setup code tests
