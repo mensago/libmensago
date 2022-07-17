@@ -361,7 +361,7 @@ mod tests {
 		Ok(())
 	}
 
-	// This test works by creating a message that is a little bigger than 128K, forcing
+	// This test works by creating a message that is a little bigger than 64K, forcing
 	// write_message() to create 3 frames: a start frame, a middle frame, and a final one. There is
 	// no real limit to how big of an actual message can be sent outside of physical resources, but
 	// it does have to be send in 65532-byte chunks.
@@ -372,8 +372,8 @@ mod tests {
 
 		let mut conn = IoBuffer::new();
 		
-		let msg = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".repeat(5100);
-		match write_message(&mut conn, msg.as_bytes()) {
+		let sentmsg = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".repeat(2601);
+		match write_message(&mut conn, sentmsg.as_bytes()) {
 			Ok(_) => (),
 			Err(e) => {
 				return Err(MensagoError::ErrProgramException(
@@ -382,11 +382,12 @@ mod tests {
 			}
 		}
 
-		let mut chunk1 = DataFrame::new();
-		chunk1.read(&mut conn)?;
+		let mut frame = DataFrame::new();
+		frame.read(&mut conn)?;
 
-		
-		let totalsize = match get_multipart_size(&chunk1) {
+		// First, get the first data frame, which should be of type MultipartMessageStart and the 
+		// payload should contain a decimal string of the size of the complete message size.
+		let totalsize = match get_multipart_size(&frame) {
 			Ok(v) => v,
 			Err(e) => {
 				return Err(MensagoError::ErrProgramException(
@@ -394,13 +395,47 @@ mod tests {
 				))
 			}
 		};
-		if totalsize != msg.len() {
+		if totalsize != sentmsg.len() {
 			return Err(MensagoError::ErrProgramException(
 				format!("{}: total size mismatch: {}", testname, totalsize)
 			))
 		}
 
-		// TODO: Finish implementing test_write_multipart_msg()
+		let mut msgparts = Vec::<u8>::new();
+
+		// Now get and process the first actual data frame
+		frame.read(&mut conn)?;
+		if frame.get_type() != FrameType::MultipartFrame {
+			return Err(MensagoError::ErrProgramException(
+				format!("{}: first data frame had wrong type", testname)
+			))
+		}
+		msgparts.extend_from_slice(frame.get_payload());
+
+		// Finally deal with the final frame
+		frame.read(&mut conn)?;
+		if frame.get_type() != FrameType::MultipartFrameFinal {
+			return Err(MensagoError::ErrProgramException(
+				format!("{}: final frame had wrong type", testname)
+			))
+		}
+		msgparts.extend_from_slice(frame.get_payload());
+
+		// Message data received from both data frames and complete. Now reassemble, check total
+		// size, and confirm value match.
+
+		let receivedmsg = String::from_utf8(msgparts.to_vec())?;
+		if sentmsg.len() != receivedmsg.len() {
+			return Err(MensagoError::ErrProgramException(
+				format!("{}: message size mismatch: {} vs {}", testname, sentmsg.len(), 
+					receivedmsg.len())
+			))
+		}
+		if sentmsg != receivedmsg {
+			return Err(MensagoError::ErrProgramException(
+				format!("{}: message mismatch", testname)
+			))
+		}
 
 		Ok(())
 	}
