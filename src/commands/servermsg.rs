@@ -135,7 +135,7 @@ fn write_frame<W: Write>(conn: &mut W, ftype: FrameType, payload: &[u8]) -> Resu
 	Ok(())
 }
 
-/// Reads an arbitrarily-sized message from a socket and returns it
+/// Reads an arbitrarily-sized message from an IO::Read and returns it
 pub fn read_message<R: Read>(conn: &mut R) -> Result<Vec::<u8>, MensagoError> {
 
 	let mut out = Vec::<u8>::new();
@@ -195,7 +195,14 @@ pub fn read_message<R: Read>(conn: &mut R) -> Result<Vec::<u8>, MensagoError> {
 	Ok(out)
 }
 
-/// Writes an arbitrarily-sized message to a socket
+/// Reads a message as per `read_message()` but returns the data as a string
+pub fn read_str_message<R: Read>(conn: &mut R) -> Result<String, MensagoError> {
+	
+	let rawdata = read_message(conn)?;
+	Ok(String::from_utf8(rawdata)?)
+}
+
+/// Writes an arbitrarily-sized message to an IO::Write
 pub fn write_message<W: Write>(conn: &mut W, msg: &[u8]) -> Result<(), MensagoError> {
 
 	if msg.len() == 0 {
@@ -279,8 +286,7 @@ impl ServerResponse {
 	/// Reads a ServerResponse from the connection
 	pub fn receive<R: Read>(conn: &mut R) -> Result<ServerResponse, MensagoError> {
 		
-		let rawdata = read_message(conn)?;
-		let rawjson = match String::from_utf8(rawdata) {
+		let rawjson = match read_str_message(conn) {
 			Ok(v) => v,
 			Err(_) => { return Err(MensagoError::ErrBadMessage) }
 		};
@@ -349,8 +355,7 @@ mod tests {
 			}
 		}
 
-		let rawdata = read_message(&mut conn)?;
-		let msgstr = String::from_utf8(rawdata).unwrap();
+		let msgstr = read_str_message(&mut conn)?;
 		
 		if msgstr != "ThisIsATestMessage" {
 			return Err(MensagoError::ErrProgramException(
@@ -443,7 +448,32 @@ mod tests {
 	#[test]
 	fn test_read_multipart_msg() -> Result<(), MensagoError> {
 
-		// TODO: Implement test_read_multipart_msg()
+		let testname = String::from("test_read_multipart_msg");
+
+		let mut conn = IoBuffer::new();
+		
+		let sentmsg = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".repeat(2601);
+		match write_message(&mut conn, sentmsg.as_bytes()) {
+			Ok(_) => (),
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error writing msg: {}", testname, e.to_string())
+				))
+			}
+		}
+
+		let receivedmsg = read_str_message(&mut conn)?;
+		if sentmsg.len() != receivedmsg.len() {
+			return Err(MensagoError::ErrProgramException(
+				format!("{}: message size mismatch: {} vs {}", testname, sentmsg.len(), 
+					receivedmsg.len())
+			))
+		}
+		if sentmsg != receivedmsg {
+			return Err(MensagoError::ErrProgramException(
+				format!("{}: message mismatch", testname)
+			))
+		}
 
 		Ok(())
 	}
