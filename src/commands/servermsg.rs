@@ -305,10 +305,6 @@ impl ServerResponse {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use std::net::{TcpListener,TcpStream};
-	use std::sync::mpsc::channel;
-	use std::time::Duration;
-	use std::thread;
 	use iobuffer::IoBuffer;
 
 	// This method only works for frames with the type MultipartFrameStart. It returns the size of
@@ -338,47 +334,18 @@ mod tests {
 	fn test_frame_session() -> Result<(), MensagoError> {
 		let testname = String::from("test_frame_session");
 
-		// Use a channel for synchronization
-		let (sender, receiver) = channel::<u8>();
+		let mut conn = IoBuffer::new();
 
-		let listener = TcpListener::bind("127.0.0.1:2999")?;
-
-		let thandle = thread::spawn(move || {
-			let _ = receiver.recv().unwrap();
-
-			thread::sleep(Duration::from_millis(100));
-			
-			let mut senderconn = match TcpStream::connect("127.0.0.1:2999") {
-				Ok(v) => v,
-				Err(e) => {
-					print!("test_frame_session: error creating thread socket: {}", e.to_string());
-					panic!("")
-				}
-			};
-
-			let msg = "ThisIsATestMessage";
-			match write_message(&mut senderconn, msg.as_bytes()) {
-				Ok(_) => (),
-				Err(e) => {
-					print!("test_frame_session: error thread writing msg: {}", e.to_string());
-					panic!("")
-				}
-			}
-
-		});
-		
-		// Send data over the channel to unblock the sender thread
-		match sender.send(0) {
+		let msg = "ThisIsATestMessage";
+		match write_message(&mut conn, msg.as_bytes()) {
 			Ok(_) => (),
 			Err(e) => {
-				return Err(MensagoError::ErrProgramException(
-					format!("{}: error unblocking sender thread: {}", testname, e.to_string())
-				))
+				print!("test_frame_session: error thread writing msg: {}", e.to_string());
+				panic!("")
 			}
 		}
-		
-		let (mut receiverconn, _) = listener.accept()?;
-		let rawdata = read_message(&mut receiverconn)?;
+
+		let rawdata = read_message(&mut conn)?;
 		let msgstr = String::from_utf8(rawdata).unwrap();
 		
 		if msgstr != "ThisIsATestMessage" {
@@ -387,7 +354,6 @@ mod tests {
 			))
 		}
 
-		thandle.join().unwrap();
 		Ok(())
 	}
 
