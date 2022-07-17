@@ -96,19 +96,22 @@ impl DataFrame {
 		// Invalidate the index in case we error out
 		self.index = 0;
 
-		let bytes_read = conn.read(&mut self.buffer)?;
+		// Check how much should be waiting for us
+		let bytes_read = conn.read(&mut self.buffer[..3])?;
 		
-		if bytes_read < 4 || FrameType::from(self.buffer[0]) == FrameType::InvalidFrame {
+		if bytes_read < 3 || FrameType::from(self.buffer[0]) == FrameType::InvalidFrame {
 			return Err(MensagoError::ErrInvalidFrame)
 		}
 
-		// The size bytes are in network order (MSB), so this makes dealing with CPU architecture much
-		// less of a headache regardless of what archictecture this is compiled for.
+		// The size bytes are in network order (MSB), so this makes dealing with CPU architecture
+		// much less of a headache regardless of what archictecture this is compiled for.
 		let payload_size = (u16::from(self.buffer[1]) << 8) + u16::from(self.buffer[2]);
-		if bytes_read != usize::from(payload_size) + 3 {
+
+		let bytes_read = conn.read(&mut self.buffer[3..usize::from(3+payload_size)])?;
+		if bytes_read != usize::from(payload_size) {
 			return Err(MensagoError::ErrSize)
 		}
-		self.index = bytes_read-1;
+		self.index = bytes_read+2;
 
 		Ok(())
 	}
@@ -318,7 +321,8 @@ mod tests {
 			return Err(MensagoError::ErrTypeMismatch)
 		}
 
-		let totalsize = match String::from_utf8(frame.get_payload().to_vec())?.parse::<usize>() {
+		let valstring = String::from_utf8(frame.get_payload().to_vec())?;
+		let totalsize = match valstring.parse::<usize>() {
 			Ok(v) => v,
 			Err(_) => {
 				return Err(MensagoError::ErrBadValue)
