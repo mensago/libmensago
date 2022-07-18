@@ -25,14 +25,22 @@ use std::{path::PathBuf, fs};
 use toml_edit::{Document, value};
 
 /// Loads the Mensago server configuration from the config file
-pub fn load_server_config() -> Result<Document, MensagoError> {
+pub fn load_server_config(testmode: bool) -> Result<Document, MensagoError> {
 
 	let config_file_path: PathBuf;
 
-	if cfg!(windows) {
-		config_file_path = PathBuf::from("C:\\ProgramData\\mensagod\\serverconfig.toml");
+	if testmode {
+		if cfg!(windows) {
+			config_file_path = PathBuf::from("C:\\ProgramData\\mensagod\\testconfig.toml");
+		} else {
+			config_file_path = PathBuf::from("/etc/mensagod/testconfig.toml");
+		}
 	} else {
-		config_file_path = PathBuf::from("/etc/mensagod/serverconfig.toml");
+		if cfg!(windows) {
+			config_file_path = PathBuf::from("C:\\ProgramData\\mensagod\\serverconfig.toml");
+		} else {
+			config_file_path = PathBuf::from("/etc/mensagod/serverconfig.toml");
+		}
 	}
 
 	let mut out: toml_edit::Document;
@@ -111,7 +119,7 @@ mod tests {
 	#[test]
 	fn test_load_server_config() -> Result<(), MensagoError> {
 		
-		let config = load_server_config()?;
+		let config = load_server_config(false)?;
 
 		println!("{:#?}", config);
 
