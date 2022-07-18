@@ -52,6 +52,51 @@ pub fn load_server_config() -> Result<toml::Value, MensagoError> {
 		return Err(MensagoError::ErrProgramException(String::from("server config file not found")))
 	}
 
+	// Add defaults for missing configuration values
+	let default_string_values = [
+		("network", "listen_ip", "127.0.0.1"),
+		("database", "engine", "postgresql"),
+		("database", "ip", "127.0.0.1"),
+
+		// TODO make database.port an integer, not string
+		("database", "port", "5432"),
+		("database", "name", "mensago"),
+		("database", "user", "mensago"),
+		("database", "password", "CHANGEME"),
+
+		("global", "registration", "private"),
+		("global", "registration_subnet", "192.168.0.0/16, 172.16.0.0/12, 10.0.0.0/8, 127.0.0.1/8"),
+		("global", "registration_subnet6", "fe80::/10"),
+
+		("security", "diceware_wordlist", "eff_short_prefix"),
+	];
+	for s in default_string_values {
+		
+		// TODO: populate default values
+	}
+
+	let default_integer_values = [
+		("network", "port", 2001),
+		("global", "default_quota", 0),
+		("performance", "max_file_size", 50),
+		("performance", "max_message_size", 50),
+		("performance", "max_sync_age", 7),
+		("performance", "max_delivery_threads", 100),
+		("performance", "max_client_threads", 10_000),
+		("performance", "keycard_cache_size", 5_000),
+
+		("security", "diceware_wordcount", 6),
+		("security", "failure_delay_sec", 3),
+		("security", "max_failures", 5),
+		("security", "lockout_delay_min", 15),
+		("security", "registration_delay_min", 15),
+		("security", "password_reset_min", 60),
+	];
+
+	for i in default_integer_values {
+		
+		// TODO: populate default values
+	}
 	Ok(out)
 }
 
