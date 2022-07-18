@@ -22,10 +22,10 @@
 
 use libmensago::*;
 use std::{path::PathBuf, fs};
-use toml;
+use toml_edit::{Document, value};
 
 /// Loads the Mensago server configuration from the config file
-pub fn load_server_config() -> Result<toml::Value, MensagoError> {
+pub fn load_server_config() -> Result<Document, MensagoError> {
 
 	let config_file_path: PathBuf;
 
@@ -35,11 +35,11 @@ pub fn load_server_config() -> Result<toml::Value, MensagoError> {
 		config_file_path = PathBuf::from("/etc/mensagod/serverconfig.toml");
 	}
 
-	let out: toml::Value;
+	let mut out: toml_edit::Document;
 	if config_file_path.exists() {
 
 		let rawdata = fs::read_to_string(config_file_path)?;
-		out = match rawdata.parse::<toml::Value>() {
+		out = match rawdata.parse::<Document>() {
 			Ok(v) => v,
 			Err(e) => {
 				return Err(MensagoError::ErrProgramException(
@@ -71,8 +71,9 @@ pub fn load_server_config() -> Result<toml::Value, MensagoError> {
 		("security", "diceware_wordlist", "eff_short_prefix"),
 	];
 	for s in default_string_values {
-		
-		// TODO: populate default values
+		if out.get(s.0).is_none() || out.get(s.1).is_none() {
+			out[s.0][s.1] = value(s.2)
+		}
 	}
 
 	let default_integer_values = [
@@ -94,9 +95,11 @@ pub fn load_server_config() -> Result<toml::Value, MensagoError> {
 	];
 
 	for i in default_integer_values {
-		
-		// TODO: populate default values
+		if out.get(i.0).is_none() || out.get(i.1).is_none() {
+			out[i.0][i.1] = value(i.2)
+		}
 	}
+
 	Ok(out)
 }
 
@@ -112,7 +115,8 @@ mod tests {
 
 		println!("{:#?}", config);
 
-		println!("{}", config["database"].get("password").unwrap().as_str().unwrap());
+		println!("max_failures: {}", config["security"].get("max_failures").unwrap()
+			.as_integer().unwrap());
 		Ok(())
 	}
 }

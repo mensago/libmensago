@@ -8,7 +8,7 @@ autotests = false
 
 [dependencies]
 libmensago = { path = "../libmensago" }
-toml = "0.5.3"
+toml_edit = "0.14.4"
 
 [[test]]
 name = "integration"
