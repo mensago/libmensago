@@ -8,6 +8,7 @@ autotests = false
 
 [dependencies]
 libmensago = { path = "../libmensago" }
+postgres = "0.19.3"
 toml_edit = "0.14.4"
 
 [[test]]
