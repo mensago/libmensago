@@ -20,8 +20,11 @@
 
 // THESE KEYS ARE STORED ON GITLAB! DO NOT USE THESE FOR ANYTHING EXCEPT UNIT TESTS!!
 
+use eznacl::*;
+use libkeycard::*;
 use libmensago::*;
 use postgres::{Client, NoTls};
+use std::collections::HashMap;
 use std::{path::PathBuf, fs};
 use toml_edit::{Document, value};
 
@@ -225,6 +228,37 @@ pub fn setup_test(config: &Document) -> Result<postgres::Client, MensagoError> {
 	}
 
 	Ok(db)
+}
+
+// Adds basic data to the database as if setup had been run. It also rotates the org 
+// keycard so that there are two entries. Returns data needed for tests, such as the keys
+pub fn init_server(db: &postgres::Client) -> Result<HashMap<String,String>, MensagoError> {
+
+	let out = HashMap::<String, String>::new();
+
+	// Start off by generating the org's root keycard entry and add to the database
+	let orgcard = Keycard::new(&EntryType::Organization);
+	let mut root_entry = Entry::new(EntryType::Organization)?;
+	root_entry.set_fields(&vec![
+		(String::from("Name"), String::from("Example, Inc.")),
+		(String::from("Contact-Admin"), String::from("c590b44c-798d-4055-8d72-725a7942f3f6/example.com")),
+		(String::from("Language"), String::from("en")),
+		(String::from("Domain"), String::from("example.com")),
+		(String::from("Primary-Verification-Key"),
+			String::from("ED25519:r#r*RiXIN-0n)BzP3bv`LA&t4LFEQNF0Q@$N~RF*")),
+		(String::from("Encryption-Key"),
+			String::from("CURVE25519:SNhj2K`hgBd8>G>lW$!pXiM7S-B!Fbd9jT2&{{Az")),
+	])?;
+
+	let initial_ospair = SigningPair::from(
+		&CryptoString::from("ED25519:r#r*RiXIN-0n)BzP3bv`LA&t4LFEQNF0Q@$N~RF*").unwrap(),
+		&CryptoString::from("ED25519:{UNQmjYhz<(-ikOBYoEQpXPt<irxUF*nq25PoW=_").unwrap());
+	let initial_oepair = EncryptionPair::from(
+		&CryptoString::from("CURVE25519:SNhj2K`hgBd8>G>lW$!pXiM7S-B!Fbd9jT2&{{Az").unwrap(),
+		&CryptoString::from("CURVE25519:WSHgOhi+bg=<bO^4UoJGF-z9`+TBN{ds?7RZ;w3o").unwrap());
+	
+	// TODO: Finish implementing init_server()
+	Ok(out)
 }
 
 #[cfg(test)]
