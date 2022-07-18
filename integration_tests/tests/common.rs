@@ -232,14 +232,15 @@ pub fn setup_test(config: &Document) -> Result<postgres::Client, MensagoError> {
 
 // Adds basic data to the database as if setup had been run. It also rotates the org 
 // keycard so that there are two entries. Returns data needed for tests, such as the keys
-pub fn init_server(db: &postgres::Client) -> Result<HashMap<String,String>, MensagoError> {
+pub fn init_server(db: &mut postgres::Client) -> Result<HashMap<String,String>, MensagoError> {
 
 	let out = HashMap::<String, String>::new();
 
 	// Start off by generating the org's root keycard entry and add to the database
-	let orgcard = Keycard::new(&EntryType::Organization);
+	let mut orgcard = Keycard::new(&EntryType::Organization);
 	let mut root_entry = Entry::new(EntryType::Organization)?;
 	root_entry.set_fields(&vec![
+		(String::from("Index"), String::from("1")),
 		(String::from("Name"), String::from("Example, Inc.")),
 		(String::from("Contact-Admin"), String::from("c590b44c-798d-4055-8d72-725a7942f3f6/example.com")),
 		(String::from("Language"), String::from("en")),
@@ -257,6 +258,72 @@ pub fn init_server(db: &postgres::Client) -> Result<HashMap<String,String>, Mens
 		&CryptoString::from("CURVE25519:SNhj2K`hgBd8>G>lW$!pXiM7S-B!Fbd9jT2&{{Az").unwrap(),
 		&CryptoString::from("CURVE25519:WSHgOhi+bg=<bO^4UoJGF-z9`+TBN{ds?7RZ;w3o").unwrap());
 	
+	match root_entry.is_data_compliant() {
+		Ok(_) => (),
+		Err(e) => {
+			return Err(MensagoError::ErrProgramException(
+				format!("root org entry not data compliant: {}", e.to_string())
+			))
+		}
+	}
+
+	// TODO: update hash call once preferred algorithm updates added to eznacl
+	match root_entry.hash("BLAKE3-256") {
+		Ok(_) => (),
+		Err(e) => {
+			return Err(MensagoError::ErrProgramException(
+				format!("couldn't hash root org entry: {}", e.to_string())
+			))
+		}
+	}
+	
+	match root_entry.sign("Organization-Signature", &initial_ospair) {
+		Ok(_) => (),
+		Err(e) => {
+			return Err(MensagoError::ErrProgramException(
+				format!("failed to sign root org entry: {}", e.to_string())
+			))
+		}
+	}
+	
+	match root_entry.verify_signature("Organization-Signature", &initial_ospair) {
+		Ok(_) => (),
+		Err(e) => {
+			return Err(MensagoError::ErrProgramException(
+				format!("couldn't verify root org entry: {}", e.to_string())
+			))
+		}
+	}
+	
+	match root_entry.is_compliant() {
+		Ok(_) => (),
+		Err(e) => {
+			return Err(MensagoError::ErrProgramException(
+				format!("root org entry not compliant: {}", e.to_string())
+			))
+		}
+	}
+
+	orgcard.entries.push(root_entry);
+
+	let root_entry = &orgcard.entries[0];
+	match db.execute("INSERT INTO keycards(owner,creationtime,index,entry,fingerprint) 
+	VALUES('organization',$1,$2,$3,$4);", &[
+		&root_entry.get_field("Timestamp")?,
+		&initial_oepair.get_public_str(),
+		&initial_oepair.get_private_str(),
+		// TODO: update hash call once preferred algorithm updates added to eznacl
+		&get_hash("BLAKE3-256", &initial_oepair.get_public_bytes())?.as_str(),
+	]) {
+		Ok(_) => (),
+		Err(e) => {
+			return Err(MensagoError::ErrProgramException(
+				format!("error initializing keycard table: {}", e.to_string())
+			))
+		}
+	}
+
+
 	// TODO: Finish implementing init_server()
 	Ok(out)
 }
@@ -283,6 +350,16 @@ mod tests {
 		
 		let config = load_server_config(true)?;
 		setup_test(&config)?;
+
+		Ok(())
+	}
+
+	#[test]
+	fn test_init_server() -> Result<(), MensagoError> {
+		
+		let config = load_server_config(true)?;
+		let mut db = setup_test(&config)?;
+		init_server(&mut db)?;
 
 		Ok(())
 	}
