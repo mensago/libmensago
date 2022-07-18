@@ -7,8 +7,8 @@ license = "MPL-2.0-no-copyleft-exception"
 autotests = false
 
 [dependencies]
-eznacl = "3.2.3"
-libkeycard = "0.1.1"
+eznacl = "3.2.4"
+libkeycard = "0.1.2"
 libmensago = { path = "../libmensago" }
 postgres = "0.19.3"
 toml_edit = "0.14.4"
