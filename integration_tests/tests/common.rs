@@ -21,10 +21,11 @@
 // THESE KEYS ARE STORED ON GITLAB! DO NOT USE THESE FOR ANYTHING EXCEPT UNIT TESTS!!
 
 use libmensago::*;
-use std::path::PathBuf;
+use std::{path::PathBuf, fs};
+use toml;
 
 /// Loads the Mensago server configuration from the config file
-pub fn load_server_config() -> Result<(), MensagoError> {
+pub fn load_server_config() -> Result<toml::Value, MensagoError> {
 
 	let config_file_path: PathBuf;
 
@@ -34,16 +35,44 @@ pub fn load_server_config() -> Result<(), MensagoError> {
 		config_file_path = PathBuf::from("/etc/mensagod/serverconfig.toml");
 	}
 
+	let out: toml::Value;
 	if config_file_path.exists() {
-		// TODO: load server config file with toml crate
+
+		let rawdata = fs::read_to_string(config_file_path)?;
+		out = match rawdata.parse::<toml::Value>() {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("error parsing server config file: {}", e.to_string())
+				))
+			}
+		};
+
 	} else {
-		return Err(MensagoError::ErrNotFound)
+		return Err(MensagoError::ErrProgramException(String::from("server config file not found")))
 	}
 
-	// TODO: Finish implementing load_server_config()
-	Ok(())
+	Ok(out)
+}
+
+#[cfg(test)]
+mod tests {
+	use libmensago::*;
+	use super::*;
+
+	#[test]
+	fn test_load_server_config() -> Result<(), MensagoError> {
+		
+		let config = load_server_config()?;
+
+		println!("{:#?}", config);
+
+		println!("{}", config["database"].get("password").unwrap().as_str().unwrap());
+		Ok(())
+	}
 }
 
 // TODO: finish porting integration test setup code from pymensago
 
 // TODO: write setup code tests
+
