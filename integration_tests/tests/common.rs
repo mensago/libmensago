@@ -28,6 +28,7 @@ use postgres::{Client, NoTls};
 use std::collections::HashMap;
 use std::fs;
 use std::{path::PathBuf};
+use std::{thread, time};
 use toml_edit::{Document, value};
 
 /// Loads the Mensago server configuration from the config file
@@ -590,6 +591,37 @@ pub fn reset_workspace_dir(config: &Document) -> Result<(), MensagoError> {
 	Ok(())
 }
 
+/// Creates a new profile folder hierarchy on the client side in the specified test folder
+pub fn setup_profile_base(name: &str) -> Result<String, MensagoError> {
+
+	let mut test_folder = PathBuf::from("testfiles");
+	if !test_folder.exists() {
+		fs::create_dir(&test_folder)?;
+	}
+
+	test_folder.push(name);
+	while test_folder.exists() {
+		match fs::remove_dir_all(&test_folder) {
+			Ok(_) => break,
+			Err(_) => {
+				println!("Waiting a second for test folder to unlock");
+				thread::sleep(time::Duration::from_secs(1));
+			}
+		}
+	}
+	fs::create_dir(&test_folder)?;
+
+	match test_folder.to_str() {
+		Some(v) => return Ok(String::from(v)),
+		None => {
+			return Err(MensagoError::ErrProgramException(
+				format!("filesystem entry with non-UTF8 name like {}. Please resolve this.",
+					test_folder.to_string_lossy())
+			))
+		}
+	}
+}
+
 #[cfg(test)]
 mod tests {
 	use libmensago::*;
@@ -632,6 +664,13 @@ mod tests {
 		let config = load_server_config(true)?;
 		reset_workspace_dir(&config)?;
 
+		Ok(())
+	}
+
+	#[test]
+	fn test_setup_profile_base() -> Result<(), MensagoError> {
+		
+		setup_profile_base("test_setup_profile_base")?;
 		Ok(())
 	}
 }
