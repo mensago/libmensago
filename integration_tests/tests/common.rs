@@ -232,9 +232,7 @@ pub fn setup_test(config: &Document) -> Result<postgres::Client, MensagoError> {
 
 // Adds basic data to the database as if setup had been run. It also rotates the org 
 // keycard so that there are two entries. Returns data needed for tests, such as the keys
-pub fn init_server(db: &mut postgres::Client) -> Result<HashMap<String,String>, MensagoError> {
-
-	let out = HashMap::<String, String>::new();
+pub fn init_server(db: &mut postgres::Client) -> Result<HashMap<&'static str,String>, MensagoError> {
 
 	// Start off by generating the org's root keycard entry and add to the database
 	let mut orgcard = Keycard::new(&EntryType::Organization);
@@ -437,7 +435,78 @@ pub fn init_server(db: &mut postgres::Client) -> Result<HashMap<String,String>, 
 
 	// Preregister the admin account
 
-	// TODO: Finish implementing init_server()
+	let admin_wid = RandomID::from("ae406c5e-2673-4d3e-af20-91325d9623ca").unwrap();
+	let admin_address = String::from("ae406c5e-2673-4d3e-af20-91325d9623ca/example.com");
+	let regcode = "Undamaged Shining Amaretto Improve Scuttle Uptake";
+	match db.execute("INSERT INTO prereg(wid,uid,domain,regcode) 
+	VALUES($1,'admin','example.com',$2);", &[
+		&admin_wid.to_string(),
+		&regcode,
+	]) {
+		Ok(_) => (),
+		Err(e) => {
+			return Err(MensagoError::ErrProgramException(
+				format!("error preregistering admin account: {}", e.to_string())
+			))
+		}
+	}
+
+	// Set up abuse/support forwarding to admin
+
+	let abuse_wid = RandomID::from("f8cfdbdf-62fe-4275-b490-736f5fdc82e3").unwrap();
+	match db.execute("INSERT INTO workspaces(wid, uid, domain, password, status, wtype) 
+	VALUES($1,'abuse','example.com', '-', 'active', 'alias');", &[&abuse_wid.to_string()]) {
+		Ok(_) => (),
+		Err(e) => {
+			return Err(MensagoError::ErrProgramException(
+				format!("error adding abuse account to workspace table: {}", e.to_string())
+			))
+		}
+	}
+	match db.execute("INSERT INTO aliases(wid, alias) VALUES($1,$2);", &[
+		&abuse_wid.to_string(),
+		&admin_address,
+	]) {
+		Ok(_) => (),
+		Err(e) => {
+			return Err(MensagoError::ErrProgramException(
+				format!("error adding abuse account to alias table: {}", e.to_string())
+			))
+		}
+	}
+
+	let support_wid = RandomID::from("f0309ef1-a155-4655-836f-55173cc1bc3b").unwrap();
+	match db.execute("INSERT INTO workspaces(wid, uid, domain, password, status, wtype) 
+	VALUES($1,'support','example.com', '-', 'active', 'alias');", &[&support_wid.to_string()]) {
+		Ok(_) => (),
+		Err(e) => {
+			return Err(MensagoError::ErrProgramException(
+				format!("error adding support account to workspace table: {}", e.to_string())
+			))
+		}
+	}
+	match db.execute("INSERT INTO aliases(wid, alias) VALUES($1,$2);", &[
+		&support_wid.to_string(),
+		&admin_address,
+	]) {
+		Ok(_) => (),
+		Err(e) => {
+			return Err(MensagoError::ErrProgramException(
+				format!("error adding support account to alias table: {}", e.to_string())
+			))
+		}
+	}
+
+	let mut out = HashMap::<&'static str, String>::new();
+	out.insert("ovkey", keys["primary.public"].to_string());
+	out.insert("oskey", keys["primary.private"].to_string());
+	out.insert("oekey", keys["encryption.public"].to_string());
+	out.insert("odkey", keys["encryption.private"].to_string());
+	out.insert("admin_wid", admin_wid.to_string());
+	out.insert("admin_regcode", String::from(regcode));
+	out.insert("abuse_wid", abuse_wid.to_string());
+	out.insert("support_wid", support_wid.to_string());
+
 	Ok(out)
 }
 
