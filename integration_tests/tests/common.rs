@@ -164,14 +164,14 @@ pub fn setup_test(config: &Document) -> Result<postgres::Client, MensagoError> {
 
 	-- passcodes table is used for password resets
 	CREATE TABLE passcodes(rowid SERIAL PRIMARY KEY, wid VARCHAR(36) NOT NULL UNIQUE,
-		passcode VARCHAR(128) NOT NULL, expires TIMESTAMP NOT NULL);
+		passcode VARCHAR(128) NOT NULL, expires CHAR(16) NOT NULL);
 
 	-- For logging different types of failures, such as failed usernanme entry or a server's failure
 	-- to authenticate for delivery. Information stored here is to ensure that all parties which the
 	-- server interacts with behave themselves.
 	CREATE TABLE failure_log(rowid SERIAL PRIMARY KEY, type VARCHAR(16) NOT NULL,
 		id VARCHAR(36), source VARCHAR(36) NOT NULL, count INTEGER,
-		last_failure TIMESTAMP NOT NULL, lockout_until TIMESTAMP);
+		last_failure CHAR(16) NOT NULL, lockout_until CHAR(16));
 
 	-- Preregistration information. Entries are removed upon successful account registration.
 	CREATE TABLE prereg(rowid SERIAL PRIMARY KEY, wid VARCHAR(36) NOT NULL UNIQUE,
@@ -179,11 +179,11 @@ pub fn setup_test(config: &Document) -> Result<postgres::Client, MensagoError> {
 
 	-- Stores all entries in the keycard tree
 	CREATE TABLE keycards(rowid SERIAL PRIMARY KEY, owner VARCHAR(292) NOT NULL,
-		creationtime TIMESTAMP NOT NULL, index INTEGER NOT NULL,
+		creationtime CHAR(16) NOT NULL, index INTEGER NOT NULL,
 		entry VARCHAR(8192) NOT NULL, fingerprint VARCHAR(96) NOT NULL);
 
 	-- Keycard information for the organization
-	CREATE TABLE orgkeys(rowid SERIAL PRIMARY KEY, creationtime TIMESTAMP NOT NULL, 
+	CREATE TABLE orgkeys(rowid SERIAL PRIMARY KEY, creationtime CHAR(16) NOT NULL, 
 		pubkey VARCHAR(7000), privkey VARCHAR(7000) NOT NULL, 
 		purpose VARCHAR(8) NOT NULL, fingerprint VARCHAR(96) NOT NULL);
 
@@ -267,7 +267,6 @@ pub fn init_server(db: &mut postgres::Client) -> Result<HashMap<String,String>, 
 		}
 	}
 
-	// TODO: update hash call once preferred algorithm updates added to eznacl
 	match root_entry.hash("BLAKE3-256") {
 		Ok(_) => (),
 		Err(e) => {
@@ -307,13 +306,16 @@ pub fn init_server(db: &mut postgres::Client) -> Result<HashMap<String,String>, 
 	orgcard.entries.push(root_entry);
 
 	let root_entry = &orgcard.entries[0];
+	let index = match root_entry.get_field("Index")?.parse::<i32>() {
+		Ok(v) => v,
+		Err(e) => panic!("{}", e.to_string()),
+	};
 	match db.execute("INSERT INTO keycards(owner,creationtime,index,entry,fingerprint) 
 	VALUES('organization',$1,$2,$3,$4);", &[
 		&root_entry.get_field("Timestamp")?,
-		&initial_oepair.get_public_str(),
-		&initial_oepair.get_private_str(),
-		// TODO: update hash call once preferred algorithm updates added to eznacl
-		&get_hash("BLAKE3-256", &initial_oepair.get_public_bytes())?.as_str(),
+		&index,
+		&root_entry.get_full_text("")?,
+		&root_entry.get_authstr("Hash")?.to_string(),
 	]) {
 		Ok(_) => (),
 		Err(e) => {
