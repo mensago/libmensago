@@ -325,6 +325,35 @@ pub fn init_server(db: &mut postgres::Client) -> Result<HashMap<String,String>, 
 		}
 	}
 
+	match db.execute("INSERT INTO orgkeys(creationtime,pubkey,privkey,purpose,fingerprint) 
+	VALUES($1,$2,$3,'encrypt',$4);", &[
+		&root_entry.get_field("Timestamp")?,
+		&initial_oepair.get_public_str(),
+		&initial_oepair.get_private_str(),
+		&get_hash("BLAKE3-256", &initial_oepair.get_public_bytes())?.to_string(),
+	]) {
+		Ok(_) => (),
+		Err(e) => {
+			return Err(MensagoError::ErrProgramException(
+				format!("error adding encryption keys to orgkeys table: {}", e.to_string())
+			))
+		}
+	}
+
+	match db.execute("INSERT INTO orgkeys(creationtime,pubkey,privkey,purpose,fingerprint) 
+	VALUES($1,$2,$3,'sign',$4);", &[
+		&root_entry.get_field("Timestamp")?,
+		&initial_ospair.get_public_str(),
+		&initial_ospair.get_private_str(),
+		&get_hash("BLAKE3-256", &initial_ospair.get_public_bytes())?.to_string(),
+	]) {
+		Ok(_) => (),
+		Err(e) => {
+			return Err(MensagoError::ErrProgramException(
+				format!("error adding signing keys to orgkeys table: {}", e.to_string())
+			))
+		}
+	}
 
 	// TODO: Finish implementing init_server()
 	Ok(out)
