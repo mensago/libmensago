@@ -305,43 +305,123 @@ pub fn init_server(db: &mut postgres::Client) -> Result<HashMap<String,String>, 
 
 	orgcard.entries.push(root_entry);
 
-	let root_entry = &orgcard.entries[0];
-	let index = match root_entry.get_field("Index")?.parse::<i32>() {
+	{	// Limit scope for access to root entry to enable chaining later
+
+		let root_entry = &orgcard.entries[0];
+		let index = match root_entry.get_field("Index")?.parse::<i32>() {
+			Ok(v) => v,
+			Err(e) => panic!("{}", e.to_string()),
+		};
+		match db.execute("INSERT INTO keycards(owner,creationtime,index,entry,fingerprint) 
+		VALUES('organization',$1,$2,$3,$4);", &[
+			&root_entry.get_field("Timestamp")?,
+			&index,
+			&root_entry.get_full_text("")?,
+			&root_entry.get_authstr("Hash")?.to_string(),
+		]) {
+			Ok(_) => (),
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("error initializing keycard table: {}", e.to_string())
+				))
+			}
+		}
+
+		match db.execute("INSERT INTO orgkeys(creationtime,pubkey,privkey,purpose,fingerprint) 
+		VALUES($1,$2,$3,'encrypt',$4);", &[
+			&root_entry.get_field("Timestamp")?,
+			&initial_oepair.get_public_str(),
+			&initial_oepair.get_private_str(),
+			&get_hash("BLAKE3-256", &initial_oepair.get_public_bytes())?.to_string(),
+		]) {
+			Ok(_) => (),
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("error adding encryption keys to orgkeys table: {}", e.to_string())
+				))
+			}
+		}
+
+		match db.execute("INSERT INTO orgkeys(creationtime,pubkey,privkey,purpose,fingerprint) 
+		VALUES($1,$2,$3,'sign',$4);", &[
+			&root_entry.get_field("Timestamp")?,
+			&initial_ospair.get_public_str(),
+			&initial_ospair.get_private_str(),
+			&get_hash("BLAKE3-256", &initial_ospair.get_public_bytes())?.to_string(),
+		]) {
+			Ok(_) => (),
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("error adding signing keys to orgkeys table: {}", e.to_string())
+				))
+			}
+		}
+	}
+
+	// Chain new entry to the root and add to the database
+
+	let keys = match orgcard.chain(&initial_ospair, 365) {
+		Ok(v) => (v),
+		Err(e) => {
+			return Err(MensagoError::ErrProgramException(
+				format!("error chaining org root entry: {}", e.to_string())
+			))
+		}
+	};
+	
+	let new_entry = &orgcard.entries[1];
+	let index = match new_entry.get_field("Index")?.parse::<i32>() {
 		Ok(v) => v,
 		Err(e) => panic!("{}", e.to_string()),
 	};
 	match db.execute("INSERT INTO keycards(owner,creationtime,index,entry,fingerprint) 
 	VALUES('organization',$1,$2,$3,$4);", &[
-		&root_entry.get_field("Timestamp")?,
+		&new_entry.get_field("Timestamp")?,
 		&index,
-		&root_entry.get_full_text("")?,
-		&root_entry.get_authstr("Hash")?.to_string(),
+		&new_entry.get_full_text("")?,
+		&new_entry.get_authstr("Hash")?.to_string(),
 	]) {
 		Ok(_) => (),
 		Err(e) => {
 			return Err(MensagoError::ErrProgramException(
-				format!("error initializing keycard table: {}", e.to_string())
+				format!("error adding updated entry to keycard table: {}", e.to_string())
 			))
 		}
 	}
 
 	match db.execute("INSERT INTO orgkeys(creationtime,pubkey,privkey,purpose,fingerprint) 
 	VALUES($1,$2,$3,'encrypt',$4);", &[
-		&root_entry.get_field("Timestamp")?,
-		&initial_oepair.get_public_str(),
-		&initial_oepair.get_private_str(),
-		&get_hash("BLAKE3-256", &initial_oepair.get_public_bytes())?.to_string(),
+		&new_entry.get_field("Timestamp")?,
+		&keys["encryption.public"].as_str(),
+		&keys["encryption.private"].as_str(),
+		&get_hash("BLAKE3-256", &keys["encryption.public"].as_bytes())?.to_string(),
 	]) {
 		Ok(_) => (),
 		Err(e) => {
 			return Err(MensagoError::ErrProgramException(
-				format!("error adding encryption keys to orgkeys table: {}", e.to_string())
+				format!("error adding updated encryption keys to orgkeys table: {}", e.to_string())
 			))
 		}
 	}
 
 	match db.execute("INSERT INTO orgkeys(creationtime,pubkey,privkey,purpose,fingerprint) 
 	VALUES($1,$2,$3,'sign',$4);", &[
+		&new_entry.get_field("Timestamp")?,
+		&keys["primary.public"].as_str(),
+		&keys["primary.private"].as_str(),
+		&get_hash("BLAKE3-256", &keys["primary.public"].as_bytes())?.to_string(),
+	]) {
+		Ok(_) => (),
+		Err(e) => {
+			return Err(MensagoError::ErrProgramException(
+				format!("error adding updated signing keys to orgkeys table: {}", e.to_string())
+			))
+		}
+	}
+
+	let root_entry = &orgcard.entries[0];
+	match db.execute("INSERT INTO orgkeys(creationtime,pubkey,privkey,purpose,fingerprint) 
+	VALUES($1,$2,$3,'altsign',$4);", &[
 		&root_entry.get_field("Timestamp")?,
 		&initial_ospair.get_public_str(),
 		&initial_ospair.get_private_str(),
@@ -350,10 +430,12 @@ pub fn init_server(db: &mut postgres::Client) -> Result<HashMap<String,String>, 
 		Ok(_) => (),
 		Err(e) => {
 			return Err(MensagoError::ErrProgramException(
-				format!("error adding signing keys to orgkeys table: {}", e.to_string())
+				format!("error adding secondary signing keys to orgkeys table: {}", e.to_string())
 			))
 		}
 	}
+
+	// Preregister the admin account
 
 	// TODO: Finish implementing init_server()
 	Ok(out)
