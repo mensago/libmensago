@@ -21,11 +21,13 @@
 // THESE KEYS ARE STORED ON GITLAB! DO NOT USE THESE FOR ANYTHING EXCEPT UNIT TESTS!!
 
 use eznacl::*;
+use glob;
 use libkeycard::*;
 use libmensago::*;
 use postgres::{Client, NoTls};
 use std::collections::HashMap;
-use std::{path::PathBuf, fs};
+use std::fs;
+use std::{path::PathBuf};
 use toml_edit::{Document, value};
 
 /// Loads the Mensago server configuration from the config file
@@ -526,6 +528,70 @@ pub fn init_server(db: &mut postgres::Client) -> Result<HashMap<&'static str,Str
 	Ok(out)
 }
 
+/// Resets the system workspace storage directory to an empty skeleton
+pub fn reset_workspace_dir(config: &Document) -> Result<(), MensagoError> {
+
+	let workstr = config["global"]["workspace_dir"].to_string();
+	let mut globpath = PathBuf::from(&workstr);
+	globpath.push("*");
+
+	// Delete all contents of the workspace directory
+	// for item in glob::glob(path.to_str().unwrap()).unwrap() {
+	for item in glob::glob(globpath.to_str().unwrap()).unwrap() {
+		let entry = match item {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("couldn't read entry: {}", e.to_string())
+				))
+			}
+		};
+
+		// Because *NIX filename standards are stupid. *grrr*
+		match entry.to_str() {
+			Some(_) => (),
+			None => {
+				return Err(MensagoError::ErrProgramException(
+					format!("filesystem entry with non-UTF8 name like {}. Please resolve this.",
+						entry.to_string_lossy())
+				))
+			}
+		}
+
+		if entry.is_file() {
+			println!("removed file {}", entry.to_str().unwrap());
+			// match fs::remove_file(&entry) {
+			// 	Ok(_) => (),
+			// 	Err(e) => {
+			// 		return Err(MensagoError::ErrProgramException(
+			// 			format!("couldn't delete file {}: {}", entry.to_str().unwrap(),
+			// 				e.to_string())
+			// 		))
+			// 	}
+			// }
+		} else if entry.is_dir() {
+			println!("removed directory {}", entry.to_str().unwrap());
+			// match fs::remove_dir_all(&entry) {
+			// 	Ok(_) => (),
+			// 	Err(e) => {
+			// 		return Err(MensagoError::ErrProgramException(
+			// 			format!("couldn't delete file {}: {}", entry.to_str().unwrap(),
+			// 				e.to_string())
+			// 		))
+			// 	}
+			// }
+		}
+	}
+
+	let mut path = PathBuf::from(config["global"]["workspace_dir"].to_string());
+	path.push("tmp");
+	if !path.exists() {
+		fs::create_dir(&path)?;
+	}
+
+	Ok(())
+}
+
 #[cfg(test)]
 mod tests {
 	use libmensago::*;
@@ -558,6 +624,15 @@ mod tests {
 		let config = load_server_config(true)?;
 		let mut db = setup_test(&config)?;
 		init_server(&mut db)?;
+
+		Ok(())
+	}
+
+	#[test]
+	fn test_reset_workspace_dir() -> Result<(), MensagoError> {
+		
+		let config = load_server_config(true)?;
+		reset_workspace_dir(&config)?;
 
 		Ok(())
 	}
