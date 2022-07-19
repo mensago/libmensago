@@ -83,7 +83,7 @@ pub fn load_server_config(testmode: bool) -> Result<Document, MensagoError> {
 		("security", "diceware_wordlist", "eff_short_prefix"),
 	];
 	for s in default_string_values {
-		if out.get(s.0).is_none() || out.get(s.1).is_none() {
+		if out.get(s.0).is_none() || out[s.0].get(s.1).is_none() {
 			out[s.0][s.1] = value(s.2)
 		}
 	}
@@ -107,8 +107,24 @@ pub fn load_server_config(testmode: bool) -> Result<Document, MensagoError> {
 	];
 
 	for i in default_integer_values {
-		if out.get(i.0).is_none() || out.get(i.1).is_none() {
+		if out.get(i.0).is_none() || out[i.0].get(i.1).is_none() {
 			out[i.0][i.1] = value(i.2)
+		}
+	}
+
+	if cfg!(windows) {
+		if out["global"].get("top_dir").is_none() {
+			out["global"]["top_dir"] = value("C:\\ProgramData\\mensagodata");
+		}
+		if out["global"].get("workspace_dir").is_none() {
+			out["global"]["workspace_dir"] = value("C:\\ProgramData\\mensagodata\\wsp");
+		}
+	} else {
+		if out["global"].get("top_dir").is_none() {
+			out["global"]["top_dir"] = value("/var/mensago");
+		}
+		if out["global"].get("workspace_dir").is_none() {
+			out["global"]["workspace_dir"] = value("/var/mensago/wsp");
 		}
 	}
 
