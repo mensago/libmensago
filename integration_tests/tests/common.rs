@@ -531,7 +531,7 @@ pub fn init_server(db: &mut postgres::Client) -> Result<HashMap<&'static str,Str
 /// Resets the system workspace storage directory to an empty skeleton
 pub fn reset_workspace_dir(config: &Document) -> Result<(), MensagoError> {
 
-	let workstr = config["global"]["workspace_dir"].to_string();
+	let workstr = config["global"]["workspace_dir"].as_str().unwrap();
 	let mut globpath = PathBuf::from(&workstr);
 	globpath.push("*");
 
@@ -583,7 +583,7 @@ pub fn reset_workspace_dir(config: &Document) -> Result<(), MensagoError> {
 		}
 	}
 
-	let mut path = PathBuf::from(config["global"]["workspace_dir"].to_string());
+	let mut path = PathBuf::from(config["global"]["workspace_dir"].as_str().unwrap());
 	path.push("tmp");
 	if !path.exists() {
 		fs::create_dir(&path)?;
