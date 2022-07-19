@@ -559,27 +559,25 @@ pub fn reset_workspace_dir(config: &Document) -> Result<(), MensagoError> {
 		}
 
 		if entry.is_file() {
-			println!("removed file {}", entry.to_str().unwrap());
-			// match fs::remove_file(&entry) {
-			// 	Ok(_) => (),
-			// 	Err(e) => {
-			// 		return Err(MensagoError::ErrProgramException(
-			// 			format!("couldn't delete file {}: {}", entry.to_str().unwrap(),
-			// 				e.to_string())
-			// 		))
-			// 	}
-			// }
+			match fs::remove_file(&entry) {
+				Ok(_) => (),
+				Err(e) => {
+					return Err(MensagoError::ErrProgramException(
+						format!("couldn't delete file {}: {}", entry.to_str().unwrap(),
+							e.to_string())
+					))
+				}
+			}
 		} else if entry.is_dir() {
-			println!("removed directory {}", entry.to_str().unwrap());
-			// match fs::remove_dir_all(&entry) {
-			// 	Ok(_) => (),
-			// 	Err(e) => {
-			// 		return Err(MensagoError::ErrProgramException(
-			// 			format!("couldn't delete file {}: {}", entry.to_str().unwrap(),
-			// 				e.to_string())
-			// 		))
-			// 	}
-			// }
+			match fs::remove_dir_all(&entry) {
+				Ok(_) => (),
+				Err(e) => {
+					return Err(MensagoError::ErrProgramException(
+						format!("couldn't delete file {}: {}", entry.to_str().unwrap(),
+							e.to_string())
+					))
+				}
+			}
 		}
 	}
 
