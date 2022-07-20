@@ -53,7 +53,7 @@ lazy_static! {
 	// Initial Organization Decryption Key: WSHgOhi+bg=<bO^4UoJGF-z9`+TBN{ds?7RZ;w3o
 	
 	// Test profile data for the administrator account used in integration tests
-	static ref ADMIN_PROFILE_DATA: HashMap<&'static str, String> = {
+	pub static ref ADMIN_PROFILE_DATA: HashMap<&'static str, String> = {
 		let mut m = HashMap::new();
 		m.insert("name", String::from("Administrator"));
 		m.insert("uid", String::from("admin"));
@@ -90,7 +90,7 @@ lazy_static! {
 	};
 
 	// Test profile data for the test user account used in integration tests
-	static ref USER1_PROFILE_DATA: HashMap<&'static str, String> = {
+	pub static ref USER1_PROFILE_DATA: HashMap<&'static str, String> = {
 		let mut m = HashMap::new();
 		m.insert("name", String::from("Corbin Simons"));
 		m.insert("uid", String::from("csimons"));
