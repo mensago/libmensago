@@ -27,9 +27,7 @@ use libkeycard::*;
 use libmensago::*;
 use postgres::{Client, NoTls};
 use std::collections::HashMap;
-use std::fs;
-use std::str::FromStr;
-use std::{path::PathBuf};
+use std::{env, fs, path::PathBuf, str::FromStr};
 use std::{thread, time};
 use toml_edit::{Document, value};
 
@@ -127,6 +125,20 @@ lazy_static! {
 			String::from("CURVE25519:!x2~_pSSCx1M$n7{QBQ5e*%~ytBzKL_C(bCviqYh"));
 		m
 	};
+}
+
+/// Returns the canonical version of the path specified. 
+pub fn get_path_for_test(name: &str) -> Option<String> {
+	
+	let mut path = env::current_exe().unwrap();
+	path.pop();
+	path.push("testfiles");
+	path.push(name);
+
+	match path.to_str() {
+		Some(v) => Some(String::from(v)),
+		None => None,
+	}
 }
 
 /// Loads the Mensago server configuration from the config file
@@ -691,29 +703,31 @@ pub fn reset_workspace_dir(config: &Document) -> Result<(), MensagoError> {
 /// Creates a new profile folder hierarchy on the client side in the specified test folder
 pub fn setup_profile_base(name: &str) -> Result<String, MensagoError> {
 
-	let mut test_folder = PathBuf::from("testfiles");
-	if !test_folder.exists() {
-		fs::create_dir(&test_folder)?;
-	}
-
-	test_folder.push(name);
-	while test_folder.exists() {
-		match fs::remove_dir_all(&test_folder) {
-			Ok(_) => break,
-			Err(_) => {
-				println!("Waiting a second for test folder to unlock");
-				thread::sleep(time::Duration::from_secs(1));
+	let mut testpath = PathBuf::from(get_path_for_test(name).unwrap());
+	testpath.push("primary");
+	
+	if testpath.exists() {
+		while testpath.exists() {
+			match fs::remove_dir_all(&testpath) {
+				Ok(_) => break,
+				Err(_) => {
+					println!("Waiting a second for test folder to unlock");
+					thread::sleep(time::Duration::from_secs(1));
+				}
 			}
 		}
+		fs::create_dir(&testpath)?;
+	} else {
+		fs::create_dir_all(&testpath)?;
 	}
-	fs::create_dir(&test_folder)?;
 
-	match test_folder.to_str() {
+
+	match testpath.to_str() {
 		Some(v) => return Ok(String::from(v)),
 		None => {
 			return Err(MensagoError::ErrProgramException(
 				format!("filesystem entry with non-UTF8 name like {}. Please resolve this.",
-					test_folder.to_string_lossy())
+					testpath.to_string_lossy())
 			))
 		}
 	}
@@ -833,8 +847,8 @@ mod tests {
 	fn test_setup_profile() -> Result<(), MensagoError> {
 		
 		let mut config = load_server_config(true)?;
-		setup_profile_base("test_setup_profile")?;
-		setup_profile("test_setup_profile", &mut config, &ADMIN_PROFILE_DATA)?;
+		let profile_folder = setup_profile_base("test_setup_profile")?;
+		setup_profile(&profile_folder, &mut config, &ADMIN_PROFILE_DATA)?;
 
 		Ok(())
 	}
