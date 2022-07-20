@@ -147,7 +147,20 @@ impl Workspace {
 		//let address = MAddress::from_parts(&UserID::from_wid(wid), server);
 		let waddr = WAddress::from_parts(&wid, &server);
 		
-		let conn = self.open_secrets()?;
+		let secretstr = match self.secretspath.to_str() {
+			Some(v) => v,
+			None => {
+				return Err(MensagoError::ErrProgramException(
+					String::from("non-UTF8 path encountered in Workspace::generate")))
+			}
+		};
+
+		let conn = match rusqlite::Connection::open(&secretstr) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())));
+			}
+		};
 		
 		// Generate and add the workspace's various crypto keys
 
