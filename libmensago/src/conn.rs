@@ -51,15 +51,19 @@ impl ServerConnection {
 		sock.set_read_timeout(Some(*CONN_TIMEOUT))?;
 
 		// absorb the hello string for now
-		sock.read(&mut self.buffer)?;
+		let bytes_read = sock.read(&mut self.buffer)?;
 
-		let rawjson = match String::from_utf8(self.buffer.to_vec()) {
+		let rawjson = match String::from_utf8(self.buffer[..bytes_read].to_vec()) {
 			Ok(v) => v,
 			Err(_) => { return Err(MensagoError::ErrBadMessage) }
 		};
-		let greeting: GreetingData = match serde_json::from_str(&rawjson) {
+		let greeting: GreetingData = match serde_json::from_str(&rawjson.trim()) {
 			Ok(v) => v,
-			Err(_) => { return Err(MensagoError::ErrBadMessage) }
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("error parsing server greeting: {}", e.to_string())
+				))
+			}
 		};
 
 		if greeting.code != 200 {
