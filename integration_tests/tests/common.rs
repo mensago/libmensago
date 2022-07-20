@@ -704,7 +704,6 @@ pub fn reset_workspace_dir(config: &Document) -> Result<(), MensagoError> {
 pub fn setup_profile_base(name: &str) -> Result<String, MensagoError> {
 
 	let mut testpath = PathBuf::from(get_path_for_test(name).unwrap());
-	testpath.push("primary");
 	
 	if testpath.exists() {
 		while testpath.exists() {
@@ -779,7 +778,7 @@ profile_data: &HashMap<&'static str, String>) -> Result<(), MensagoError> {
 	// The profile folder is assumed to be empty for the purposes of these tests. 'primary' is
 	// assigned to the admin. Test users are assigned 'user1' and 'user2' for clarity.
 
-	let mut w = Workspace::new(&pbuf);
+	let mut w = Workspace::new(&profile.path);
 	w.generate(&UserID::from(&profile_data.get("uid").as_ref().unwrap()).unwrap(),
 		&Domain::from(&profile_data.get("domain").as_ref().unwrap()).unwrap(),
 		&RandomID::from(&profile_data.get("wid").as_ref().unwrap()).unwrap(),
