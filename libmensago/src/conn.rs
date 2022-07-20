@@ -30,6 +30,9 @@ pub struct ServerConnection {
 }
 
 impl ServerConnection {
+	pub fn new() -> ServerConnection {
+		ServerConnection{ socket: None, buffer: [0; BUFFER_SIZE] }
+	}
 
 	/// Connects to a Mensago server given the specified address and port
 	pub fn connect(&mut self, address: &str, port: &str) -> Result<(), MensagoError> {
