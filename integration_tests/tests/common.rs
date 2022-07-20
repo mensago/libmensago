@@ -703,7 +703,7 @@ pub fn reset_workspace_dir(config: &Document) -> Result<(), MensagoError> {
 /// Creates a new profile folder hierarchy on the client side in the specified test folder
 pub fn setup_profile_base(name: &str) -> Result<String, MensagoError> {
 
-	let mut testpath = PathBuf::from(get_path_for_test(name).unwrap());
+	let testpath = PathBuf::from(get_path_for_test(name).unwrap());
 	
 	if testpath.exists() {
 		while testpath.exists() {
