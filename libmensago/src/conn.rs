@@ -81,4 +81,18 @@ impl ServerConnection {
 			None => Ok(()),
 		}
 	}
+
+	pub fn receive(&mut self) -> Result<ServerResponse, MensagoError> {
+		if self.socket.is_none() {
+			return Err(MensagoError::ErrNotConnected)
+		}
+		ServerResponse::receive(self.socket.as_mut().unwrap())
+	}
+
+	pub fn send(&mut self, msg: &ClientRequest) -> Result<(), MensagoError> {
+		if self.socket.is_none() {
+			return Err(MensagoError::ErrNotConnected)
+		}
+		msg.send(self.socket.as_mut().unwrap())
+	}
 }
