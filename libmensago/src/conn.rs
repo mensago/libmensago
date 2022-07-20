@@ -16,10 +16,15 @@ const BUFFER_SIZE: usize = 16384;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct GreetingData {
+	#[serde(rename="Name")]
 	name: String,
+	#[serde(rename="Version")]
 	version: String,
+	#[serde(rename="Code")]
 	code: u16,
+	#[serde(rename="Status")]
 	status: String,
+	#[serde(rename="Date")]
 	date: String,
 }
 
