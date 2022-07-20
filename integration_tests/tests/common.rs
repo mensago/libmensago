@@ -853,7 +853,3 @@ mod tests {
 	}
 }
 
-// TODO: finish porting integration test setup code from pymensago
-
-// TODO: write setup code tests
-
