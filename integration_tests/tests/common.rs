@@ -28,6 +28,7 @@ use libmensago::*;
 use postgres::{Client, NoTls};
 use std::collections::HashMap;
 use std::fs;
+use std::str::FromStr;
 use std::{path::PathBuf};
 use std::{thread, time};
 use toml_edit::{Document, value};
@@ -718,6 +719,64 @@ pub fn setup_profile_base(name: &str) -> Result<String, MensagoError> {
 	}
 }
 
+// Profile_data fields
+// Note that the field names are carefully chosen -- for code efficiency they are the exact same
+// field names as those used in the database to identify the key types. All items are strings and
+// will need to be instantiated to their proper types when needed.
+
+// name - (str) the user's name
+// uid - (UserID) user ID of the user
+// wid - (RandomID) workspace ID of the user
+// domain - (Domain) domain of the user
+// address - (MAddress) full address of the user -- exists just for convenience
+// password - (Password) password object of the user's password
+// device.(public|private) - (EncryptionPair) first device encryption pair
+// crencryption.(public|private) - (EncryptionPair) contact request encryption pair
+// crsigning.(public|private) - (SigningPair) contact request signing pair
+// encryption.(public|private) - (EncryptionPair) general encryption pair
+// signing.(public|private) - (SigningPair) general signing pair
+// folder - (SecretKey) secret key for server-side folder name storage
+// storage - (SecretKey) secret key for server-side file storage
+pub fn setup_profile(profile_folder: &str, config: &mut Document,
+profile_data: &HashMap<&'static str, String>) -> Result<(), MensagoError> {
+
+	config["profile_folder"] = value(profile_folder);
+
+	let pbuf = match PathBuf::from_str(profile_folder) {
+		Ok(v) => v,
+		Err(e) => {
+			return Err(MensagoError::ErrProgramException(
+				format!("bad path in setup_profile: {}", e.to_string())
+			))
+		},
+	};
+
+	let mut profman = libmensago::ProfileManager::new(&pbuf);
+	profman.load_profiles(Some(&pbuf))?;
+	let profile = match profman.get_active_profile_mut() {
+		Some(v) => v,
+		None => {
+			return Err(MensagoError::ErrProgramException(
+				format!("failed to get active profile from profile manager")
+			))
+		}
+	};
+
+	// The profile folder is assumed to be empty for the purposes of these tests. 'primary' is
+	// assigned to the admin. Test users are assigned 'user1' and 'user2' for clarity.
+
+	let mut w = Workspace::new(&pbuf);
+	w.generate(&UserID::from(&profile_data.get("uid").as_ref().unwrap()).unwrap(),
+		&Domain::from(&profile_data.get("domain").as_ref().unwrap()).unwrap(),
+		&RandomID::from(&profile_data.get("wid").as_ref().unwrap()).unwrap(),
+		&profile_data.get("password").as_ref().unwrap())?;
+
+	let password = ArgonHash::from(&profile_data.get("password").as_ref().unwrap());
+	profile.set_identity(w, &password)?;
+
+	Ok(())
+}
+
 #[cfg(test)]
 mod tests {
 	use libmensago::*;
@@ -767,6 +826,16 @@ mod tests {
 	fn test_setup_profile_base() -> Result<(), MensagoError> {
 		
 		setup_profile_base("test_setup_profile_base")?;
+		Ok(())
+	}
+
+	#[test]
+	fn test_setup_profile() -> Result<(), MensagoError> {
+		
+		let mut config = load_server_config(true)?;
+		setup_profile_base("test_setup_profile")?;
+		setup_profile("test_setup_profile", &mut config, &ADMIN_PROFILE_DATA)?;
+
 		Ok(())
 	}
 }
