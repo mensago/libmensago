@@ -16,14 +16,9 @@ mod tests {
 		setup_profile(&profile_folder, &mut config, &ADMIN_PROFILE_DATA)?;
 
 		let mut conn = ServerConnection::new();
-		match conn.connect("localhost", "2001") {
-			Ok(_) => (),
-			Err(e) => {
-				return Err(MensagoError::ErrProgramException(
-					format!("error connecting to server: {}", e.to_string())
-				))
-			}
-		}
+		conn.connect("localhost", "2001")?;
+
+		// TODO: call regcode here
 
 		let wid = match getwid(&mut conn, &UserID::from("admin").unwrap(),
 			Domain::from("example.com").as_ref()) {
