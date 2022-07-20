@@ -22,6 +22,7 @@
 
 use eznacl::*;
 use glob;
+use lazy_static::lazy_static;
 use libkeycard::*;
 use libmensago::*;
 use postgres::{Client, NoTls};
@@ -30,6 +31,102 @@ use std::fs;
 use std::{path::PathBuf};
 use std::{thread, time};
 use toml_edit::{Document, value};
+
+lazy_static! {
+	
+	// WARNING! WARNING! DANGER WILL ROBINSON!
+	// THIS INFORMATION IS STORED IN GITLAB! DO NOT USE FOR ANYTHING EXCEPT INTEGRATION TESTS!
+
+	// Test Organization Information
+
+	// Name: Example.com
+	// Contact-Admin: ae406c5e-2673-4d3e-af20-91325d9623ca/acme.com
+	// Support and Abuse accounts are forwarded to Admin
+	// Language: en
+	
+	// Initial Organization Primary Signing Key: {UNQmjYhz<(-ikOBYoEQpXPt<irxUF*nq25PoW=_
+	// Initial Organization Primary Verification Key: r#r*RiXIN-0n)BzP3bv`LA&t4LFEQNF0Q@$N~RF*
+	// Initial Organization Primary Verification Key Hash: 
+	// 	BLAKE2B-256:ag29av@TUvh-V5KaB2l}H=m?|w`}dvkS1S1&{cMo
+	
+	// Initial Organization Encryption Key: SNhj2K`hgBd8>G>lW$!pXiM7S-B!Fbd9jT2&{{Az
+	// Initial Organization Encryption Key Hash: BLAKE2B-256:-Zz4O7J;m#-rB)2llQ*xTHjtblwm&kruUVa_v(&W
+	// Initial Organization Decryption Key: WSHgOhi+bg=<bO^4UoJGF-z9`+TBN{ds?7RZ;w3o
+	
+	// Test profile data for the administrator account used in integration tests
+	static ref ADMIN_PROFILE_DATA: HashMap<&'static str, String> = {
+		let mut m = HashMap::new();
+		m.insert("name", String::from("Administrator"));
+		m.insert("uid", String::from("admin"));
+		m.insert("wid", String::from("ae406c5e-2673-4d3e-af20-91325d9623ca"));
+		m.insert("domain", String::from("example.com"));
+		m.insert("address", String::from("admin/example.com"));
+		m.insert("waddress", String::from("ae406c5e-2673-4d3e-af20-91325d9623ca/example.com"));
+		m.insert("password", String::from("Linguini2Pegboard*Album"));
+		m.insert("crencryption.public",
+			String::from("CURVE25519:mO?WWA-k2B2O|Z%fA`~s3^$iiN{5R->#jxO@cy6{"));
+		m.insert("crencryption.private",
+			String::from("CURVE25519:2bLf2vMA?GA2?L~tv<PA9XOw6e}V~ObNi7C&qek>"));
+		m.insert("crsigning.public",
+			String::from("ED25519:E?_z~5@+tkQz!iXK?oV<Zx(ec;=27C8Pjm((kRc|"));
+		m.insert("crsigning.private",
+			String::from("ED25519:u4#h6LEwM6Aa+f<++?lma4Iy63^}V$JOP~ejYkB;"));
+		m.insert("encryption.public",
+			String::from("CURVE25519:Umbw0Y<^cf1DN|>X38HCZO@Je(zSe6crC6X_C_0F"));
+		m.insert("encryption.private",
+			String::from("CURVE25519:Bw`F@ITv#sE)2NnngXWm7RQkxg{TYhZQbebcF5b$"));
+		m.insert("signing.public",
+			String::from("ED25519:6|HBWrxMY6-?r&Sm)_^PLPerpqOj#b&x#N_#C3}p"));
+		m.insert("signing.private",
+			String::from("ED25519:p;XXU0XF#UO^}vKbC-wS(#5W6=OEIFmR2z`rS1j+"));
+		m.insert("storage",
+			String::from("XSALSA20:M^z-E(u3QFiM<QikL|7|vC|aUdrWI6VhN+jt>GH}"));
+		m.insert("folder",
+			String::from("XSALSA20:H)3FOR}+C8(4Jm#$d+fcOXzK=Z7W+ZVX11jI7qh*"));
+		m.insert("device.public",
+			String::from("CURVE25519:mO?WWA-k2B2O|Z%fA`~s3^$iiN{5R->#jxO@cy6{"));
+		m.insert("device.private",
+			String::from("CURVE25519:2bLf2vMA?GA2?L~tv<PA9XOw6e}V~ObNi7C&qek>"));
+		m
+	};
+
+	// Test profile data for the test user account used in integration tests
+	static ref USER1_PROFILE_DATA: HashMap<&'static str, String> = {
+		let mut m = HashMap::new();
+		m.insert("name", String::from("Corbin Simons"));
+		m.insert("uid", String::from("csimons"));
+		m.insert("wid", String::from("4418bf6c-000b-4bb3-8111-316e72030468"));
+		m.insert("domain", String::from("example.com"));
+		m.insert("address", String::from("csimons/example.com"));
+		m.insert("waddress", String::from("4418bf6c-000b-4bb3-8111-316e72030468/example.com"));
+		m.insert("password", String::from("MyS3cretPassw*rd"));
+		m.insert("crencryption.public",
+			String::from("CURVE25519:j(IBzX*F%OZF;g77O8jrVjM1a`Y<6-ehe{S;{gph"));
+		m.insert("crencryption.private",
+			String::from("CURVE25519:55t6A0y%S?{7c47p(R@C*X#at9Y`q5(Rc#YBS;r}"));
+		m.insert("crsigning.public",
+			String::from("ED25519:d0-oQb;{QxwnO{=!|^62+E=UYk2Y3mr2?XKScF4D"));
+		m.insert("crsigning.private",
+			String::from("ED25519:ip52{ps^jH)t$k-9bc_RzkegpIW?}FFe~BX&<V}9"));
+		m.insert("encryption.public",
+			String::from("CURVE25519:nSRso=K(WF{P+4x5S*5?Da-rseY-^>S8VN#v+)IN"));
+		m.insert("encryption.private",
+			String::from("CURVE25519:4A!nTPZSVD#tm78d=-?1OIQ43{ipSpE;@il{lYkg"));
+		m.insert("signing.public",
+			String::from("ED25519:k^GNIJbl3p@N=j8diO-wkNLuLcNF6#JF=@|a}wFE"));
+		m.insert("signing.private",
+			String::from("ED25519:;NEoR>t9n3v%RbLJC#*%n4g%oxqzs)&~k+fH4uqi"));
+		m.insert("storage",
+			String::from("XSALSA20:(bk%y@WBo3&}(UeXeHeHQ|1B}!rqYF20DiDG+9^Q"));
+		m.insert("folder",
+			String::from("XSALSA20:-DfH*_9^tVtb(z9j3Lu@_(=ow7q~8pq^<;;f%2_B"));
+		m.insert("device.public",
+			String::from("CURVE25519:94|@e{Kpsu_Qe{L@_U;QnOHz!eJ5zz?V@>+K)6F}"));
+		m.insert("device.private",
+			String::from("CURVE25519:!x2~_pSSCx1M$n7{QBQ5e*%~ytBzKL_C(bCviqYh"));
+		m
+	};
+}
 
 /// Loads the Mensago server configuration from the config file
 pub fn load_server_config(testmode: bool) -> Result<Document, MensagoError> {
@@ -454,8 +551,7 @@ pub fn init_server(db: &mut postgres::Client) -> Result<HashMap<&'static str,Str
 
 	// Preregister the admin account
 
-	let admin_wid = RandomID::from("ae406c5e-2673-4d3e-af20-91325d9623ca").unwrap();
-	let admin_address = String::from("ae406c5e-2673-4d3e-af20-91325d9623ca/example.com");
+	let admin_wid = RandomID::from(ADMIN_PROFILE_DATA.get("wid").unwrap()).unwrap();
 	let regcode = "Undamaged Shining Amaretto Improve Scuttle Uptake";
 	match db.execute("INSERT INTO prereg(wid,uid,domain,regcode) 
 	VALUES($1,'admin','example.com',$2);", &[
@@ -484,7 +580,7 @@ pub fn init_server(db: &mut postgres::Client) -> Result<HashMap<&'static str,Str
 	}
 	match db.execute("INSERT INTO aliases(wid, alias) VALUES($1,$2);", &[
 		&abuse_wid.to_string(),
-		&admin_address,
+		&ADMIN_PROFILE_DATA.get("address").unwrap(),
 	]) {
 		Ok(_) => (),
 		Err(e) => {
@@ -506,7 +602,7 @@ pub fn init_server(db: &mut postgres::Client) -> Result<HashMap<&'static str,Str
 	}
 	match db.execute("INSERT INTO aliases(wid, alias) VALUES($1,$2);", &[
 		&support_wid.to_string(),
-		&admin_address,
+		&ADMIN_PROFILE_DATA.get("address").unwrap(),
 	]) {
 		Ok(_) => (),
 		Err(e) => {
