@@ -6,8 +6,11 @@ use thiserror::Error;
 /// Type to hold status information from a Mensago protocol command response
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Error)]
 pub struct CmdStatus {
+	#[serde(rename="Code")]
 	pub code: u16,
+	#[serde(rename="Description")]
 	pub description: String,
+	#[serde(rename="Info")]
 	pub info: String,
 }
 

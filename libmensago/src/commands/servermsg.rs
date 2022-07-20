@@ -246,7 +246,9 @@ pub fn write_message<W: Write>(conn: &mut W, msg: &[u8]) -> Result<(), MensagoEr
 /// provide a much better developer experience and integrate with other Rust code better.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ClientRequest {
+	#[serde(rename="Action")]
 	pub action: String,
+	#[serde(rename="Data")]
 	pub data: HashMap<String, String>
 }
 
@@ -283,7 +285,13 @@ impl ClientRequest {
 /// the individual command.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ServerResponse {
-	pub status: CmdStatus,
+	#[serde(rename="Code")]
+	pub code: u16,
+	#[serde(rename="Status")]
+	pub status: String,
+	#[serde(rename="Info")]
+	pub info: String,
+	#[serde(rename="Data")]
 	pub data: HashMap<String, String>
 }
 
@@ -296,10 +304,7 @@ impl ServerResponse {
 			Ok(v) => v,
 			Err(_) => { return Err(MensagoError::ErrBadMessage) }
 		};
-		let msg: ServerResponse = match serde_json::from_str(&rawjson) {
-			Ok(v) => v,
-			Err(_) => { return Err(MensagoError::ErrBadMessage) }
-		};
+		let msg: ServerResponse = serde_json::from_str(&rawjson)?;
 
 		Ok(msg)
 	}
@@ -314,6 +319,15 @@ impl ServerResponse {
 			}
 		}
 		true
+	}
+
+	/// Returns a CmdStatus object based on the contents of the server response
+	pub fn as_status(&self) -> CmdStatus {
+		return CmdStatus {
+			code: self.code,
+			description: self.status.clone(),
+			info: self.info.clone(),
+		}
 	}
 }
 

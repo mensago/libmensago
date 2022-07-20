@@ -18,8 +18,8 @@ pub fn getwid(conn: &mut ServerConnection, uid: &UserID, domain: Option<&Domain>
 	conn.send(&req)?;
 
 	let resp = conn.receive()?;
-	if resp.status.code != 200 {
-		return Err(MensagoError::ErrProtocol(resp.status))
+	if resp.code != 200 {
+		return Err(MensagoError::ErrProtocol(resp.as_status()))
 	}
 	
 	if !resp.check_fields(&vec![("Workspace-ID", true)]) {
@@ -47,8 +47,8 @@ pub fn iscurrent(conn: &mut ServerConnection, index: usize, wid: Option<RandomID
 	conn.send(&req)?;
 
 	let resp = conn.receive()?;
-	if resp.status.code != 200 {
-		return Err(MensagoError::ErrProtocol(resp.status))
+	if resp.code != 200 {
+		return Err(MensagoError::ErrProtocol(resp.as_status()))
 	}
 	
 	if !resp.check_fields(&vec![("Is-Current", true)]) {
