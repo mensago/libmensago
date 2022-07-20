@@ -1,9 +1,9 @@
 use crate::base::*;
 use crate::commands::servermsg::*;
+use crate::conn::*;
 use libkeycard::*;
-use std::net::TcpStream;
 
-pub fn getwid(conn: &mut TcpStream, uid: &UserID, domain: Option<&Domain>)
+pub fn getwid(conn: &mut ServerConnection, uid: &UserID, domain: Option<&Domain>)
 -> Result<RandomID, MensagoError> {
 
 	let mut req = ClientRequest::from(
@@ -15,9 +15,9 @@ pub fn getwid(conn: &mut TcpStream, uid: &UserID, domain: Option<&Domain>)
 	if domain.is_some() {
 		req.data.insert(String::from("Domain"), String::from(domain.unwrap().as_string()));
 	}
-	req.send(conn)?;
+	conn.send(&req)?;
 
-	let resp = ServerResponse::receive(conn)?;
+	let resp = conn.receive()?;
 	if resp.status.code != 200 {
 		return Err(MensagoError::ErrProtocol(resp.status))
 	}
@@ -32,7 +32,7 @@ pub fn getwid(conn: &mut TcpStream, uid: &UserID, domain: Option<&Domain>)
 	}
 }
 
-pub fn iscurrent(conn: &mut TcpStream, index: usize, wid: Option<RandomID>)
+pub fn iscurrent(conn: &mut ServerConnection, index: usize, wid: Option<RandomID>)
 -> Result<bool, MensagoError> {
 
 	let mut req = ClientRequest::from(
@@ -44,9 +44,9 @@ pub fn iscurrent(conn: &mut TcpStream, index: usize, wid: Option<RandomID>)
 	if wid.is_some() {
 		req.data.insert(String::from("Workspace-ID"), String::from(wid.unwrap().as_string()));
 	}
-	req.send(conn)?;
+	conn.send(&req)?;
 
-	let resp = ServerResponse::receive(conn)?;
+	let resp = conn.receive()?;
 	if resp.status.code != 200 {
 		return Err(MensagoError::ErrProtocol(resp.status))
 	}
