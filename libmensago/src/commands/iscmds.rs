@@ -77,47 +77,42 @@ pub fn iscurrent(conn: &mut ServerConnection, index: usize, wid: Option<RandomID
 }
 
 /// Starts the login process by submitting the desired workspace ID.
-pub fn login(conn: &mut ServerConnection, wid: &RandomID, serverkey: &CryptoString)
+pub fn login<E: Encryptor>(conn: &mut ServerConnection, wid: &RandomID, serverkey: &E)
 -> Result<(), MensagoError> {
 
 	// We have a challenge for the server to ensure that we're connecting to the server we *think*
 	// we are.
-	// let mut challenge = [0u8; 32];
-    // match thread_rng().try_fill(&mut challenge[..]) {
-	// 	Ok(_) => (),
-	// 	Err(e) => {
-	// 		return Err(MensagoError::ErrProgramException(
-	// 			format!("random number generator failure in login(): {}", e.to_string())
-	// 		))			
-	// 	}
-	// }
-	// let ekey = EncryptionKey::from(serverkey);
-	// let echallenge = ekey.encrypt()
-	// let challenge85 = base85::encode(&challenge[..]);
+	let mut challenge = [0u8; 32];
+    match thread_rng().try_fill(&mut challenge[..]) {
+		Ok(_) => (),
+		Err(e) => {
+			return Err(MensagoError::ErrProgramException(
+				format!("random number generator failure in login(): {}", e.to_string())
+			))			
+		}
+	}
+	let echallenge = serverkey.encrypt(&challenge[..])?;
 
-	// let req = ClientRequest::from(
-	// 	"LOGIN", &vec![
-	// 		("Workspace-ID", wid.to_string().as_str()),
-	// 		("Login-Type", "PLAIN"),
-	// 		("Challenge", challenge85.as_str()),
-	// 	]
-	// );
+	let req = ClientRequest::from(
+		"LOGIN", &vec![
+			("Workspace-ID", wid.to_string().as_str()),
+			("Login-Type", "PLAIN"),
+			("Challenge", echallenge.as_str()),
+		]
+	);
 
-	// conn.send(&req)?;
+	conn.send(&req)?;
 
-	// let resp = conn.receive()?;
-	// if resp.code != 201 {
-	// 	return Err(MensagoError::ErrProtocol(resp.as_status()))
-	// }
+	let resp = conn.receive()?;
+	if resp.code != 201 {
+		return Err(MensagoError::ErrProtocol(resp.as_status()))
+	}
 	
-	// if !resp.check_fields(&vec![("Response", true),]) {
-	// 	return Err(MensagoError::ErrSchemaFailure)
-	// }
+	if !resp.check_fields(&vec![("Response", true),]) {
+		return Err(MensagoError::ErrSchemaFailure)
+	}
 
-	// TODO: Finish implementing login after patching ezcrypt
-	
-	// Ok(())
-	return Err(MensagoError::ErrUnimplemented)
+	Ok(())
 }
 
 /// Continues the login process by sending a password hash for the workspace
