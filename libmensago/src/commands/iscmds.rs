@@ -2,7 +2,6 @@ use std::collections::HashMap;
 use crate::base::*;
 use crate::commands::servermsg::*;
 use crate::conn::*;
-use base85;
 use eznacl::*;
 use libkeycard::*;
 use rand::thread_rng;
@@ -12,6 +11,31 @@ use rand::Rng;
 /// challenge.
 pub fn device(conn: &mut ServerConnection, devid: &RandomID, devpair: &EncryptionPair)
 -> Result<(), MensagoError> {
+
+	let req = ClientRequest::from(
+		"DEVICE", &vec![
+			("Device-ID", devid.as_string()),
+			("Device-Key", devpair.get_public_str().as_str()),
+		]
+	);
+	conn.send(&req)?;
+
+	let resp = conn.receive()?;
+	if resp.code != 100 {
+		return Err(MensagoError::ErrProtocol(resp.as_status()))
+	}
+	
+	if !resp.check_fields(&vec![("Challenge", true)]) {
+		return Err(MensagoError::ErrSchemaFailure)
+	}
+
+	let keystr = match CryptoString::from(resp.data.get("Challenge").unwrap()) {
+		Some(v) => v,
+		None => {
+			return Err(MensagoError::ErrBadValue)
+		},
+	};
+	let dchallenge = devpair.decrypt(&keystr)?;
 
 	// TODO: implement iscmds::device()
 	return Err(MensagoError::ErrUnimplemented)
@@ -133,8 +157,20 @@ pub fn logout(conn: &mut ServerConnection) -> Result<(), MensagoError> {
 pub fn password(conn: &mut ServerConnection, pwhash: &ArgonHash)
 -> Result<(), MensagoError> {
 
-	// TODO: implement iscmds::password()
-	return Err(MensagoError::ErrUnimplemented)
+	let req = ClientRequest::from(
+		"PASSWORD", &vec![
+			("Password-Hash", pwhash.to_string().as_str()),
+		]
+	);
+
+	conn.send(&req)?;
+
+	let resp = conn.receive()?;
+	if resp.code != 100 {
+		return Err(MensagoError::ErrProtocol(resp.as_status()))
+	}
+	
+	Ok(())
 }
 
 /// Finishes the registration of a workspace. The address may be a regular Mensago address or it 
