@@ -790,6 +790,15 @@ profile_data: &HashMap<&'static str, String>) -> Result<(), MensagoError> {
 	Ok(())
 }
 
+/// Finishes setting up a user account by registering it, logging in, and uploading a root
+/// keycard entry.
+pub fn regcode_user(conn: &mut ServerConnection, config: &mut Document,
+profile_data: &HashMap<&'static str, String>, regcode: &str,) -> Result<(), MensagoError> {
+
+	// TODO: implement regcode_user, which depends on addentry()
+	Err(MensagoError::ErrUnimplemented)
+}
+
 #[cfg(test)]
 mod tests {
 	use libmensago::*;
