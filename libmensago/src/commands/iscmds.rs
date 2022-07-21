@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use crate::base::*;
 use crate::commands::servermsg::*;
 use crate::conn::*;
@@ -91,8 +92,44 @@ pub fn password(conn: &mut ServerConnection, pwhash: &ArgonHash)
 /// Finishes the registration of a workspace. The address may be a regular Mensago address or it 
 /// can be a workspace address.
 pub fn regcode(conn: &mut ServerConnection, address: &MAddress, code: &str, pwhash: &ArgonHash, 
-devid: &RandomID, devpubkey: &CryptoString) -> Result<(), MensagoError> {
+devid: &RandomID, devpubkey: &CryptoString) -> Result<HashMap<&'static str,String>, MensagoError> {
 
-	// TODO: implement iscmds::regcode()
-	return Err(MensagoError::ErrUnimplemented)
+	let mut req = ClientRequest::from(
+		"REGCODE", &vec![
+			("Reg-Code", code),
+			("Password-Hash", &pwhash.to_string()),
+			("Device-ID", &devid.to_string()),
+			("Device-Key", &devpubkey.to_string()),
+			("Domain", &address.domain.to_string()),
+		]
+	);
+
+	if address.uid.get_type() == IDType::WorkspaceID {
+		req.data.insert(String::from("Workspace-ID"), address.uid.to_string());
+	} else {
+		req.data.insert(String::from("User-ID"), address.uid.to_string());
+	}
+
+	conn.send(&req)?;
+
+	let resp = conn.receive()?;
+	if resp.code != 201 {
+		return Err(MensagoError::ErrProtocol(resp.as_status()))
+	}
+	
+	if !resp.check_fields(&vec![
+			("Workspsace-ID", true),
+			("User-ID", true),
+			("Domain", true),
+		]) {
+		return Err(MensagoError::ErrSchemaFailure)
+	}
+	
+	let mut out = HashMap::<&'static str,String>::new();
+	out.insert("devid", devid.to_string());
+	out.insert("wid", resp.data["Workspace-ID"].clone());
+	out.insert("uid", resp.data["User-ID"].clone());
+	out.insert("domain", resp.data["Domain"].clone());
+
+	Ok(out)
 }
