@@ -115,6 +115,20 @@ pub fn login<E: Encryptor>(conn: &mut ServerConnection, wid: &RandomID, serverke
 	Ok(())
 }
 
+/// Logs the current user out without disconnecting
+pub fn logout(conn: &mut ServerConnection) -> Result<(), MensagoError> {
+
+	let req = ClientRequest::new("QUIT");
+	conn.send(&req)?;
+
+	let resp = conn.receive()?;
+	if resp.code != 200 {
+		return Err(MensagoError::ErrProtocol(resp.as_status()))
+	}
+
+	Ok(())
+}
+
 /// Continues the login process by sending a password hash for the workspace
 pub fn password(conn: &mut ServerConnection, pwhash: &ArgonHash)
 -> Result<(), MensagoError> {
