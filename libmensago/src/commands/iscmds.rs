@@ -259,3 +259,31 @@ devid: &RandomID, devpubkey: &CryptoString) -> Result<HashMap<&'static str,Strin
 
 	Ok(out)
 }
+
+/// Sets the activity status of the workspace specified. Requires admin privileges.
+pub fn setstatus(conn: &mut ServerConnection, wid: &RandomID, status: &str)
+-> Result<(), MensagoError> {
+
+	match status {
+		"active" | "disabled" | "approved" => (),
+		_ => {
+			return Err(MensagoError::ErrBadValue)
+		},
+	}
+
+	let mut req = ClientRequest::from(
+		"SETSTATUS", &vec![
+			("Workspace-ID", wid.to_string().as_str()),
+			("Status", status),
+		]
+	);
+
+	conn.send(&req)?;
+
+	let resp = conn.receive()?;
+	if resp.code != 200 {
+		return Err(MensagoError::ErrProtocol(resp.as_status()))
+	}
+	
+	Ok(())
+}
