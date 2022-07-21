@@ -2,8 +2,11 @@ use std::collections::HashMap;
 use crate::base::*;
 use crate::commands::servermsg::*;
 use crate::conn::*;
+use base85;
 use eznacl::*;
 use libkeycard::*;
+use rand::thread_rng;
+use rand::Rng;
 
 /// Completes the login process by submitting the device ID and responding to the server's device
 /// challenge.
@@ -77,7 +80,43 @@ pub fn iscurrent(conn: &mut ServerConnection, index: usize, wid: Option<RandomID
 pub fn login(conn: &mut ServerConnection, wid: &RandomID, serverkey: &CryptoString)
 -> Result<(), MensagoError> {
 
-	// TODO: implement iscmds::login()
+	// We have a challenge for the server to ensure that we're connecting to the server we *think*
+	// we are.
+	// let mut challenge = [0u8; 32];
+    // match thread_rng().try_fill(&mut challenge[..]) {
+	// 	Ok(_) => (),
+	// 	Err(e) => {
+	// 		return Err(MensagoError::ErrProgramException(
+	// 			format!("random number generator failure in login(): {}", e.to_string())
+	// 		))			
+	// 	}
+	// }
+	// let ekey = EncryptionKey::from(serverkey);
+	// let echallenge = ekey.encrypt()
+	// let challenge85 = base85::encode(&challenge[..]);
+
+	// let req = ClientRequest::from(
+	// 	"LOGIN", &vec![
+	// 		("Workspace-ID", wid.to_string().as_str()),
+	// 		("Login-Type", "PLAIN"),
+	// 		("Challenge", challenge85.as_str()),
+	// 	]
+	// );
+
+	// conn.send(&req)?;
+
+	// let resp = conn.receive()?;
+	// if resp.code != 201 {
+	// 	return Err(MensagoError::ErrProtocol(resp.as_status()))
+	// }
+	
+	// if !resp.check_fields(&vec![("Response", true),]) {
+	// 	return Err(MensagoError::ErrSchemaFailure)
+	// }
+
+	// TODO: Finish implementing login after patching ezcrypt
+	
+	// Ok(())
 	return Err(MensagoError::ErrUnimplemented)
 }
 
@@ -118,7 +157,7 @@ devid: &RandomID, devpubkey: &CryptoString) -> Result<HashMap<&'static str,Strin
 	}
 	
 	if !resp.check_fields(&vec![
-			("Workspsace-ID", true),
+			("Workspace-ID", true),
 			("User-ID", true),
 			("Domain", true),
 		]) {

@@ -14,6 +14,7 @@ exclude = [".gitignore"]
 autotests = false
 
 [dependencies]
+base85 = "1.1.0"
 chrono = "0.4.19"
 eznacl = "3.2.4"
 hex = "0.4.3"
