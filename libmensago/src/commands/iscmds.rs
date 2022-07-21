@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::os::raw;
 use crate::base::*;
 use crate::commands::servermsg::*;
 use crate::conn::*;
@@ -7,6 +6,35 @@ use eznacl::*;
 use libkeycard::*;
 use rand::thread_rng;
 use rand::Rng;
+
+/// Handles the process to upload an entry to the server
+pub fn addentry<V: VerifySignature>(conn: &mut ServerConnection, entry: &Entry, ovkey: V, 
+spair: &SigningPair) -> Result<(), MensagoError> {
+
+	let req = ClientRequest::from(
+		"ADDENTRY", &vec![
+			("Base-Entry", entry.get_full_text("")?.as_str()),
+		]
+	);
+	conn.send(&req)?;
+
+	let resp = conn.receive()?;
+	if resp.code != 100 {
+		return Err(MensagoError::ErrProtocol(resp.as_status()))
+	}
+	
+	if !resp.check_fields(&vec![
+			("Organization-Signature", true),
+			("Hash", true),
+			("Previous-Hash", true),
+		]) {
+		return Err(MensagoError::ErrSchemaFailure)
+	}
+
+	// TODO: finish implementing addentry()
+
+	Err(MensagoError::ErrUnimplemented)
+}
 
 /// Returns the session to a state where it is ready for the next command
 pub fn cancel(conn: &mut ServerConnection) -> Result<(), MensagoError> {
