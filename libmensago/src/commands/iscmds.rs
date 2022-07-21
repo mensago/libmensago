@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::os::raw;
 use crate::base::*;
 use crate::commands::servermsg::*;
 use crate::conn::*;
@@ -7,10 +8,24 @@ use libkeycard::*;
 use rand::thread_rng;
 use rand::Rng;
 
+/// Returns the session to a state where it is ready for the next command
+pub fn cancel(conn: &mut ServerConnection) -> Result<(), MensagoError> {
+
+	let req = ClientRequest::new("CANCEL");
+	conn.send(&req)?;
+
+	let resp = conn.receive()?;
+	if resp.code != 200 {
+		return Err(MensagoError::ErrProtocol(resp.as_status()))
+	}
+
+	Ok(())
+}
+
 /// Completes the login process by submitting the device ID and responding to the server's device
-/// challenge.
+/// challenge. The call returns true if the user has admin privileges or false if not.
 pub fn device(conn: &mut ServerConnection, devid: &RandomID, devpair: &EncryptionPair)
--> Result<(), MensagoError> {
+-> Result<bool, MensagoError> {
 
 	let req = ClientRequest::from(
 		"DEVICE", &vec![
@@ -29,16 +44,43 @@ pub fn device(conn: &mut ServerConnection, devid: &RandomID, devpair: &Encryptio
 		return Err(MensagoError::ErrSchemaFailure)
 	}
 
+	// The challenge from the server is expected to be Base85-encoded random bytes that are
+	// encrypted into a CryptoString. This means we decrypt the challenge and send the resulting
+	// decrypted string back to the server as proof of device identity.
 	let keystr = match CryptoString::from(resp.data.get("Challenge").unwrap()) {
 		Some(v) => v,
 		None => {
 			return Err(MensagoError::ErrBadValue)
 		},
 	};
-	let dchallenge = devpair.decrypt(&keystr)?;
+	let rawbytes = match devpair.decrypt(&keystr) {
+		Ok(v) => v,
+		Err(e) => {
+			cancel(conn)?;
+			return Err(MensagoError::EzNaclError(e));
+		}
+	};
+	let dchallenge = String::from_utf8(rawbytes)?;
 
-	// TODO: implement iscmds::device()
-	return Err(MensagoError::ErrUnimplemented)
+	let req = ClientRequest::from(
+		"DEVICE", &vec![
+			("Device-ID", devid.as_string()),
+			("Device-Key", devpair.get_public_str().as_str()),
+			("Response", dchallenge.as_str()),
+		]
+	);
+	conn.send(&req)?;
+
+	let resp = conn.receive()?;
+	if resp.code != 200 {
+		return Err(MensagoError::ErrProtocol(resp.as_status()))
+	}
+	
+	if !resp.check_fields(&vec![("Is-Admin", true)]) {
+		return Err(MensagoError::ErrSchemaFailure)
+	}
+
+	Ok(resp.data["Is-Admin"] == "True")
 }
 
 /// Looks up a workspace ID based on the specified user ID and optional domain. If the domain is
