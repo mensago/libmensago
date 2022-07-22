@@ -7,10 +7,25 @@ use libkeycard::*;
 use rand::thread_rng;
 use rand::Rng;
 
-/// Handles the process to upload an entry to the server
-pub fn addentry<V: VerifySignature>(conn: &mut ServerConnection, entry: &Entry, ovkey: V, 
+/// Handles the process to upload a user entry to the server
+pub fn addentry<V: VerifySignature>(conn: &mut ServerConnection, entry: &mut Entry, ovkey: V, 
 spair: &SigningPair) -> Result<(), MensagoError> {
 
+	// NOTE: adding an entry to the keycard database must be handled carefully -- security and
+	// integrity of the keycard chain tree depends on all t's being crossed and all i's being
+	// dotted. Don't make changes to this unless you fully understand the process here and have
+	// also double-checked your work.
+
+	// Before we start, make sure that the data in the entry is compliant
+	entry.is_data_compliant()?;
+
+	// The first round trip to the server provides us with the organization's signature, the hash
+	// of the previous entry in the chain tree, and the server's hash of the data we sent. We can't
+	// just use the hash of the previous entry in the keycard because the root entry of a user
+	// keycard is attached to the chain tree at the latest entry in the organization's keycard. We
+	// send the data to the server for the hashes and signature because the server doesn't trust
+	// clients any more than the clients trust the server. It provides the hashes and signature, but
+	// we verify everything that it gives us.
 	let req = ClientRequest::from(
 		"ADDENTRY", &vec![
 			("Base-Entry", entry.get_full_text("")?.as_str()),
@@ -30,6 +45,53 @@ spair: &SigningPair) -> Result<(), MensagoError> {
 		]) {
 		return Err(MensagoError::ErrSchemaFailure)
 	}
+
+	// Verify the organization's signature and hashes against the data stored locally to ensure that
+	// the server didn't change our entry and sign or hash the modified version
+	let org_sig = match CryptoString::from(&resp.data["Organization-Signature"]) {
+		Some(v) => v,
+		None => {
+			return Err(MensagoError::ErrServerException(
+				format!("Server exception: bad signature returned ({})", 
+					&resp.data["Organization-Signature"])
+			))
+		}
+	};
+	entry.add_authstr("Organization-Signature", &org_sig)?;
+	entry.verify_signature("Organization-Signature", &ovkey)?;
+	
+	let prev_hash = match CryptoString::from(&resp.data["Previous-Hash"]) {
+		Some(v) => v,
+		None => {
+			return Err(MensagoError::ErrServerException(
+				format!("Server exception: bad previous hash returned ({})", 
+					&resp.data["Previous-Hash"])
+			))
+		}
+	};
+	entry.add_authstr("Previous-Hash", &prev_hash)?;
+	
+	let hash = match CryptoString::from(&resp.data["Hash"]) {
+		Some(v) => v,
+		None => {
+			return Err(MensagoError::ErrServerException(
+				format!("Server exception: bad entry hash returned ({})", 
+					&resp.data["Hash"])
+			))
+		}
+	};
+	entry.add_authstr("Hash", &hash)?;
+	entry.verify_hash()?;
+
+	// Having come this far:
+	// 1) The raw entry data has been verified by us
+	// 2) The raw entry data has theoretically been verified by the server, digitally signed with
+	//    the organization's primary signing key, linked into the keycard chain tree, and hashed.
+	// 3) We have also verified that the signature and hash match the data we have locally so that
+	//    the server can't have modified our data before signing and hashing
+
+	// Next steps: sign with our key and upload to the server where everything is checked again
+	// before officially adding it to the keycard chain tree.
 
 	// TODO: finish implementing addentry()
 
