@@ -298,6 +298,28 @@ pub fn logout(conn: &mut ServerConnection) -> Result<(), MensagoError> {
 	Ok(())
 }
 
+/// Resets a workspace's password
+pub fn passcode(conn: &mut ServerConnection, wid: &RandomID, reset_code: &str, pwhash: &str)
+-> Result<(), MensagoError> {
+
+	let req = ClientRequest::from(
+		"PASSCODE", &vec![
+			("Workspace-ID", wid.as_string()),
+			("Reset-Code", reset_code),
+			("Password-Hash", pwhash),
+		]
+	);
+
+	conn.send(&req)?;
+
+	let resp = conn.receive()?;
+	if resp.code != 200 {
+		return Err(MensagoError::ErrProtocol(resp.as_status()))
+	}
+
+	Ok(())
+}
+
 /// Continues the login process by sending a password hash for the workspace
 pub fn password(conn: &mut ServerConnection, pwhash: &ArgonHash)
 -> Result<(), MensagoError> {
