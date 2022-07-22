@@ -71,6 +71,9 @@ pub enum MensagoError {
 	ErrSchemaFailure,
 	#[error("not connected")]
 	ErrNotConnected,
+	// Server exceptions are returned when the server does something wrong to help troubleshoot
+	#[error("Server exception: {0}")]
+	ErrServerException(String),
 
 
 	// Passthrough errors
