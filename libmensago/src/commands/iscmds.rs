@@ -90,12 +90,25 @@ spair: &SigningPair) -> Result<(), MensagoError> {
 	// 3) We have also verified that the signature and hash match the data we have locally so that
 	//    the server can't have modified our data before signing and hashing
 
-	// Next steps: sign with our key and upload to the server where everything is checked again
+	// Next steps: sign with our key and upload to the server where it verifies everything again
 	// before officially adding it to the keycard chain tree.
 
-	// TODO: finish implementing addentry()
+	entry.sign("User-Signature", &spair)?;
+	entry.is_compliant()?;
 
-	Err(MensagoError::ErrUnimplemented)
+	let req = ClientRequest::from(
+		"ADDENTRY", &vec![
+			("User-Signature", entry.get_authstr("User-Signature")?.as_str()),
+		]
+	);
+	conn.send(&req)?;
+
+	let resp = conn.receive()?;
+	if resp.code != 200 {
+		return Err(MensagoError::ErrProtocol(resp.as_status()))
+	}
+	
+	Ok(())
 }
 
 /// Returns the session to a state where it is ready for the next command
