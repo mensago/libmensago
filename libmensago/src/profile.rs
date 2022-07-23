@@ -239,7 +239,7 @@ impl Profile {
 
 		// We got this far, which means we need to get the info from the profile database
 		{
-			let conn = self.open_db()?;
+			let conn = self.open_storage()?;
 
 			let mut stmt = match conn
 				.prepare("SELECT wid,domain,userid FROM workspaces WHERE type = 'identity'") {
@@ -324,7 +324,7 @@ impl Profile {
 			return Err(MensagoError::ErrExists)
 		}
 
-		let conn = self.open_db()?;
+		let conn = self.open_storage()?;
 
 		// Cached version doesn't exist, so check the database
 		{
@@ -404,7 +404,7 @@ impl Profile {
 	/// Resolves a Mensago address to its corresponding workspace ID
 	pub fn resolve_address(&self, a: MAddress) -> Result<RandomID,MensagoError> {
 
-		let conn = self.open_db()?;
+		let conn = self.open_storage()?;
 
 		let mut stmt = match conn
 			.prepare("SELECT wid FROM workspaces WHERE userid=?1 AND domain=?2") {
@@ -445,9 +445,16 @@ impl Profile {
 		}
 	}
 
-	/// Private function to make code that deals with the database easier. It also ensures that
-	/// an error is returned if the database doesn't exist.
-	fn open_db(&self) -> Result<rusqlite::Connection, rusqlite::Error> {
+	/// Creates a connection to the profile's database for storage of keys
+	pub fn open_secrets(&self) -> Result<rusqlite::Connection, rusqlite::Error> {
+		
+		let mut dbpath = self.path.clone();
+		dbpath.push("secrets.db");
+		rusqlite::Connection::open_with_flags(dbpath, rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE)
+	}
+
+	/// Creates a connection to the profile's main storage database
+	pub fn open_storage(&self) -> Result<rusqlite::Connection, rusqlite::Error> {
 		
 		let mut dbpath = self.path.clone();
 		dbpath.push("storage.db");
