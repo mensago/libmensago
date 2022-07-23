@@ -16,7 +16,7 @@ autotests = false
 [dependencies]
 base85 = "1.1.0"
 chrono = "0.4.19"
-eznacl = "3.2.4"
+eznacl = "3.2.5"
 hex = "0.4.3"
 iobuffer = "0.2.0"
 lazy_static = "1.4.0"
