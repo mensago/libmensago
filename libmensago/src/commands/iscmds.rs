@@ -8,7 +8,7 @@ use rand::thread_rng;
 use rand::Rng;
 
 /// Handles the process to upload a user entry to the server
-pub fn addentry<V: VerifySignature>(conn: &mut ServerConnection, entry: &mut Entry, ovkey: V, 
+pub fn addentry<V: VerifySignature>(conn: &mut ServerConnection, entry: &mut Entry, ovkey: &V, 
 spair: &SigningPair) -> Result<(), MensagoError> {
 
 	// NOTE: adding an entry to the keycard database must be handled carefully -- security and
@@ -219,7 +219,7 @@ pub fn getwid(conn: &mut ServerConnection, uid: &UserID, domain: Option<&Domain>
 
 /// Finds out if an entry index is current. If workspace ID is omitted, this command checks the
 /// index for the organization's keycard.
-pub fn iscurrent(conn: &mut ServerConnection, index: usize, wid: Option<RandomID>)
+pub fn iscurrent(conn: &mut ServerConnection, index: usize, wid: Option<&RandomID>)
 -> Result<bool, MensagoError> {
 
 	let mut req = ClientRequest::from(
@@ -320,7 +320,13 @@ pub fn passcode(conn: &mut ServerConnection, wid: &RandomID, reset_code: &str, p
 	Ok(())
 }
 
-/// Continues the login process by sending a password hash for the workspace
+/// Continues the login process by sending a password hash for the workspace. This function returns
+/// a hashmap containing 4 String fields:
+/// 
+/// - devid - the RandomID that identifies the device to the server
+/// - wid - the workspace ID of the account
+/// - uid - the user ID of the account. This will be the same as the wid field for private accounts
+/// - domain - the domain of the account
 pub fn password(conn: &mut ServerConnection, pwhash: &ArgonHash)
 -> Result<(), MensagoError> {
 
