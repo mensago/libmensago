@@ -751,7 +751,7 @@ pub fn setup_profile_base(name: &str) -> Result<String, MensagoError> {
 // folder - (SecretKey) secret key for server-side folder name storage
 // storage - (SecretKey) secret key for server-side file storage
 pub fn setup_profile(profile_folder: &str, config: &mut Document,
-profile_data: &HashMap<&'static str, String>) -> Result<(), MensagoError> {
+profile_data: &HashMap<&'static str, String>) -> Result<ArgonHash, MensagoError> {
 
 	config["profile_folder"] = value(profile_folder);
 
@@ -787,16 +787,111 @@ profile_data: &HashMap<&'static str, String>) -> Result<(), MensagoError> {
 	let password = ArgonHash::from(&profile_data.get("password").as_ref().unwrap());
 	profile.set_identity(w, &password)?;
 
-	Ok(())
+	Ok(password)
 }
 
 /// Finishes setting up a user account by registering it, logging in, and uploading a root
 /// keycard entry.
-pub fn regcode_user(conn: &mut ServerConnection, config: &mut Document,
-profile_data: &HashMap<&'static str, String>, regcode: &str,) -> Result<(), MensagoError> {
+pub fn regcode_user(conn: &mut ServerConnection, profman: &mut ProfileManager,
+dbdata: &HashMap<&'static str, String>, profile_data: &HashMap<&'static str, String>,
+user_regcode: &str, pwhash: &ArgonHash) -> Result<(), MensagoError> {
 
-	// TODO: implement regcode_user, which depends on addentry()
-	Err(MensagoError::ErrUnimplemented)
+	let profile = profman.get_active_profile().unwrap();
+
+	let regdata = match regcode(
+		conn, 
+		MAddress::from(&profile_data["address"]).as_ref().unwrap(),
+		user_regcode,
+		pwhash,
+		profile.devid.as_ref().unwrap(),
+		&CryptoString::from(&profile_data["device"]).unwrap()) {
+		Ok(v) => v,
+		Err(e) => {
+			return Err(MensagoError::ErrProgramException(
+				format!("regcode failed in regcode_user: {}", e.to_string())
+			))
+		},
+	};
+
+	let waddr = WAddress::from(&ADMIN_PROFILE_DATA["waddress"]).unwrap();
+	let devpair = EncryptionPair::from_strings(
+		&ADMIN_PROFILE_DATA["device.public"],
+		&ADMIN_PROFILE_DATA["device.private"],
+	).unwrap();
+	let db = profile.open_secrets()?;
+	match add_device_session(&db, &waddr, profile.devid.as_ref().unwrap(), &devpair, None) {
+		Ok(v) => v,
+		Err(e) => {
+			return Err(MensagoError::ErrProgramException(
+				format!("add_device_session() failed in regcode_user: {}", e.to_string())
+			))
+		},
+	}
+
+	let oekey = EncryptionKey::from_string(&dbdata["oekey"]).unwrap();
+	match login(conn, waddr.get_wid(), &oekey) {
+		Ok(v) => v,
+		Err(e) => {
+			return Err(MensagoError::ErrProgramException(
+				format!("login() failed in regcode_user: {}", e.to_string())
+			))
+		},
+	}
+
+	match password(conn, &pwhash) {
+		Ok(v) => v,
+		Err(e) => {
+			return Err(MensagoError::ErrProgramException(
+				format!("password() failed in regcode_user: {}", e.to_string())
+			))
+		},
+	}
+
+	match device(conn, profile.devid.as_ref().unwrap(), &devpair) {
+		Ok(v) => v,
+		Err(e) => {
+			return Err(MensagoError::ErrProgramException(
+				format!("device() failed in regcode_user: {}", e.to_string())
+			))
+		},
+	}
+
+	// Admin login complete. Now create and upload the admin account's root keycard entry
+
+	let entry = Entry::new(&EntryType::User).unwrap();
+	entry.set_fields(&vec![
+		(String::from("Index"), String::from("1")),
+		(String::from("Name"), profile_data["name"]),
+		(String::from("Workspace-ID"), profile_data["wid"]),
+		(String::from("User-ID"), profile_data["uid"]),
+		(String::from("Domain"), profile_data["domain"]),
+		(String::from("Contact-Request-Verification-Key"), profile_data["crsigning.public"]),
+		(String::from("Contact-Request-Encryption-Key"), profile_data["crencryption.public"]),
+		(String::from("Encryption-Key"), profile_data["encryption.public"]),
+		(String::from("Verification-Key"), profile_data["signing.public"]),
+	])?;
+
+	let spair = SigningPair::from_strings(&profile_data["signing.public"],
+		&profile_data["signing.private"])?;
+	match addentry(conn, &mut entry, &ovkey, &spair) {
+		Ok(v) => v,
+		Err(e) => {
+			return Err(MensagoError::ErrProgramException(
+				format!("addentry() failed in regcode_user: {}", e.to_string())
+			))
+		},
+	}
+
+	match iscurrent(conn, 1, profile.wid) {
+		Ok(v) => v,
+		Err(e) => {
+			return Err(MensagoError::ErrProgramException(
+				format!("iscurrent() failed in regcode_user: {}", e.to_string())
+			))
+		},
+	}
+	
+	Ok(())
 }
 
 #[cfg(test)]
