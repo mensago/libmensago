@@ -955,5 +955,77 @@ mod tests {
 
 		Ok(())
 	}
+
+	#[test]
+	fn test_regcode_user() -> Result<(), MensagoError> {
+		
+		let testname = "test_regcode_user";
+		let mut config = load_server_config(true)?;
+		let db = match setup_test(&config) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: setup_test error: {}", testname, e.to_string())
+				))
+			}
+		};
+		let dbdata = match init_server(&mut db) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: init_server error: {}", testname, e.to_string())
+				))
+			}
+		};
+		let profile_folder = match setup_profile_base("test_setup_profile") {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: setup_profile_base error: {}", testname, e.to_string())
+				))
+			}
+		};
+		let pwhash = match setup_profile(&profile_folder, &mut config, &ADMIN_PROFILE_DATA) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: setup_profile error: {}", testname, e.to_string())
+				))
+			}
+		};
+
+		let profman = ProfileManager::new(&profile_folder);
+		match profman.load_profiles(Some(&PathBuf::from(&profile_folder))) {
+			Ok(_) => (),
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: load_profiles error: {}", testname, e.to_string())
+				))
+			}
+		};
+
+		let conn = ServerConnection::new();
+		let port = config["network"]["listen_ip"].as_integer().unwrap();
+		match conn.connect(config["network"]["listen_ip"].as_str().unwrap(), &port.to_string()) {
+			Ok(_) => (),
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error connecting to server: {}", testname, e.to_string())
+				))
+			}
+		}
+		
+		match regcode_user(&mut conn, &mut profman, &dbdata, &ADMIN_PROFILE_DATA, user_regcode,
+			&pwhash) {
+			Ok(_) => (),
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: regcode_user error: {}", testname, e.to_string())
+				))
+			}
+		}
+
+		Ok(())
+	}
 }
 
