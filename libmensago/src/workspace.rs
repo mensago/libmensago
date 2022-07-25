@@ -164,29 +164,30 @@ impl Workspace {
 		
 		// Generate and add the workspace's various crypto keys
 
-		let crepair = eznacl::EncryptionPair::generate().unwrap();
+		// TODO: Add preferred algorithm support once implemented in eznacl
+		let crepair = eznacl::EncryptionPair::generate("CURVE25519").unwrap();
 		let _ = auth::add_keypair(&conn, &waddr, &crepair.get_public_key(),
 			&crepair.get_private_key(), "sha-256", &KeyType::AsymEncryptionKey,
 			&KeyCategory::ConReqEncryption)?;
 
-		let crspair = eznacl::SigningPair::generate().unwrap();
+		let crspair = eznacl::SigningPair::generate("ED25519").unwrap();
 		let _ = auth::add_keypair(&conn, &waddr, &crspair.get_public_key(),
 			&crspair.get_private_key(), "sha-256", &KeyType::SigningKey,
 			&KeyCategory::ConReqSigning)?;
 
-		let epair = eznacl::EncryptionPair::generate().unwrap();
+		let epair = eznacl::EncryptionPair::generate("CURVE25519").unwrap();
 		let _ = auth::add_keypair(&conn, &waddr, &epair.get_public_key(), &epair.get_private_key(),
 			"sha-256", &KeyType::AsymEncryptionKey, &KeyCategory::Encryption)?;
 
-		let spair = eznacl::SigningPair::generate().unwrap();
+		let spair = eznacl::SigningPair::generate("ED25519").unwrap();
 		let _ = auth::add_keypair(&conn, &waddr, &spair.get_public_key(), &spair.get_private_key(),
 			"sha-256", &KeyType::SigningKey, &KeyCategory::Signing)?;
 
-		let folderkey = eznacl::SecretKey::generate().unwrap();
+		let folderkey = eznacl::SecretKey::generate("XSALSA20").unwrap();
 		let _ = auth::add_key(&conn, &waddr, &folderkey.get_public_key(), "sha-256",
 			&KeyCategory::Folder)?;
 
-		let storagekey = eznacl::SecretKey::generate().unwrap();
+		let storagekey = eznacl::SecretKey::generate("XSALSA20").unwrap();
 		let _ = auth::add_key(&conn, &waddr, &storagekey.get_public_key(), "sha-256", 
 			&KeyCategory::Storage)?;
 		

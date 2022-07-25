@@ -58,7 +58,7 @@ spair: &SigningPair) -> Result<(), MensagoError> {
 		}
 	};
 	entry.add_authstr("Organization-Signature", &org_sig)?;
-	entry.verify_signature("Organization-Signature", &ovkey)?;
+	entry.verify_signature("Organization-Signature", ovkey)?;
 	
 	let prev_hash = match CryptoString::from(&resp.data["Previous-Hash"]) {
 		Some(v) => v,
@@ -402,7 +402,7 @@ pub fn setstatus(conn: &mut ServerConnection, wid: &RandomID, status: &str)
 		},
 	}
 
-	let mut req = ClientRequest::from(
+	let req = ClientRequest::from(
 		"SETSTATUS", &vec![
 			("Workspace-ID", wid.to_string().as_str()),
 			("Status", status),

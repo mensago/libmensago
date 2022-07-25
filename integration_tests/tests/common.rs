@@ -380,10 +380,11 @@ pub fn init_server(db: &mut postgres::Client) -> Result<HashMap<&'static str,Str
 
 	let initial_ospair = SigningPair::from(
 		&CryptoString::from("ED25519:r#r*RiXIN-0n)BzP3bv`LA&t4LFEQNF0Q@$N~RF*").unwrap(),
-		&CryptoString::from("ED25519:{UNQmjYhz<(-ikOBYoEQpXPt<irxUF*nq25PoW=_").unwrap());
+		&CryptoString::from("ED25519:{UNQmjYhz<(-ikOBYoEQpXPt<irxUF*nq25PoW=_").unwrap()).unwrap();
 	let initial_oepair = EncryptionPair::from(
 		&CryptoString::from("CURVE25519:SNhj2K`hgBd8>G>lW$!pXiM7S-B!Fbd9jT2&{{Az").unwrap(),
-		&CryptoString::from("CURVE25519:WSHgOhi+bg=<bO^4UoJGF-z9`+TBN{ds?7RZ;w3o").unwrap());
+		&CryptoString::from("CURVE25519:WSHgOhi+bg=<bO^4UoJGF-z9`+TBN{ds?7RZ;w3o").unwrap())
+			.unwrap();
 	
 	match root_entry.is_data_compliant() {
 		Ok(_) => (),
@@ -798,12 +799,8 @@ user_regcode: &str, pwhash: &ArgonHash) -> Result<(), MensagoError> {
 
 	let profile = profman.get_active_profile().unwrap();
 
-	let regdata = match regcode(
-		conn, 
-		MAddress::from(&profile_data["address"]).as_ref().unwrap(),
-		user_regcode,
-		pwhash,
-		profile.devid.as_ref().unwrap(),
+	let regdata = match regcode(conn, MAddress::from(&profile_data["address"]).as_ref().unwrap(),
+		user_regcode, pwhash, profile.devid.as_ref().unwrap(),
 		&CryptoString::from(&profile_data["device"]).unwrap()) {
 		Ok(v) => v,
 		Err(e) => {
@@ -848,29 +845,38 @@ user_regcode: &str, pwhash: &ArgonHash) -> Result<(), MensagoError> {
 	}
 
 	match device(conn, profile.devid.as_ref().unwrap(), &devpair) {
-		Ok(v) => v,
+		Ok(v) => {
+			if !v {
+				return Err(MensagoError::ErrProgramException(
+					format!("device() failed in regcode_user")
+				))
+			}
+		},
 		Err(e) => {
 			return Err(MensagoError::ErrProgramException(
-				format!("device() failed in regcode_user: {}", e.to_string())
+				format!("device() error in regcode_user: {}", e.to_string())
 			))
 		},
 	}
 
 	// Admin login complete. Now create and upload the admin account's root keycard entry
 
-	let entry = Entry::new(&EntryType::User).unwrap();
+	let mut entry = Entry::new(EntryType::User).unwrap();
 	entry.set_fields(&vec![
 		(String::from("Index"), String::from("1")),
-		(String::from("Name"), profile_data["name"]),
-		(String::from("Workspace-ID"), profile_data["wid"]),
-		(String::from("User-ID"), profile_data["uid"]),
-		(String::from("Domain"), profile_data["domain"]),
-		(String::from("Contact-Request-Verification-Key"), profile_data["crsigning.public"]),
-		(String::from("Contact-Request-Encryption-Key"), profile_data["crencryption.public"]),
-		(String::from("Encryption-Key"), profile_data["encryption.public"]),
-		(String::from("Verification-Key"), profile_data["signing.public"]),
+		(String::from("Name"), profile_data["name"].clone()),
+		(String::from("Workspace-ID"), profile_data["wid"].clone()),
+		(String::from("User-ID"), profile_data["uid"].clone()),
+		(String::from("Domain"), profile_data["domain"].clone()),
+		(String::from("Contact-Request-Verification-Key"),
+			profile_data["crsigning.public"].clone()),
+		(String::from("Contact-Request-Encryption-Key"),
+			profile_data["crencryption.public"].clone()),
+		(String::from("Encryption-Key"), profile_data["encryption.public"].clone()),
+		(String::from("Verification-Key"), profile_data["signing.public"].clone()),
 	])?;
 
+	let ovkey = VerificationKey::from_string(&dbdata["ovkey"]).unwrap();
 	let spair = SigningPair::from_strings(&profile_data["signing.public"],
 		&profile_data["signing.private"])?;
 	match addentry(conn, &mut entry, &ovkey, &spair) {
@@ -882,8 +888,14 @@ user_regcode: &str, pwhash: &ArgonHash) -> Result<(), MensagoError> {
 		},
 	}
 
-	match iscurrent(conn, 1, profile.wid) {
-		Ok(v) => v,
+	match iscurrent(conn, 1, profile.wid.as_ref()) {
+		Ok(v) => {
+			if !v {
+				return Err(MensagoError::ErrProgramException(
+					format!("iscurrent() returned false in regcode_user")
+				))
+			}
+		},
 		Err(e) => {
 			return Err(MensagoError::ErrProgramException(
 				format!("iscurrent() failed in regcode_user: {}", e.to_string())
@@ -961,7 +973,7 @@ mod tests {
 		
 		let testname = "test_regcode_user";
 		let mut config = load_server_config(true)?;
-		let db = match setup_test(&config) {
+		let mut db = match setup_test(&config) {
 			Ok(v) => v,
 			Err(e) => {
 				return Err(MensagoError::ErrProgramException(
@@ -994,7 +1006,7 @@ mod tests {
 			}
 		};
 
-		let profman = ProfileManager::new(&profile_folder);
+		let mut profman = ProfileManager::new(&PathBuf::from(&profile_folder));
 		match profman.load_profiles(Some(&PathBuf::from(&profile_folder))) {
 			Ok(_) => (),
 			Err(e) => {
@@ -1004,7 +1016,7 @@ mod tests {
 			}
 		};
 
-		let conn = ServerConnection::new();
+		let mut conn = ServerConnection::new();
 		let port = config["network"]["listen_ip"].as_integer().unwrap();
 		match conn.connect(config["network"]["listen_ip"].as_str().unwrap(), &port.to_string()) {
 			Ok(_) => (),
@@ -1015,8 +1027,8 @@ mod tests {
 			}
 		}
 		
-		match regcode_user(&mut conn, &mut profman, &dbdata, &ADMIN_PROFILE_DATA, user_regcode,
-			&pwhash) {
+		match regcode_user(&mut conn, &mut profman, &dbdata, &ADMIN_PROFILE_DATA,
+			&dbdata["admin_regcode"], &pwhash) {
 			Ok(_) => (),
 			Err(e) => {
 				return Err(MensagoError::ErrProgramException(

@@ -132,10 +132,8 @@ pub fn get_session_keypair(conn: &rusqlite::Connection, waddr: &WAddress)
 	})?;
 
 	match EncryptionPair::from_strings(&pubstr, &privstr) {
-		Some(v) => Ok(v),
-		None => { Err(MensagoError::ErrProgramException(
-					String::from("Error obtaining encryption pair from database")))
-		}
+		Ok(v) => Ok(v),
+		Err(e) => Err(MensagoError::EzNaclError(e)),
 	}
 }
 
