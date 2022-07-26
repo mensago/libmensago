@@ -817,7 +817,7 @@ user_regcode: &str, pwhash: &ArgonHash) -> Result<HashMap<&'static str, String>,
 		&ADMIN_PROFILE_DATA["device.private"],
 	).unwrap();
 	let db = profile.open_secrets()?;
-	match add_device_session(&db, &waddr, profile.devid.as_ref().unwrap(), &devpair, None) {
+	match add_device_session(&db, &waddr, &devid, &devpair, None) {
 		Ok(v) => v,
 		Err(e) => {
 			return Err(MensagoError::ErrProgramException(
