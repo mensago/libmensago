@@ -799,9 +799,10 @@ user_regcode: &str, pwhash: &ArgonHash) -> Result<HashMap<&'static str, String>,
 
 	let profile = profman.get_active_profile().unwrap();
 
+	let devid = RandomID::generate();
 	let regdata = match regcode(conn, MAddress::from(&profile_data["address"]).as_ref().unwrap(),
-		user_regcode, pwhash, profile.devid.as_ref().unwrap(),
-		&CryptoString::from(&profile_data["device"]).unwrap()) {
+		user_regcode, pwhash, &devid,
+		&CryptoString::from(&profile_data["device.public"]).unwrap()) {
 		Ok(v) => v,
 		Err(e) => {
 			return Err(MensagoError::ErrProgramException(
@@ -1017,7 +1018,7 @@ mod tests {
 		};
 
 		let mut conn = ServerConnection::new();
-		let port = config["network"]["listen_ip"].as_integer().unwrap();
+		let port = config["network"]["port"].as_integer().unwrap();
 		match conn.connect(config["network"]["listen_ip"].as_str().unwrap(), &port.to_string()) {
 			Ok(_) => (),
 			Err(e) => {

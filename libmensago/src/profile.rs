@@ -143,17 +143,15 @@ impl Profile {
 	/// Creates a new profile from a specified path
 	fn new(profpath: &Path) -> Result<Profile, MensagoError> {
 
-		let mut profname = match profpath.to_str() {
-			Some(v) => v,
-			None =>  { return Err(MensagoError::ErrBadValue) },
+		let profname = match profpath.to_str() {
+			Some(_) => {
+				String::from(profpath.file_name().unwrap().to_str().unwrap())
+			},
+			None =>  { return Err(MensagoError::ErrUTF8) },
 		};
 		if profname.len() == 0 {
 			return Err(MensagoError::ErrEmptyData);
 		}
-		profname = match profpath.parent() {
-			Some(v) => v.to_str().unwrap(),
-			None => { return Err(MensagoError::ErrBadValue) },
-		};
 		
 		let mut profile = Profile{
 			name: String::from(profname),
@@ -289,7 +287,7 @@ impl Profile {
 				self.domain = Domain::from(&row.get::<usize,String>(1).unwrap());
 			}
 			if self.uid.is_none() {
-				self.uid = UserID::from(&row.get::<usize,String>(3).unwrap());
+				self.uid = UserID::from(&row.get::<usize,String>(2).unwrap());
 			}
 
 			// Connection to the database will be closed when the connection object is dropped
