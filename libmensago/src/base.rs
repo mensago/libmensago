@@ -54,6 +54,8 @@ pub enum MensagoError {
 	ErrBadSession,
 	#[error("Bad message")]
 	ErrBadMessage,
+	#[error("UTF-8 error")]
+	ErrUTF8,
 	
 	// Database exceptions are *bad*. This is returned only when there is a major problem with the
 	// data in the database, such as a workspace having no identity entry.
