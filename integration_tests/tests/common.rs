@@ -795,7 +795,7 @@ profile_data: &HashMap<&'static str, String>) -> Result<ArgonHash, MensagoError>
 /// keycard entry.
 pub fn regcode_user(conn: &mut ServerConnection, profman: &mut ProfileManager,
 dbdata: &HashMap<&'static str, String>, profile_data: &HashMap<&'static str, String>,
-user_regcode: &str, pwhash: &ArgonHash) -> Result<(), MensagoError> {
+user_regcode: &str, pwhash: &ArgonHash) -> Result<HashMap<&'static str, String>, MensagoError> {
 
 	let profile = profman.get_active_profile().unwrap();
 
@@ -903,7 +903,7 @@ user_regcode: &str, pwhash: &ArgonHash) -> Result<(), MensagoError> {
 		},
 	}
 	
-	Ok(())
+	Ok(regdata)
 }
 
 #[cfg(test)]
