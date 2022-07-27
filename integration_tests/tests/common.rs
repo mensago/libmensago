@@ -845,7 +845,7 @@ user_regcode: &str, pwhash: &ArgonHash) -> Result<HashMap<&'static str, String>,
 		},
 	}
 
-	match device(conn, profile.devid.as_ref().unwrap(), &devpair) {
+	match device(conn, &devid, &devpair) {
 		Ok(v) => {
 			if !v {
 				return Err(MensagoError::ErrProgramException(
