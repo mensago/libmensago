@@ -29,7 +29,7 @@ spair: &SigningPair) -> Result<(), MensagoError> {
 	// we verify everything that it gives us.
 	let req = ClientRequest::from(
 		"ADDENTRY", &vec![
-			("Base-Entry", entry.get_full_text("")?.as_str()),
+			("Base-Entry", entry.get_text()?.as_str()),
 		]
 	);
 	conn.send(&req)?;
