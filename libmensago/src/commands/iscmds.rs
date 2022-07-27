@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use crate::base::*;
 use crate::commands::servermsg::*;
 use crate::conn::*;
+use base85;
 use eznacl::*;
 use libkeycard::*;
 use rand::thread_rng;
@@ -251,8 +252,8 @@ pub fn login<E: Encryptor>(conn: &mut ServerConnection, wid: &RandomID, serverke
 
 	// We have a challenge for the server to ensure that we're connecting to the server we *think*
 	// we are.
-	let mut challenge = [0u8; 32];
-    match thread_rng().try_fill(&mut challenge[..]) {
+	let mut rawchallenge = [0u8; 32];
+    match thread_rng().try_fill(&mut rawchallenge[..]) {
 		Ok(_) => (),
 		Err(e) => {
 			return Err(MensagoError::ErrProgramException(
@@ -260,7 +261,8 @@ pub fn login<E: Encryptor>(conn: &mut ServerConnection, wid: &RandomID, serverke
 			))			
 		}
 	}
-	let echallenge = serverkey.encrypt(&challenge[..])?;
+	let challenge = base85::encode(&rawchallenge);
+	let echallenge = serverkey.encrypt(challenge.as_bytes())?;
 
 	let req = ClientRequest::from(
 		"LOGIN", &vec![
@@ -273,7 +275,7 @@ pub fn login<E: Encryptor>(conn: &mut ServerConnection, wid: &RandomID, serverke
 	conn.send(&req)?;
 
 	let resp = conn.receive()?;
-	if resp.code != 201 {
+	if resp.code != 100 {
 		return Err(MensagoError::ErrProtocol(resp.as_status()))
 	}
 	
