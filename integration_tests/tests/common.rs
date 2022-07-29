@@ -990,7 +990,7 @@ mod tests {
 				))
 			}
 		};
-		let profile_folder = match setup_profile_base("test_setup_profile") {
+		let profile_folder = match setup_profile_base(testname) {
 			Ok(v) => v,
 			Err(e) => {
 				return Err(MensagoError::ErrProgramException(
