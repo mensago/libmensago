@@ -94,6 +94,8 @@ mod tests {
 			))
 		}
 
+		conn.disconnect()?;
+
 		Ok(())
 	}
 
