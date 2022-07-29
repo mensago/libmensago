@@ -7,6 +7,7 @@ use eznacl::*;
 use libkeycard::*;
 use rand::thread_rng;
 use rand::Rng;
+use std::{thread, time::Duration};
 
 /// Handles the process to upload a user entry to the server
 pub fn addentry<V: VerifySignature>(conn: &mut ServerConnection, entry: &mut Entry, ovkey: &V, 
@@ -105,6 +106,7 @@ spair: &SigningPair) -> Result<(), MensagoError> {
 	conn.send(&req)?;
 
 	let resp = conn.receive()?;
+	thread::sleep(Duration::from_millis(10));
 	if resp.code != 200 {
 		return Err(MensagoError::ErrProtocol(resp.as_status()))
 	}
@@ -119,6 +121,7 @@ pub fn cancel(conn: &mut ServerConnection) -> Result<(), MensagoError> {
 	conn.send(&req)?;
 
 	let resp = conn.receive()?;
+	thread::sleep(Duration::from_millis(10));
 	if resp.code != 200 {
 		return Err(MensagoError::ErrProtocol(resp.as_status()))
 	}
@@ -176,6 +179,7 @@ pub fn device(conn: &mut ServerConnection, devid: &RandomID, devpair: &Encryptio
 	conn.send(&req)?;
 
 	let resp = conn.receive()?;
+	thread::sleep(Duration::from_millis(10));
 	if resp.code != 200 {
 		return Err(MensagoError::ErrProtocol(resp.as_status()))
 	}
@@ -204,6 +208,7 @@ pub fn getwid(conn: &mut ServerConnection, uid: &UserID, domain: Option<&Domain>
 	conn.send(&req)?;
 
 	let resp = conn.receive()?;
+	thread::sleep(Duration::from_millis(10));
 	if resp.code != 200 {
 		return Err(MensagoError::ErrProtocol(resp.as_status()))
 	}
@@ -235,6 +240,7 @@ pub fn iscurrent(conn: &mut ServerConnection, index: usize, wid: Option<&RandomI
 	conn.send(&req)?;
 
 	let resp = conn.receive()?;
+	thread::sleep(Duration::from_millis(10));
 	if resp.code != 200 {
 		return Err(MensagoError::ErrProtocol(resp.as_status()))
 	}
@@ -275,6 +281,7 @@ pub fn login<E: Encryptor>(conn: &mut ServerConnection, wid: &RandomID, serverke
 	conn.send(&req)?;
 
 	let resp = conn.receive()?;
+	thread::sleep(Duration::from_millis(10));
 	if resp.code != 100 {
 		return Err(MensagoError::ErrProtocol(resp.as_status()))
 	}
@@ -315,6 +322,7 @@ pub fn passcode(conn: &mut ServerConnection, wid: &RandomID, reset_code: &str, p
 	conn.send(&req)?;
 
 	let resp = conn.receive()?;
+	thread::sleep(Duration::from_millis(10));
 	if resp.code != 200 {
 		return Err(MensagoError::ErrProtocol(resp.as_status()))
 	}
@@ -341,6 +349,7 @@ pub fn password(conn: &mut ServerConnection, pwhash: &ArgonHash)
 	conn.send(&req)?;
 
 	let resp = conn.receive()?;
+	thread::sleep(Duration::from_millis(10));
 	if resp.code != 100 {
 		return Err(MensagoError::ErrProtocol(resp.as_status()))
 	}
@@ -372,6 +381,7 @@ devid: &RandomID, devpubkey: &CryptoString) -> Result<HashMap<&'static str,Strin
 	conn.send(&req)?;
 
 	let resp = conn.receive()?;
+	thread::sleep(Duration::from_millis(10));
 	if resp.code != 201 {
 		return Err(MensagoError::ErrProtocol(resp.as_status()))
 	}
@@ -414,6 +424,7 @@ pub fn setstatus(conn: &mut ServerConnection, wid: &RandomID, status: &str)
 	conn.send(&req)?;
 
 	let resp = conn.receive()?;
+	thread::sleep(Duration::from_millis(10));
 	if resp.code != 200 {
 		return Err(MensagoError::ErrProtocol(resp.as_status()))
 	}
