@@ -6,6 +6,10 @@ mod tests {
 	use libmensago::*;
 	use crate::common::*;
 	use std::path::PathBuf;
+	
+	// addentry() is tested by common.rs::test_regcode_user()
+	
+	// device() is tested by common.rs::test_regcode_user()
 
 	#[test]
 	fn test_getwid() -> Result<(), MensagoError> {
@@ -99,4 +103,5 @@ mod tests {
 		Ok(())
 	}
 
+	// login() is tested by common.rs::test_regcode_user()
 }
