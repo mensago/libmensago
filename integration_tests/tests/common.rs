@@ -878,9 +878,9 @@ user_regcode: &str, pwhash: &ArgonHash) -> Result<HashMap<&'static str, String>,
 	])?;
 
 	let ovkey = VerificationKey::from_string(&dbdata["ovkey"]).unwrap();
-	let spair = SigningPair::from_strings(&profile_data["signing.public"],
-		&profile_data["signing.private"])?;
-	match addentry(conn, &mut entry, &ovkey, &spair) {
+	let crspair = SigningPair::from_strings(&profile_data["crsigning.public"],
+		&profile_data["crsigning.private"])?;
+	match addentry(conn, &mut entry, &ovkey, &crspair) {
 		Ok(v) => v,
 		Err(e) => {
 			return Err(MensagoError::ErrProgramException(
