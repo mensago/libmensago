@@ -300,6 +300,7 @@ pub fn logout(conn: &mut ServerConnection) -> Result<(), MensagoError> {
 	conn.send(&req)?;
 
 	let resp = conn.receive()?;
+	thread::sleep(Duration::from_millis(10));
 	if resp.code != 200 {
 		return Err(MensagoError::ErrProtocol(resp.as_status()))
 	}
