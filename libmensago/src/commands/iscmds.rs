@@ -129,6 +129,82 @@ pub fn cancel(conn: &mut ServerConnection) -> Result<(), MensagoError> {
 	Ok(())
 }
 
+/// Replaces the specified device's key stored on the server. This is used specifically for
+/// rotating device keys.
+pub fn devkey(conn: &mut ServerConnection, devid: &RandomID, oldpair: &EncryptionPair,
+newpair: &EncryptionPair) -> Result<(), MensagoError> {
+
+	let req = ClientRequest::from(
+		"DEVKEY", &vec![
+			("Device-ID", devid.as_string()),
+			("Old-Key", oldpair.get_public_str().as_str()),
+			("New-Key", newpair.get_public_str().as_str()),
+		]
+	);
+	conn.send(&req)?;
+
+	let resp = conn.receive()?;
+	if resp.code != 100 {
+		return Err(MensagoError::ErrProtocol(resp.as_status()))
+	}
+	
+	if !resp.check_fields(&vec![("Challenge", true),("New-Challenge", true),
+		]) {
+		return Err(MensagoError::ErrSchemaFailure)
+	}
+
+	// Both challenges from the server are expected to be Base85-encoded random bytes that are
+	// encrypted into a CryptoString. This means we decrypt the challenge and send the resulting
+	// decrypted string back to the server as proof of device identity.
+	
+	let challstr = match CryptoString::from(&resp.data["Challenge"]) {
+		Some(v) => v,
+		None => {
+			return Err(MensagoError::ErrBadValue)
+		},
+	};
+	let rawbytes = match oldpair.decrypt(&challstr) {
+		Ok(v) => v,
+		Err(e) => {
+			cancel(conn)?;
+			return Err(MensagoError::EzNaclError(e));
+		}
+	};
+	let oldresponse = String::from_utf8(rawbytes)?;
+
+	let newchallstr = match CryptoString::from(&resp.data["New-Challenge"]) {
+		Some(v) => v,
+		None => {
+			return Err(MensagoError::ErrBadValue)
+		},
+	};
+	let newrawbytes = match newpair.decrypt(&newchallstr) {
+		Ok(v) => v,
+		Err(e) => {
+			cancel(conn)?;
+			return Err(MensagoError::EzNaclError(e));
+		}
+	};
+	let newresponse = String::from_utf8(newrawbytes)?;
+
+	let req = ClientRequest::from(
+		"DEVKEY", &vec![
+			("Device-ID", devid.as_string()),
+			("Response", oldresponse.as_str()),
+			("New-Response", newresponse.as_str()),
+		]
+	);
+	conn.send(&req)?;
+
+	let resp = conn.receive()?;
+	thread::sleep(Duration::from_millis(10));
+	if resp.code != 200 {
+		return Err(MensagoError::ErrProtocol(resp.as_status()))
+	}
+	
+	Ok(())
+}
+
 /// Completes the login process by submitting the device ID and responding to the server's device
 /// challenge. The call returns true if the user has admin privileges or false if not.
 pub fn device(conn: &mut ServerConnection, devid: &RandomID, devpair: &EncryptionPair)
