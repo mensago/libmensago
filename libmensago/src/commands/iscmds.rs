@@ -531,6 +531,57 @@ devid: &RandomID, devpubkey: &CryptoString) -> Result<HashMap<&'static str,Strin
 	Ok(out)
 }
 
+/// Creates an account on the server. The response received depends on a number of factors,
+/// including the registration mode of the server.
+pub fn register(conn: &mut ServerConnection, uid: &UserID, pwhash: &str, devid: &RandomID,
+devicekey: &CryptoString) -> Result<HashMap<&'static str,String>, MensagoError> {
+
+	// TODO: finish implementing register()
+
+	Err(MensagoError::ErrUnimplemented)
+}
+
+/// Unlike setpassword(), this is an administrator command to reset the password for a user account.
+/// The `reset_code` and `expires` parameters are completely optional and exist only to give the
+/// administrator the option of choosing the reset code and expiration time. If omitted, the server
+/// will generate a secure reset code that will expire in the default period of time configured.
+/// 
+/// Mensago password resets are very different from other platforms in that the process is designed
+/// such that at no time does the administrator know the user's password.
+pub fn reset_password(conn: &mut ServerConnection, wid: &RandomID, reset_code: Option<&str>,
+expires: Option<&str>) -> Result<HashMap<&'static str,String>, MensagoError> {
+
+	let mut req = ClientRequest::from(
+		"RESETPASSWORD", &vec![("Workspace-ID", wid.to_string().as_str())]
+	);
+
+	match reset_code {
+		Some(r) => { req.data.insert(String::from("Reset-Code"), String::from(r)); },
+		None => (),
+	}
+	
+	// TODO: Update `expires` to use the new Timestamp type
+
+	match expires {
+		Some(x) => { req.data.insert(String::from("Expires"), String::from(x)); },
+		None => (),
+	}
+
+	conn.send(&req)?;
+
+	let resp = conn.receive()?;
+	thread::sleep(Duration::from_millis(10));
+	if resp.code != 200 {
+		return Err(MensagoError::ErrProtocol(resp.as_status()))
+	}
+	
+	let mut out = HashMap::<&'static str, String>::new();
+	out.insert("expires", resp.data["Expires"].clone());
+	out.insert("resetcode", resp.data["Reset-Code"].clone());
+
+	Ok(out)
+}
+
 /// Sets the activity status of the workspace specified. Requires admin privileges. Currently the
 /// status may be 'active', 'disabled', or 'approved', the last of which is used only for moderated
 /// registration.
