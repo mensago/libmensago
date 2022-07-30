@@ -308,7 +308,9 @@ pub fn logout(conn: &mut ServerConnection) -> Result<(), MensagoError> {
 	Ok(())
 }
 
-/// Resets a workspace's password
+/// Allows a user to set a new password on their workspace given a registration code from an
+/// administrator. The process for the user is meant to work exactly the same as setting up a
+/// preregistered account.
 pub fn passcode(conn: &mut ServerConnection, wid: &RandomID, reset_code: &str, pwhash: &str)
 -> Result<(), MensagoError> {
 
@@ -404,7 +406,9 @@ devid: &RandomID, devpubkey: &CryptoString) -> Result<HashMap<&'static str,Strin
 	Ok(out)
 }
 
-/// Sets the activity status of the workspace specified. Requires admin privileges.
+/// Sets the activity status of the workspace specified. Requires admin privileges. Currently the
+/// status may be 'active', 'disabled', or 'approved', the last of which is used only for moderated
+/// registration.
 pub fn setstatus(conn: &mut ServerConnection, wid: &RandomID, status: &str)
 -> Result<(), MensagoError> {
 
