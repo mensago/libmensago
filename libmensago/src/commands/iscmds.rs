@@ -582,6 +582,29 @@ expires: Option<&str>) -> Result<HashMap<&'static str,String>, MensagoError> {
 	Ok(out)
 }
 
+/// Allows a user to change their workspace's password. For administrator-assisted password resets,
+/// use resetpassword().
+pub fn setpassword(conn: &mut ServerConnection, pwhash: &ArgonHash, newpwhash: &ArgonHash)
+-> Result<(), MensagoError> {
+
+	let req = ClientRequest::from(
+		"SETPASSWORD", &vec![
+			("Password-Hash", pwhash.to_string().as_str()),
+			("NewPassword-Hash", newpwhash.to_string().as_str()),
+		]
+	);
+
+	conn.send(&req)?;
+
+	let resp = conn.receive()?;
+	thread::sleep(Duration::from_millis(10));
+	if resp.code != 200 {
+		return Err(MensagoError::ErrProtocol(resp.as_status()))
+	}
+	
+	Ok(())
+}
+
 /// Sets the activity status of the workspace specified. Requires admin privileges. Currently the
 /// status may be 'active', 'disabled', or 'approved', the last of which is used only for moderated
 /// registration.
