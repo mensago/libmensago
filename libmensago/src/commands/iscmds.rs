@@ -635,3 +635,29 @@ pub fn setstatus(conn: &mut ServerConnection, wid: &RandomID, status: &str)
 	
 	Ok(())
 }
+
+/// Deletes the user's account from the connected server. This can be the user's identity account,
+/// but it could also be a membership on a shared workspace when that feature is implemented. In
+/// the case of servers using private or moderated registration, this command will return either an
+/// error or a Pending status.
+pub fn unregister(conn: &mut ServerConnection, pwhash: &ArgonHash)
+-> Result<CmdStatus, MensagoError> {
+
+	let req = ClientRequest::from(
+		"UNREGISTER", &vec![("Password-Hash", pwhash.to_string().as_str())]
+	);
+
+	conn.send(&req)?;
+
+	let resp = conn.receive()?;
+	thread::sleep(Duration::from_millis(10));
+	if resp.code != 200 {
+		return Err(MensagoError::ErrProtocol(resp.as_status()))
+	}
+	
+	// This particular command is very simple: make a request, because the server will return one of
+	// of three possible types of responses: success, pending (for private/moderated 
+	// registration modes), or an error. In all of those cases there isn't anything else to do.
+	Ok(resp.as_status())
+}
+
