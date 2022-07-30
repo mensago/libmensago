@@ -438,6 +438,53 @@ pub fn password(conn: &mut ServerConnection, pwhash: &ArgonHash)
 	Ok(())
 }
 
+/// Provisions a preregistered account on the server. Note that the uid, wid, and domain are all
+/// optional. If none of them are specified, then the server generates an anonymous workspace with
+/// the organization's default domain. This command requires administrator privileges.
+pub fn preregister(conn: &mut ServerConnection, wid: Option<&RandomID>, uid: Option<&UserID>,
+domain: Option<&Domain>) -> Result<HashMap<&'static str,String>, MensagoError> {
+
+	let mut req = ClientRequest::new("PREREG");
+
+	match wid {
+		Some(w) => { req.data.insert(String::from("Workspace-ID"), w.to_string()); },
+		None => (),
+	}
+
+	match uid {
+		Some(u) => { req.data.insert(String::from("User-ID"), u.to_string()); },
+		None => (),
+	}
+
+	match domain {
+		Some(d) => { req.data.insert(String::from("Domain"), d.to_string()); },
+		None => (),
+	}
+
+	conn.send(&req)?;
+
+	let resp = conn.receive()?;
+	thread::sleep(Duration::from_millis(10));
+	if resp.code != 200 {
+		return Err(MensagoError::ErrProtocol(resp.as_status()))
+	}
+
+	if !resp.check_fields(&vec![
+			("Workspace-ID", true),
+			("Reg-Code", true),
+			("Domain", true),
+		]) {
+		return Err(MensagoError::ErrSchemaFailure)
+	}
+
+	let mut out = HashMap::<&'static str, String>::new();
+	out.insert("domain", resp.data["Domain"].clone());
+	out.insert("wid", resp.data["Workspace-ID"].clone());
+	out.insert("regcode", resp.data["Reg-Code"].clone());
+
+	Ok(out)
+}
+
 /// Finishes the registration of a workspace. The address may be a regular Mensago address or it 
 /// can be a workspace address.
 pub fn regcode(conn: &mut ServerConnection, address: &MAddress, code: &str, pwhash: &ArgonHash, 
