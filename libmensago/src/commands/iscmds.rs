@@ -549,7 +549,7 @@ devicekey: &CryptoString) -> Result<HashMap<&'static str,String>, MensagoError> 
 /// Mensago password resets are very different from other platforms in that the process is designed
 /// such that at no time does the administrator know the user's password.
 pub fn reset_password(conn: &mut ServerConnection, wid: &RandomID, reset_code: Option<&str>,
-expires: Option<&str>) -> Result<HashMap<&'static str,String>, MensagoError> {
+expires: Option<&Timestamp>) -> Result<HashMap<&'static str,String>, MensagoError> {
 
 	let mut req = ClientRequest::from(
 		"RESETPASSWORD", &vec![("Workspace-ID", wid.to_string().as_str())]
@@ -560,10 +560,8 @@ expires: Option<&str>) -> Result<HashMap<&'static str,String>, MensagoError> {
 		None => (),
 	}
 	
-	// TODO: Update `expires` to use the new Timestamp type
-
 	match expires {
-		Some(x) => { req.data.insert(String::from("Expires"), String::from(x)); },
+		Some(x) => { req.data.insert(String::from("Expires"), x.to_string()); },
 		None => (),
 	}
 
