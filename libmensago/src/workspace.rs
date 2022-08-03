@@ -164,7 +164,6 @@ impl Workspace {
 		
 		// Generate and add the workspace's various crypto keys
 
-		// TODO: Add preferred algorithm support once implemented in eznacl
 		let crepair = eznacl::EncryptionPair::generate("CURVE25519").unwrap();
 		let _ = auth::add_keypair(&conn, &waddr, &crepair.get_public_key(),
 			&crepair.get_private_key(), "sha-256", &KeyType::AsymEncryptionKey,
