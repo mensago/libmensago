@@ -800,7 +800,7 @@ user_regcode: &str, pwhash: &ArgonHash) -> Result<HashMap<&'static str, String>,
 	let profile = profman.get_active_profile().unwrap();
 
 	let devid = RandomID::generate();
-	let regdata = match regcode(conn, MAddress::from(&profile_data["address"]).as_ref().unwrap(),
+	let mut regdata = match regcode(conn, MAddress::from(&profile_data["address"]).as_ref().unwrap(),
 		user_regcode, pwhash, &devid,
 		&CryptoString::from(&profile_data["device.public"]).unwrap()) {
 		Ok(v) => v,
@@ -810,6 +810,7 @@ user_regcode: &str, pwhash: &ArgonHash) -> Result<HashMap<&'static str, String>,
 			))
 		},
 	};
+	regdata.insert("devid", devid.to_string());
 
 	let waddr = WAddress::from(&ADMIN_PROFILE_DATA["waddress"]).unwrap();
 	let devpair = EncryptionPair::from_strings(
