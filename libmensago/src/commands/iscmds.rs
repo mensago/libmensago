@@ -134,8 +134,6 @@ pub fn cancel(conn: &mut ServerConnection) -> Result<(), MensagoError> {
 pub fn devkey(conn: &mut ServerConnection, devid: &RandomID, oldpair: &EncryptionPair,
 newpair: &EncryptionPair) -> Result<(), MensagoError> {
 
-	// TODO: Ensure that mensagod handles the DEVKEY process here
-	// -- send 2 keys, get 2 challenges, decrypt both challenges, send both responses
 	let req = ClientRequest::from(
 		"DEVKEY", &vec![
 			("Device-ID", devid.as_string()),

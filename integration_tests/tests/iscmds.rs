@@ -2,6 +2,7 @@
 
 #[cfg(test)] 
 mod tests {
+	use eznacl::*;
 	use libkeycard::*;
 	use libmensago::*;
 	use crate::common::*;
@@ -10,6 +11,94 @@ mod tests {
 	// addentry() is tested by common.rs::test_regcode_user()
 	
 	// device() is tested by common.rs::test_regcode_user()
+
+	#[test]
+	fn test_devkey() -> Result<(), MensagoError> {
+		let testname = "test_devkey";
+
+		let mut config = load_server_config(true)?;
+		let mut db = match setup_test(&config) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: setup_test error: {}", testname, e.to_string())
+				))
+			}
+		};
+		let dbdata = match init_server(&mut db) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: init_server error: {}", testname, e.to_string())
+				))
+			}
+		};
+		let profile_folder = match setup_profile_base(testname) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: setup_profile_base error: {}", testname, e.to_string())
+				))
+			}
+		};
+		let pwhash = match setup_profile(&profile_folder, &mut config, &ADMIN_PROFILE_DATA) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: setup_profile error: {}", testname, e.to_string())
+				))
+			}
+		};
+
+		let mut profman = ProfileManager::new(&PathBuf::from(&profile_folder));
+		match profman.load_profiles(Some(&PathBuf::from(&profile_folder))) {
+			Ok(_) => (),
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: load_profiles error: {}", testname, e.to_string())
+				))
+			}
+		};
+
+		let mut conn = ServerConnection::new();
+		let port = config["network"]["port"].as_integer().unwrap();
+		match conn.connect(config["network"]["listen_ip"].as_str().unwrap(), &port.to_string()) {
+			Ok(_) => (),
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error connecting to server: {}", testname, e.to_string())
+				))
+			}
+		}
+		
+		let regdata = match regcode_user(&mut conn, &mut profman, &dbdata, &ADMIN_PROFILE_DATA,
+			&dbdata["admin_regcode"], &pwhash) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: regcode_user error: {}", testname, e.to_string())
+				))
+			}
+		};
+
+		let oldpair = EncryptionPair::from_strings(ADMIN_PROFILE_DATA["device.public"].as_str(),
+			ADMIN_PROFILE_DATA["device.private"].as_str())?;
+		let newpair = EncryptionPair::generate("CURVE25519").unwrap();
+		let devid = RandomID::from(regdata["devid"].as_str()).unwrap();
+
+		match devkey(&mut conn, &devid, &oldpair, &newpair) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: devkey error: {}", testname, e.to_string())
+				))
+			}
+		}
+
+		conn.disconnect()?;
+
+		Ok(())
+	}
 
 	#[test]
 	fn test_getwid() -> Result<(), MensagoError> {
