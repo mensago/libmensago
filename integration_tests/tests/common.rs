@@ -62,6 +62,8 @@ lazy_static! {
 		m.insert("address", String::from("admin/example.com"));
 		m.insert("waddress", String::from("ae406c5e-2673-4d3e-af20-91325d9623ca/example.com"));
 		m.insert("password", String::from("Linguini2Pegboard*Album"));
+		m.insert("passhash", String::from("$argon2id$v=19$m=65536,t=2,p=1$anXvadxtNJAYa2cUQ\
+		FqKSQ$zLbLnmbtluKQIOKHk0Hb7+kQZHmZG4Uxf3DI7soKiYE"));
 		m.insert("crencryption.public",
 			String::from("CURVE25519:mO?WWA-k2B2O|Z%fA`~s3^$iiN{5R->#jxO@cy6{"));
 		m.insert("crencryption.private",
@@ -99,6 +101,8 @@ lazy_static! {
 		m.insert("address", String::from("csimons/example.com"));
 		m.insert("waddress", String::from("4418bf6c-000b-4bb3-8111-316e72030468/example.com"));
 		m.insert("password", String::from("MyS3cretPassw*rd"));
+		m.insert("passhash", String::from("$argon2id$v=19$m=65536,t=2,p=1$ejzAtaom5H1y6wnLH\
+		vrb7g$ArzyFkg5KH5rp8fa6/7iLp/kAVLh9kaSJQfUKMnHWRM"));
 		m.insert("crencryption.public",
 			String::from("CURVE25519:j(IBzX*F%OZF;g77O8jrVjM1a`Y<6-ehe{S;{gph"));
 		m.insert("crencryption.private",
