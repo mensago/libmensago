@@ -195,6 +195,158 @@ mod tests {
 	// login() is tested by common.rs::test_regcode_user()
 
 	#[test]
+	fn test_preregister_regcode() -> Result<(), MensagoError> {
+		let testname = "test_preregister";
+
+		let mut config = load_server_config(true)?;
+		let mut db = match setup_test(&config) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: setup_test error: {}", testname, e.to_string())
+				))
+			}
+		};
+		let dbdata = match init_server(&mut db) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: init_server error: {}", testname, e.to_string())
+				))
+			}
+		};
+		let profile_folder = match setup_profile_base(testname) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: setup_profile_base error: {}", testname, e.to_string())
+				))
+			}
+		};
+		let pwhash = match setup_profile(&profile_folder, &mut config, &ADMIN_PROFILE_DATA) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: setup_profile error: {}", testname, e.to_string())
+				))
+			}
+		};
+
+		let mut profman = ProfileManager::new(&PathBuf::from(&profile_folder));
+		match profman.load_profiles(Some(&PathBuf::from(&profile_folder))) {
+			Ok(_) => (),
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: load_profiles error: {}", testname, e.to_string())
+				))
+			}
+		};
+
+		let mut conn = ServerConnection::new();
+		let port = config["network"]["port"].as_integer().unwrap();
+		match conn.connect(config["network"]["listen_ip"].as_str().unwrap(), &port.to_string()) {
+			Ok(_) => (),
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error connecting to server: {}", testname, e.to_string())
+				))
+			}
+		}
+
+		let profile = profman.get_active_profile().unwrap();
+
+		let devid = RandomID::generate();
+		let mut regdata = match regcode(&mut conn, MAddress::from(&ADMIN_PROFILE_DATA["address"]).as_ref().unwrap(),
+			&dbdata["admin_regcode"], &pwhash, &devid,
+			&CryptoString::from(&ADMIN_PROFILE_DATA["device.public"]).unwrap()) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("regcode failed in {}: {}", testname, e.to_string())
+				))
+			},
+		};
+		regdata.insert("devid", devid.to_string());
+	
+		let waddr = WAddress::from(&ADMIN_PROFILE_DATA["waddress"]).unwrap();
+		let devpair = EncryptionPair::from_strings(
+			&ADMIN_PROFILE_DATA["device.public"],
+			&ADMIN_PROFILE_DATA["device.private"],
+		).unwrap();
+		let db = profile.open_secrets()?;
+		match add_device_session(&db, &waddr, &devid, &devpair, None) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("add_device_session() failed in {}: {}", testname, e.to_string())
+				))
+			},
+		}
+	
+		let oekey = EncryptionKey::from_string(&dbdata["oekey"]).unwrap();
+		match login(&mut conn, waddr.get_wid(), &oekey) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("login() failed in {}: {}", testname, e.to_string())
+				))
+			},
+		}
+	
+		match password(&mut conn, &pwhash) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("password() failed in {}: {}", testname, e.to_string())
+				))
+			},
+		}
+	
+		match device(&mut conn, &devid, &devpair) {
+			Ok(v) => {
+				if !v {
+					return Err(MensagoError::ErrProgramException(
+						format!("device() failed in {}", testname)
+					))
+				}
+			},
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("device() error in {}: {}", testname, e.to_string())
+				))
+			},
+		}
+	
+		let userwid = RandomID::from(&USER1_PROFILE_DATA["wid"]);
+		let useruid = UserID::from(&USER1_PROFILE_DATA["uid"]);
+		let userdomain = Domain::from(&USER1_PROFILE_DATA["domain"]);
+		let userregdata = match preregister(&mut conn, userwid.as_ref(), useruid.as_ref(),
+			userdomain.as_ref()) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("preregister() failed in {}: {}", testname, e.to_string())
+				))
+			},
+		};
+
+		match regcode(&mut conn, MAddress::from(&USER1_PROFILE_DATA["address"]).as_ref().unwrap(),
+			&userregdata["regcode"], &pwhash, &devid,
+			&CryptoString::from(&USER1_PROFILE_DATA["device.public"]).unwrap()) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("use regcode failed in regcode_user: {}", e.to_string())
+				))
+			},
+		};
+
+		conn.disconnect()?;
+
+		Ok(())
+	}
+
+	#[test]
 	fn test_register() -> Result<(), MensagoError> {
 		let testname = "test_register";
 
