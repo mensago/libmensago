@@ -574,12 +574,7 @@ devicekey: &CryptoString) -> Result<HashMap<&'static str,String>, MensagoError> 
 		
 		match resp.code {
 			101 | 201 => { // Success
-				if !resp.check_fields(&vec![
-					("Device-ID", true),
-					("Workspace-ID", true),
-					("Domain", true),
-					("User-ID", true),
-				]) {
+				if !resp.check_fields(&vec![("Domain", true)]) {
 					return Err(MensagoError::ErrSchemaFailure)
 				}
 				
@@ -597,24 +592,13 @@ devicekey: &CryptoString) -> Result<HashMap<&'static str,String>, MensagoError> 
 					}
 				};
 				
-				let realuid = match resp.data.get("User-ID") {
-					Some(s) => {
-						match UserID::from(s) {
-							Some(u) => u,
-							None => {
-								return Err(MensagoError::ErrBadValue)
-							}
-						}
-					},
-					None => {
-						return Err(MensagoError::ErrSchemaFailure)
-					}
-				};
 
 				out.insert("devid", devid.to_string());
 				out.insert("wid", testwid.to_string());
 				out.insert("domain", domain.to_string());
-				out.insert("uid", realuid.to_string());
+				if uid.is_some() {
+					out.insert("uid", uid.unwrap().to_string());
+				}
 				break;
 			},
 			408 => { // UID or WID exists

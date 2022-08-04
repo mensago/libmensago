@@ -242,7 +242,7 @@ mod tests {
 			}
 		};
 
-		let profile = profman.get_active_profile().unwrap();
+		profman.get_active_profile().unwrap();
 		let mut conn = ServerConnection::new();
 		let port = config["network"]["port"].as_integer().unwrap();
 		match conn.connect(config["network"]["listen_ip"].as_str().unwrap(), &port.to_string()) {
@@ -254,9 +254,10 @@ mod tests {
 			}
 		}
 		
+		let devid = RandomID::generate();
 		let devpair = EncryptionPair::generate("CURVE25519")?;
-		match register(&mut conn, UserID::from("csimons").as_ref(), &pwhash.to_string(), 
-			profile.devid.as_ref().unwrap(), &devpair.get_public_key()) {
+		match register(&mut conn, UserID::from("csimons").as_ref(), &pwhash.to_string(), &devid,
+			&devpair.get_public_key()) {
 			Ok(_) => (),
 			Err(e) => {
 				return Err(MensagoError::ErrProgramException(
