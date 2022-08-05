@@ -787,12 +787,52 @@ profile_data: &HashMap<&'static str, String>) -> Result<ArgonHash, MensagoError>
 	w.generate(&UserID::from(&profile_data.get("uid").as_ref().unwrap()).unwrap(),
 		&Domain::from(&profile_data.get("domain").as_ref().unwrap()).unwrap(),
 		&RandomID::from(&profile_data.get("wid").as_ref().unwrap()).unwrap(),
-		&profile_data.get("pwhash").as_ref().unwrap())?;
+		&profile_data.get("passhash").as_ref().unwrap())?;
 
-	let password = ArgonHash::from_hashstr(&profile_data.get("pwhash").as_ref().unwrap());
+	let password = ArgonHash::from_hashstr(&profile_data.get("passhash").as_ref().unwrap());
 	profile.set_identity(w, &password)?;
 
 	Ok(password)
+}
+
+/// Performs a login sequence
+pub fn login_user<K: Encryptor>(conn: &mut ServerConnection, wid: &RandomID, oekey: &K,
+pwhash: &ArgonHash, devid: &RandomID, devpair: &EncryptionPair) -> Result<(), MensagoError> {
+
+	match login(conn, wid, oekey) {
+		Ok(v) => v,
+		Err(e) => {
+			return Err(MensagoError::ErrProgramException(
+				format!("login() failed in login_user: {}", e.to_string())
+			))
+		},
+	}
+
+	match password(conn, &pwhash) {
+		Ok(v) => v,
+		Err(e) => {
+			return Err(MensagoError::ErrProgramException(
+				format!("password() failed in login_user: {}", e.to_string())
+			))
+		},
+	}
+
+	match device(conn, &devid, &devpair) {
+		Ok(v) => {
+			if !v {
+				return Err(MensagoError::ErrProgramException(
+					format!("device() failed in login_user")
+				))
+			}
+		},
+		Err(e) => {
+			return Err(MensagoError::ErrProgramException(
+				format!("device() error in login_user: {}", e.to_string())
+			))
+		},
+	}
+
+	Ok(())
 }
 
 /// Finishes setting up a user account by registering it, logging in, and uploading a root
@@ -832,35 +872,11 @@ user_regcode: &str, pwhash: &ArgonHash) -> Result<HashMap<&'static str, String>,
 	}
 
 	let oekey = EncryptionKey::from_string(&dbdata["oekey"]).unwrap();
-	match login(conn, waddr.get_wid(), &oekey) {
+	match login_user(conn, waddr.get_wid(), &oekey, &pwhash, &devid, &devpair)	{
 		Ok(v) => v,
 		Err(e) => {
 			return Err(MensagoError::ErrProgramException(
-				format!("login() failed in regcode_user: {}", e.to_string())
-			))
-		},
-	}
-
-	match password(conn, &pwhash) {
-		Ok(v) => v,
-		Err(e) => {
-			return Err(MensagoError::ErrProgramException(
-				format!("password() failed in regcode_user: {}", e.to_string())
-			))
-		},
-	}
-
-	match device(conn, &devid, &devpair) {
-		Ok(v) => {
-			if !v {
-				return Err(MensagoError::ErrProgramException(
-					format!("device() failed in regcode_user")
-				))
-			}
-		},
-		Err(e) => {
-			return Err(MensagoError::ErrProgramException(
-				format!("device() error in regcode_user: {}", e.to_string())
+				format!("login_user() failed in regcode_user: {}", e.to_string())
 			))
 		},
 	}
