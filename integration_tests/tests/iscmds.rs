@@ -435,7 +435,7 @@ mod tests {
 				))
 			}
 		};
-		match init_server(&mut db) {
+		let dbdata = match init_server(&mut db) {
 			Ok(v) => v,
 			Err(e) => {
 				return Err(MensagoError::ErrProgramException(
@@ -481,6 +481,16 @@ mod tests {
 			}
 		}
 		
+		match regcode_user(&mut conn, &mut profman, &dbdata, &ADMIN_PROFILE_DATA,
+			&dbdata["admin_regcode"], &pwhash) {
+			Ok(_) => (),
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: regcode_user error: {}", testname, e.to_string())
+				))
+			}
+		}
+
 		let badpassword = ArgonHash::from_hashstr(USER1_PROFILE_DATA["passhash"].as_str());
 		let newpassword = ArgonHash::from_hashstr("$argon2id$v=19$m=65536,t=2,p=1$CXh8Mzm\
 		TlJNrNddm2RqWAg$874zZGneIsc1QyUJcW7O9SRrbgkF0gTKo4xdbJOiZU0");
@@ -492,7 +502,7 @@ mod tests {
 			},
 			Err(_) => (),
 		}
-		
+
 		match setpassword(&mut conn, &pwhash, &newpassword) {
 			Ok(_) => (),
 			Err(e) => {
