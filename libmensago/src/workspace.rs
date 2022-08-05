@@ -16,7 +16,7 @@ pub struct Workspace {
 	wid: Option<RandomID>,
 	domain: Option<Domain>,
 	_type: String,
-	pw: String,
+	pwhash: String,
 }
 
 impl Workspace {
@@ -38,7 +38,7 @@ impl Workspace {
 			wid: None,
 			domain: None,
 			_type: String::from("identity"),
-			pw: String::from(""),
+			pwhash: String::from(""),
 		}
 	}
 
@@ -135,16 +135,14 @@ impl Workspace {
 	}
 
 	/// Creates all the data needed for an individual workspace account
-	pub fn generate(&mut self, uid: &UserID, server: &Domain, wid: &RandomID, pw: &str) 
+	pub fn generate(&mut self, uid: &UserID, server: &Domain, wid: &RandomID, pwhash: &str) 
 		-> Result<(),MensagoError> {
 		
 		self.uid = Some(uid.clone());
 		self.wid = Some(wid.clone());
 		self.domain = Some(server.clone());
-		self.pw = String::from(pw);
+		self.pwhash = String::from(pwhash);
 
-		// This variable will be needed by the unimplemented section of generate()
-		//let address = MAddress::from_parts(&UserID::from_wid(wid), server);
 		let waddr = WAddress::from_parts(&wid, &server);
 		
 		let secretstr = match self.secretspath.to_str() {
@@ -695,7 +693,7 @@ mod tests {
 			Ok(_) => {
 				// load_from_db doesn't get the password hash, so we'll just add it here to make
 				// the comparison code simpler
-				testw.pw = pw.clone();
+				testw.pwhash = pwhash.to_string();
 				if testw != w {
 					return Err(MensagoError::ErrProgramException(
 						format!("{}: data mismatch", testname)))
