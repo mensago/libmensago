@@ -787,9 +787,9 @@ profile_data: &HashMap<&'static str, String>) -> Result<ArgonHash, MensagoError>
 	w.generate(&UserID::from(&profile_data.get("uid").as_ref().unwrap()).unwrap(),
 		&Domain::from(&profile_data.get("domain").as_ref().unwrap()).unwrap(),
 		&RandomID::from(&profile_data.get("wid").as_ref().unwrap()).unwrap(),
-		&profile_data.get("password").as_ref().unwrap())?;
+		&profile_data.get("pwhash").as_ref().unwrap())?;
 
-	let password = ArgonHash::from(&profile_data.get("password").as_ref().unwrap());
+	let password = ArgonHash::from_hashstr(&profile_data.get("pwhash").as_ref().unwrap());
 	profile.set_identity(w, &password)?;
 
 	Ok(password)
