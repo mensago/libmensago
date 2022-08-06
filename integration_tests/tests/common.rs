@@ -928,6 +928,98 @@ user_regcode: &str, pwhash: &ArgonHash) -> Result<HashMap<&'static str, String>,
 	Ok(regdata)
 }
 
+/// Completely sets up a test by:
+/// 
+/// - Loading the server config file (load_server_config)
+/// - Empties and resets the server's database (setup_test)
+/// - Adds basic test data as if setup had been run  (init_server)
+/// - Sets up a new test profile folder hierarchy (setup_profile_base)
+/// - Creates a profile for the administrator via setup_profile()
+/// - Loads and initializes a ProfileManager instance
+/// - Creates a network connection to the server via ServerConnection
+/// - Registers the administrator account (regcode_user)
+/// 
+/// Once all this has been accomplished, it returns the commonly-used output of each of the calls
+/// so that the test has complete context for its actions
+pub fn full_test_setup(testname: &str) -> Result<(
+	Document,
+	Client,
+	HashMap<&'static str, String>,
+	String,
+	ArgonHash,
+	ProfileManager,
+	ServerConnection,
+	HashMap<&'static str, String>,
+), MensagoError> {
+
+	let mut config = load_server_config(true)?;
+	let mut db = match setup_test(&config) {
+		Ok(v) => v,
+		Err(e) => {
+			return Err(MensagoError::ErrProgramException(
+				format!("{}: setup_test error: {}", testname, e.to_string())
+			))
+		}
+	};
+	let dbdata = match init_server(&mut db) {
+		Ok(v) => v,
+		Err(e) => {
+			return Err(MensagoError::ErrProgramException(
+				format!("{}: init_server error: {}", testname, e.to_string())
+			))
+		}
+	};
+	let profile_folder = match setup_profile_base(testname) {
+		Ok(v) => v,
+		Err(e) => {
+			return Err(MensagoError::ErrProgramException(
+				format!("{}: setup_profile_base error: {}", testname, e.to_string())
+			))
+		}
+	};
+	let pwhash = match setup_profile(&profile_folder, &mut config, &ADMIN_PROFILE_DATA) {
+		Ok(v) => v,
+		Err(e) => {
+			return Err(MensagoError::ErrProgramException(
+				format!("{}: setup_profile error: {}", testname, e.to_string())
+			))
+		}
+	};
+
+	let mut profman = ProfileManager::new(&PathBuf::from(&profile_folder));
+	match profman.load_profiles(Some(&PathBuf::from(&profile_folder))) {
+		Ok(_) => (),
+		Err(e) => {
+			return Err(MensagoError::ErrProgramException(
+				format!("{}: load_profiles error: {}", testname, e.to_string())
+			))
+		}
+	};
+
+	let mut conn = ServerConnection::new();
+	let port = config["network"]["port"].as_integer().unwrap();
+	match conn.connect(config["network"]["listen_ip"].as_str().unwrap(), &port.to_string()) {
+		Ok(_) => (),
+		Err(e) => {
+			return Err(MensagoError::ErrProgramException(
+				format!("{}: error connecting to server: {}", testname, e.to_string())
+			))
+		}
+	}
+	
+	let admin_regdata = match regcode_user(&mut conn, &mut profman, &dbdata, &ADMIN_PROFILE_DATA,
+		&dbdata["admin_regcode"], &pwhash) {
+		Ok(v) => (v),
+		Err(e) => {
+			return Err(MensagoError::ErrProgramException(
+				format!("{}: regcode_user error: {}", testname, e.to_string())
+			))
+		}
+	};
+
+	Ok((config, db, dbdata, profile_folder, pwhash, profman, conn, admin_regdata))
+}
+
 #[cfg(test)]
 mod tests {
 	use libmensago::*;
