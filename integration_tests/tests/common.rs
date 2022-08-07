@@ -88,6 +88,8 @@ lazy_static! {
 			String::from("CURVE25519:mO?WWA-k2B2O|Z%fA`~s3^$iiN{5R->#jxO@cy6{"));
 		m.insert("device.private",
 			String::from("CURVE25519:2bLf2vMA?GA2?L~tv<PA9XOw6e}V~ObNi7C&qek>"));
+		m.insert("devid",
+			String::from("3abaa743-40d9-4897-ac77-6a7783083f30"));
 		m
 	};
 
@@ -127,6 +129,8 @@ lazy_static! {
 			String::from("CURVE25519:94|@e{Kpsu_Qe{L@_U;QnOHz!eJ5zz?V@>+K)6F}"));
 		m.insert("device.private",
 			String::from("CURVE25519:!x2~_pSSCx1M$n7{QBQ5e*%~ytBzKL_C(bCviqYh"));
+		m.insert("devid",
+			String::from("fd21b07b-6112-4a89-b998-a1c55755d9d7"));
 		m
 	};
 }
@@ -843,7 +847,7 @@ user_regcode: &str, pwhash: &ArgonHash) -> Result<HashMap<&'static str, String>,
 
 	let profile = profman.get_active_profile().unwrap();
 
-	let devid = RandomID::generate();
+	let devid = RandomID::from(&profile_data["devid"]).unwrap();
 	let mut regdata = match regcode(conn, MAddress::from(&profile_data["address"]).as_ref().unwrap(),
 		user_regcode, pwhash, &devid,
 		&CryptoString::from(&profile_data["device.public"]).unwrap()) {
