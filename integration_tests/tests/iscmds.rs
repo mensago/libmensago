@@ -138,6 +138,38 @@ mod tests {
 	}
 
 	#[test]
+	fn test_reset_password() -> Result<(), MensagoError> {
+		let testname = "test_reset_password";
+
+		// The list of full data is as follows:
+		// let (config, db, dbdata, profile_folder, pwhash, profman, mut conn, admin_regdata) = 
+		// 	full_test_setup(testname)?;
+		let (_, _, _, _, _, _, mut conn, _) = full_test_setup(testname)?;
+
+		// Preregister the regular user
+		let userwid = RandomID::from(&USER1_PROFILE_DATA["wid"]);
+		let useruid = UserID::from(&USER1_PROFILE_DATA["uid"]);
+		let userdomain = Domain::from(&USER1_PROFILE_DATA["domain"]);
+		// let userregdata = match preregister(&mut conn, userwid.as_ref(), useruid.as_ref(),
+		match preregister(&mut conn, userwid.as_ref(), useruid.as_ref(),
+			userdomain.as_ref()) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("preregister() failed in {}: {}", testname, e.to_string())
+				))
+			},
+		};
+		conn.disconnect()?;
+
+		// Log in as the user and set up the profile
+
+		// TODO: finish test_reset_password() once client type is implemented
+
+		Ok(())
+	}
+
+	#[test]
 	fn test_setpassword() -> Result<(), MensagoError> {
 		let testname = "test_setpassword";
 
