@@ -431,9 +431,10 @@ pub fn orgcard(conn: &mut ServerConnection, start_index: usize)
 		return Err(MensagoError::ErrSchemaFailure)
 	}
 
-	// TODO: finish implementing orgcard()
-	
-	Err(MensagoError::ErrUnimplemented)
+	let mut out = Keycard::new(EntryType::Organization);
+	out.entries.append(&mut parse_entries(&resp.data["Card-Data"])?);
+
+	Ok(out)
 }
 
 /// Allows a user to set a new password on their workspace given a registration code from an
