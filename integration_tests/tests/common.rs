@@ -372,7 +372,7 @@ pub fn setup_test(config: &Document) -> Result<postgres::Client, MensagoError> {
 pub fn init_server(db: &mut postgres::Client) -> Result<HashMap<&'static str,String>, MensagoError> {
 
 	// Start off by generating the org's root keycard entry and add to the database
-	let mut orgcard = Keycard::new(&EntryType::Organization);
+	let mut orgcard = Keycard::new(EntryType::Organization);
 	let mut root_entry = Entry::new(EntryType::Organization)?;
 	root_entry.set_fields(&vec![
 		(String::from("Index"), String::from("1")),
