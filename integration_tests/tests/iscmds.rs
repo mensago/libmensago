@@ -74,6 +74,35 @@ mod tests {
 	// login() is tested by common.rs::test_regcode_user()
 
 	#[test]
+	fn test_orgcard() -> Result<(), MensagoError> {
+		let testname = "test_orgcard";
+
+		// The list of full data is as follows:
+		// let (config, db, dbdata, profile_folder, pwhash, profman, mut conn, admin_regdata) = 
+		// 	full_test_setup(testname)?;
+		let (_, _, _, _, _, _, mut conn, _) = full_test_setup(testname)?;
+
+		let card = match orgcard(&mut conn, 1) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: full card request failed: {}", testname, e.to_string())
+				))
+			}
+		};
+		if card.entries.len() != 2 {
+			return Err(MensagoError::ErrProgramException(
+				format!("{}: entry count mismatch: wanted 2, got {}", testname, card.entries.len())
+			))
+		}
+
+
+		conn.disconnect()?;
+
+		Ok(())
+	}
+
+	#[test]
 	fn test_preregister_regcode() -> Result<(), MensagoError> {
 		let testname = "test_preregister";
 
