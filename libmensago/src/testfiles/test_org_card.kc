@@ -1,6 +1,7 @@
 Type:Organization
 Index:1
 Name:Example, Inc.
+Domain:example.com
 Primary-Verification-Key:ED25519:)8id(gE02^S<{3H>9B;X4{DuYcb`%wo^mC&1lN88
 Secondary-Verification-Key:ED25519:^j&t+&+q3fgPe1%PLmW4i|RCV|KNWZBLByIUZg+~
 Encryption-Key:CURVE25519:@b?cjpeY;<&y+LSOA&yUQ&ZIrp(JGt{W$*V>ATLG
