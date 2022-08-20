@@ -6,6 +6,7 @@ mod tests {
 	use libkeycard::*;
 	use libmensago::*;
 	use crate::common::*;
+	use std::path::PathBuf;
 	
 	// addentry() is tested by common.rs::test_regcode_user()
 	
@@ -229,6 +230,99 @@ mod tests {
 		}
 		
 		conn.disconnect()?;
+
+		Ok(())
+	}
+
+	#[test]
+	fn test_usercard() -> Result<(), MensagoError> {
+		let testname = "test_usercard";
+
+		// This is an... involved... test. :( First, all the basic server and admin setup
+
+		let mut config = load_server_config(true)?;
+		let mut db = match setup_test(&config) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: setup_test error: {}", testname, e.to_string())
+				))
+			}
+		};
+		let dbdata = match init_server(&mut db) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: init_server error: {}", testname, e.to_string())
+				))
+			}
+		};
+		let profile_folder = match setup_profile_base(testname) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: setup_profile_base error: {}", testname, e.to_string())
+				))
+			}
+		};
+		let pwhash = match setup_profile(&profile_folder, &mut config, &ADMIN_PROFILE_DATA) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: setup_profile error: {}", testname, e.to_string())
+				))
+			}
+		};
+	
+		let mut profman = ProfileManager::new(&PathBuf::from(&profile_folder));
+		match profman.load_profiles(Some(&PathBuf::from(&profile_folder))) {
+			Ok(_) => (),
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: load_profiles error: {}", testname, e.to_string())
+				))
+			}
+		};
+	
+		let mut conn = ServerConnection::new();
+		let port = config["network"]["port"].as_integer().unwrap();
+		match conn.connect(config["network"]["listen_ip"].as_str().unwrap(), &port.to_string()) {
+			Ok(_) => (),
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error connecting to server: {}", testname, e.to_string())
+				))
+			}
+		}
+		
+		// match regcode_user(&mut conn, &mut profman, &dbdata, &ADMIN_PROFILE_DATA,
+		// 	&dbdata["admin_regcode"], &pwhash) {
+		// 	Ok(_) => (),
+		// 	Err(e) => {
+		// 		return Err(MensagoError::ErrProgramException(
+		// 			format!("{}: regcode_user error: {}", testname, e.to_string())
+		// 		))
+		// 	}
+		// };
+
+		// // Now that the admin has been registered and is logged in, prereg a regular user
+		// let user_regdata = match preregister(&mut conn, 
+		// 	Some(&RandomID::from(&USER1_PROFILE_DATA["wid"]).unwrap()),
+		// 	Some(&UserID::from(&USER1_PROFILE_DATA["uid"]).unwrap()),
+		// 	Some(&Domain::from(&USER1_PROFILE_DATA["domain"]).unwrap())) {
+		// 	Ok(v) => (v),
+		// 	Err(e) => {
+		// 		return Err(MensagoError::ErrProgramException(
+		// 			format!("{}: error preregistering test user: {}", testname, e.to_string())
+		// 		))
+		// 	}
+		// };
+		
+		conn.disconnect()?;
+
+		// TODO: finish test_usercard() once the client front is started
+
+		// Log in as the test user and set up a complete profile
 
 		Ok(())
 	}
