@@ -17,7 +17,7 @@ impl Client {
 		
 		Ok(Client {
 			conn: None,
-			pman: pman,
+			pman,
 		})
 	}
 
