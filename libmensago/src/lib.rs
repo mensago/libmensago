@@ -6,6 +6,7 @@ mod config;
 mod conn;
 mod dbfs;
 mod profile;
+mod resolver;
 mod types;
 mod workspace;
 
@@ -17,5 +18,6 @@ pub use config::*;
 pub use conn::*;
 pub use dbfs::*;
 pub use profile::*;
+pub use resolver::*;
 pub use types::*;
 pub use workspace::*;
