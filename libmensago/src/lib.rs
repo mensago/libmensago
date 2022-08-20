@@ -1,5 +1,6 @@
 mod auth;
 mod base;
+mod client;
 mod commands;
 mod config;
 mod conn;
@@ -10,6 +11,7 @@ mod workspace;
 
 pub use auth::*;
 pub use base::*;
+pub use client::*;
 pub use commands::*;
 pub use config::*;
 pub use conn::*;
