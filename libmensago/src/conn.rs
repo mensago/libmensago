@@ -28,6 +28,18 @@ struct GreetingData {
 	date: String,
 }
 
+/// The MConn trait is for any type which implements the methods needed for connecting to a
+/// Mensago server. It exists mostly for an abstraction to make testing easier.
+pub trait MConn {
+	fn connect(&mut self, address: &str, port: &str) -> Result<(), MensagoError>;
+	fn disconnect(&mut self) -> Result<(), MensagoError>;
+	fn is_connected(&self) -> bool;
+	fn receive(&mut self) -> Result<ServerResponse, MensagoError>;
+	fn send(&mut self, msg: &ClientRequest) -> Result<(), MensagoError>;
+}
+
+/// The ServerConnection type is a low-level connection to a Mensago server that operates over
+/// a TCP stream.
 #[derive(Debug)]
 pub struct ServerConnection {
 	socket: Option<TcpStream>,
@@ -35,12 +47,16 @@ pub struct ServerConnection {
 }
 
 impl ServerConnection {
+	/// Creates a new ServerConnection object which is ready to connect to a server.
 	pub fn new() -> ServerConnection {
 		ServerConnection{ socket: None, buffer: [0; BUFFER_SIZE] }
 	}
+}
+
+impl MConn for ServerConnection {
 
 	/// Connects to a Mensago server given the specified address and port
-	pub fn connect(&mut self, address: &str, port: &str) -> Result<(), MensagoError> {
+	fn connect(&mut self, address: &str, port: &str) -> Result<(), MensagoError> {
 
 		if address.len() == 0 || port.len() == 0 {
 			return Err(MensagoError::ErrBadValue)
@@ -81,27 +97,27 @@ impl ServerConnection {
 
 	/// Returns true if connected to a server
 	#[inline]
-	pub fn is_connected(&self) -> bool {
+	fn is_connected(&self) -> bool {
 		self.socket.is_some()
 	}
 
 	/// Disconnects from the server by sending a QUIT command to the server and then closing the 
 	/// TCP session
-	pub fn disconnect(&mut self) -> Result<(), MensagoError> {
+	fn disconnect(&mut self) -> Result<(), MensagoError> {
 		match self.socket {
 			Some(_) => { quit(self.socket.as_mut().unwrap()) },
 			None => Ok(()),
 		}
 	}
 
-	pub fn receive(&mut self) -> Result<ServerResponse, MensagoError> {
+	fn receive(&mut self) -> Result<ServerResponse, MensagoError> {
 		if self.socket.is_none() {
 			return Err(MensagoError::ErrNotConnected)
 		}
 		ServerResponse::receive(self.socket.as_mut().unwrap())
 	}
 
-	pub fn send(&mut self, msg: &ClientRequest) -> Result<(), MensagoError> {
+	fn send(&mut self, msg: &ClientRequest) -> Result<(), MensagoError> {
 		if self.socket.is_none() {
 			return Err(MensagoError::ErrNotConnected)
 		}
