@@ -127,17 +127,74 @@ impl DNSHandlerT for FakeDNSHandler {
 }
 
 pub struct DNSMgmtRecord {
-	pvk: CryptoString,
-	svk: Option<CryptoString>,
-	ek: CryptoString,
-	hash: CryptoString,
+	pub pvk: CryptoString,
+	pub svk: Option<CryptoString>,
+	pub ek: CryptoString,
+	pub tls: Option<CryptoString>,
 }
 
-pub fn get_mgmt_record<D: DNSHandlerT>(d: &Domain, dh: D) -> Result<DNSMgmtRecord, MensagoError> {
+pub fn get_mgmt_record<D: DNSHandlerT>(d: &Domain, dh: &D) -> Result<DNSMgmtRecord, MensagoError> {
 
-	// TODO: Implement get_mgmt_record()
+	let domstr = d.to_string();
+	let domparts: Vec::<&str> = domstr.split(".").collect();
+	
+	// This is probably a hostname, so we'll check just the hostname for records
+	if domparts.len() == 1 {
+		return parse_txt_records(&dh.lookup_txt(d)?)
+	}
+
+	// TODO: Finish implementing get_mgmt_record()
 
 	Err(MensagoError::ErrUnimplemented)
+}
+
+// This private function just finds the management record items in a list of TXT records
+fn parse_txt_records(records: &Vec::<String>) -> Result<DNSMgmtRecord, MensagoError> {
+
+	// This seemlingly pointless construct ensures that we have all the necessary information if,
+	// say, the admin put 2 management record items in a TXT record and put another in a second
+	// record because they ran out of space in the first one
+	let recordstr = records.join(" ");
+	let parts = recordstr.split(" ");
+
+	// The four possible record items. The PVK and EK items are required.
+	let mut pvk: Option<CryptoString> = None;
+	let mut svk: Option<CryptoString> = None;
+	let mut ek: Option<CryptoString> = None;
+	let mut tls: Option<CryptoString> = None;
+	for part in parts {
+
+		if part.len() < 5 {
+			return Err(MensagoError::ErrBadValue)
+		}
+
+		match part.to_ascii_lowercase() {
+			x if x.starts_with("pvk=") => {
+				pvk = CryptoString::from(&x[4..])
+			},
+			x if x.starts_with("svk=") => {
+				svk = CryptoString::from(&x[4..])
+			},
+			x if x.starts_with("ek=") => {
+				ek = CryptoString::from(&x[3..])
+			},
+			x if x.starts_with("tls=") => {
+				tls = CryptoString::from(&x[4..])
+			},
+			_ => (),
+		}
+	}
+
+	if pvk.is_none() || ek.is_none() {
+		return Err(MensagoError::ErrNotFound)
+	}
+
+	Ok(DNSMgmtRecord{
+		pvk: pvk.unwrap(),
+		svk,
+		ek: ek.unwrap(),
+		tls,
+	})
 }
 
 /// A caching keycard resolver type
@@ -271,6 +328,26 @@ mod test {
 				format!("{}: fake record count mismatch: wanted 2, got {}", testname, records.len())
 			))
 		}
+
+		Ok(())
+	}
+
+	#[test]
+	fn test_lookup_mgmtrec() -> Result<(), MensagoError> {
+		let testname = "test_lookup_mgmtrec";
+
+		let dh = FakeDNSHandler::new();
+		let rec = match get_mgmt_record(&Domain::from("example.com").unwrap(), &dh) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error getting fake mgmt record for example.com: {}", testname,
+						e.to_string())
+				))
+			}
+		};
+
+		// TODO: Finish test_lookup_mgmtrec
 
 		Ok(())
 	}
