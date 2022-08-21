@@ -1,14 +1,12 @@
 use std::net::{IpAddr, SocketAddr, ToSocketAddrs, Ipv4Addr, Ipv6Addr};
-use trust_dns_client::client::SyncClient;
-use trust_dns_client::tcp::TcpClientConnection;
-use trust_dns_client::udp::UdpClientConnection;
+use trust_dns_resolver::{Resolver,config::*};
 use eznacl::CryptoString;
 use libkeycard::Domain;
 use crate::MensagoError;
 
 /// The DNSHandler trait is an abstraction trait for easy unit testing
 pub trait DNSHandlerT {
-	fn set_server(&mut self, addr: SocketAddr, udp: bool) -> Result<(), MensagoError>;
+	fn set_server(&mut self, config: ResolverConfig, opts: ResolverOpts) -> Result<(), MensagoError>;
 	fn lookup_a(&self, d: &Domain) -> Result<IpAddr, MensagoError>;
 	fn lookup_aaaa(&self, d: &Domain) -> Result<IpAddr, MensagoError>;
 	fn lookup_txt(&self, d: &Domain) -> Result<Vec<String>, MensagoError>;
@@ -16,29 +14,41 @@ pub trait DNSHandlerT {
 
 /// The DNSHandler type provides a simple DNS API specific to the needs of Mensago clients
 pub struct DNSHandler {
-	server: SocketAddr,
-	udp: bool,
+	resolver: Resolver,
 }
 
 impl DNSHandler {
 
-	pub fn new(server: SocketAddr, udp: bool) -> DNSHandler {
-		DNSHandler {
-			server,
-			udp
+	/// Creates a new DNSHandler which uses the system resolver on POSIX platforms and Quad9 on
+	/// Windows.
+	pub fn new_default() -> Result<DNSHandler, MensagoError> {
+
+		if cfg!(windows) {
+			Ok(DNSHandler {
+				resolver: Resolver::new(ResolverConfig::quad9(), ResolverOpts::default())?
+			})
+		} else {
+			Ok(DNSHandler {
+				resolver: Resolver::from_system_conf()?
+			})
 		}
+	}
+
+	pub fn new(config: ResolverConfig, opts: ResolverOpts) -> Result<DNSHandler, MensagoError> {
+
+		Ok(DNSHandler {
+			resolver: Resolver::new(config, opts)?
+		})
 	}
 
 }
 
 impl DNSHandlerT for DNSHandler {
 
-	fn set_server(&mut self, addr: SocketAddr, udp: bool) -> Result<(), MensagoError> {
+	fn set_server(&mut self, config: ResolverConfig, opts: ResolverOpts) -> Result<(), MensagoError> {
 
-		self.server = addr;
-		self.udp = udp;
-
-		Err(MensagoError::ErrUnimplemented)
+		self.resolver = Resolver::new(config, opts)?;
+		Ok(())
 	}
 
 	fn lookup_a(&self, d: &Domain) -> Result<IpAddr, MensagoError> {
@@ -68,10 +78,15 @@ impl DNSHandlerT for DNSHandler {
 	}
 
 	fn lookup_txt(&self, d: &Domain) -> Result<Vec<String>, MensagoError> {
-	
-		// Implement DNSHandler::lookup_txt()
+		
+		let mut out = Vec::<String>::new();
 
-		Err(MensagoError::ErrUnimplemented)
+		let result = self.resolver.txt_lookup(&d.to_string())?;
+		for record in result.iter() {
+			out.push(record.to_string())
+		}
+
+		Ok(out)
 	}
 }
 
@@ -90,7 +105,8 @@ impl FakeDNSHandler {
 
 impl DNSHandlerT for FakeDNSHandler {
 
-	fn set_server(&mut self, _addr: SocketAddr, _udp: bool) -> Result<(), MensagoError> {
+	fn set_server(&mut self, _config: ResolverConfig, _opts: ResolverOpts)
+	-> Result<(), MensagoError> {
 		Ok(())
 	}
 
@@ -102,7 +118,7 @@ impl DNSHandlerT for FakeDNSHandler {
 		Ok(IpAddr::V6(Ipv6Addr::new(0,0,0,0,0,0,0,1)))
 	}
 
-	fn lookup_txt(&self, d: &Domain) -> Result<Vec<String>, MensagoError> {
+	fn lookup_txt(&self, _d: &Domain) -> Result<Vec<String>, MensagoError> {
 		Ok(vec![
 			String::from("pvk=ED25519:r#r*RiXIN-0n)BzP3bv`LA&t4LFEQNF0Q@$N~RF*"),
 			String::from("ek=CURVE25519:SNhj2K`hgBd8>G>lW$!pXiM7S-B!Fbd9jT2&{{Az"),
@@ -152,10 +168,10 @@ mod test {
 
 	#[test]
 	fn test_lookup_a() -> Result<(), MensagoError> {
-		let testname = "test_real_lookup_a";
+		let testname = "test_lookup_a";
 
 		let example_com = IpAddr::V4(Ipv4Addr::new(93,184,216,34));
-		let real_handler = DNSHandler::new("1.1.1.1:53".parse().unwrap(), true);
+		let real_handler = DNSHandler::new_default().unwrap();
 		let returned_ip = match real_handler.lookup_a(&Domain::from("example.com").unwrap()) {
 			Ok(v) => v,
 			Err(e) => {
@@ -183,10 +199,10 @@ mod test {
 
 	#[test]
 	fn test_lookup_aaaa() -> Result<(), MensagoError> {
-		let testname = "test_real_lookup_aaaa";
+		let testname = "test_lookup_aaaa";
 
 		let example_com = IpAddr::V6(Ipv6Addr::new(0x2606,0x2800,0x220,1,0x248,0x1893,0x25c8,0x1946));
-		let real_handler = DNSHandler::new("1.1.1.1:53".parse().unwrap(), true);
+		let real_handler = DNSHandler::new_default().unwrap();
 		let returned_ip = match real_handler.lookup_aaaa(&Domain::from("example.com").unwrap()) {
 			Ok(v) => v,
 			Err(e) => {
@@ -208,6 +224,53 @@ mod test {
 			}
 		};
 		assert_eq!(returned_ip, loopback);
+
+		Ok(())
+	}
+
+	#[test]
+	fn test_lookup_txt() -> Result<(), MensagoError> {
+		let testname = "test_lookup_txt";
+
+		let real_handler = DNSHandler::new_default().unwrap();
+
+		// mensago.net is currently used for testing and development purposes, so we can count
+		// on this returning specific values
+		let records = match real_handler.lookup_txt(
+			&Domain::from("mensago.mensago.net").unwrap()) {
+			
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error getting TXT records for mensago.net: {}", testname, e.to_string())
+				))
+			}
+		};
+
+		if records.len() != 2 {
+			return Err(MensagoError::ErrProgramException(
+				format!("{}: record count mismatch: wanted 2, got {}", testname, records.len())
+			))
+		}
+
+		let fake_handler = FakeDNSHandler::new();
+		let records = match fake_handler.lookup_txt(
+			&Domain::from("mensago.mensago.net").unwrap()) {
+			
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error getting fake TXT records for mensago.net: {}", testname,
+						e.to_string())
+				))
+			}
+		};
+
+		if records.len() != 2 {
+			return Err(MensagoError::ErrProgramException(
+				format!("{}: fake record count mismatch: wanted 2, got {}", testname, records.len())
+			))
+		}
 
 		Ok(())
 	}

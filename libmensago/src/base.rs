@@ -1,5 +1,6 @@
 use std::fmt;
 use std::string;
+use trust_dns_resolver::error::ResolveError;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -97,4 +98,7 @@ pub enum MensagoError {
 
 	#[error(transparent)]
 	Utf8Error(#[from] string::FromUtf8Error),
+
+	#[error(transparent)]
+	ResolveError(#[from] ResolveError)
 }
