@@ -210,17 +210,17 @@ fn parse_txt_records(records: &Vec::<String>) -> Result<DNSMgmtRecord, MensagoEr
 			return Err(MensagoError::ErrBadValue)
 		}
 
-		match part.to_ascii_uppercase() {
-			x if x.starts_with("PVK=") => {
+		match part {
+			x if x.to_lowercase().starts_with("pvk=") => {
 				pvk = CryptoString::from(&x[4..])
 			},
-			x if x.starts_with("SVK=") => {
+			x if x.to_lowercase().starts_with("svk=") => {
 				svk = CryptoString::from(&x[4..])
 			},
-			x if x.starts_with("EK=") => {
+			x if x.to_lowercase().starts_with("ek=") => {
 				ek = CryptoString::from(&x[3..])
 			},
-			x if x.starts_with("TLS=") => {
+			x if x.to_lowercase().starts_with("tls=") => {
 				tls = CryptoString::from(&x[4..])
 			},
 			_ => (),
@@ -262,6 +262,7 @@ impl KCResolver {
 #[cfg(test)]
 mod test {
     use crate::*;
+	use eznacl::CryptoString;
 	use libkeycard::Domain;
 	use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
@@ -388,6 +389,14 @@ mod test {
 				))
 			}
 		};
+		
+		if rec.pvk.to_string() != "ED25519:r#r*RiXIN-0n)BzP3bv`LA&t4LFEQNF0Q@$N~RF*" ||
+			rec.ek.to_string() != "CURVE25519:SNhj2K`hgBd8>G>lW$!pXiM7S-B!Fbd9jT2&{{Az" {
+			return Err(MensagoError::ErrProgramException(
+				format!("{}: fake mgmt record value mismatch:\n pvk:{} ek:{}", testname,
+					rec.pvk, rec.ek)
+			))
+		}
 
 		// TODO: Finish test_lookup_mgmtrec
 
