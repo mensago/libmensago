@@ -34,6 +34,8 @@ impl DNSHandler {
 		}
 	}
 
+	/// Creates a new DNSHandler instance with a specified configuration, corresponding to
+	/// `set_server()`.
 	pub fn new(config: ResolverConfig, opts: ResolverOpts) -> Result<DNSHandler, MensagoError> {
 
 		Ok(DNSHandler {
@@ -45,12 +47,14 @@ impl DNSHandler {
 
 impl DNSHandlerT for DNSHandler {
 
+	/// Sets the server and configuration information.
 	fn set_server(&mut self, config: ResolverConfig, opts: ResolverOpts) -> Result<(), MensagoError> {
 
 		self.resolver = Resolver::new(config, opts)?;
 		Ok(())
 	}
 
+	/// Resolves a DNS domain to an IPv4 address.
 	fn lookup_a(&self, d: &Domain) -> Result<IpAddr, MensagoError> {
 		
 		let addresses: Vec<SocketAddr> = format!("{}:443", d.as_string()).to_socket_addrs()?.collect();
@@ -64,6 +68,7 @@ impl DNSHandlerT for DNSHandler {
 		Err(MensagoError::ErrNotFound)
 	}
 
+	/// Resolves a DNS domain to an IPv6 address.
 	fn lookup_aaaa(&self, d: &Domain) -> Result<IpAddr, MensagoError> {
 		
 		let addresses: Vec<SocketAddr> = format!("{}:443", d.as_string()).to_socket_addrs()?.collect();
@@ -77,6 +82,7 @@ impl DNSHandlerT for DNSHandler {
 		Err(MensagoError::ErrNotFound)
 	}
 
+	/// Returns all text records for the specified domain
 	fn lookup_txt(&self, d: &Domain) -> Result<Vec<String>, MensagoError> {
 		
 		let mut out = Vec::<String>::new();
@@ -105,19 +111,27 @@ impl FakeDNSHandler {
 
 impl DNSHandlerT for FakeDNSHandler {
 
+	/// Normally sets the server and configuration information. This call for FakeDNSHandler is
+	/// a no-op
 	fn set_server(&mut self, _config: ResolverConfig, _opts: ResolverOpts)
 	-> Result<(), MensagoError> {
 		Ok(())
 	}
 
+	/// Normally turns a DNS domain into an IPv4 address. This implementation always returns
+	/// 127.0.0.1.
 	fn lookup_a(&self, _d: &Domain) -> Result<IpAddr, MensagoError> {
 		Ok(IpAddr::V4(Ipv4Addr::new(127,0,0,1)))
 	}
 
+	/// Normally turns a DNS domain into an IPv6 address. This implementation always returns
+	/// ::1.
 	fn lookup_aaaa(&self, _d: &Domain) -> Result<IpAddr, MensagoError> {
 		Ok(IpAddr::V6(Ipv6Addr::new(0,0,0,0,0,0,0,1)))
 	}
 
+	/// Normally returns all text records for a domain. This implementation always returns two
+	/// records which contain a PVK and an EK Mensago config item, respectively.
 	fn lookup_txt(&self, _d: &Domain) -> Result<Vec<String>, MensagoError> {
 		Ok(vec![
 			String::from("pvk=ED25519:r#r*RiXIN-0n)BzP3bv`LA&t4LFEQNF0Q@$N~RF*"),
