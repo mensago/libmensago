@@ -157,9 +157,37 @@ pub fn get_mgmt_record<D: DNSHandlerT>(d: &Domain, dh: &D) -> Result<DNSMgmtReco
 		return parse_txt_records(&dh.lookup_txt(d)?)
 	}
 
-	// TODO: Finish implementing get_mgmt_record()
+	let mut out: Option<DNSMgmtRecord> = None;
+	for i in 0..domparts.len() - 1 {
 
-	Err(MensagoError::ErrUnimplemented)
+		let mut testparts = vec!["mensago"];
+		for i in i..domparts.len() {
+			testparts.push(domparts[i])
+		}
+
+		let testdom = match Domain::from(&testparts.join(".")) {
+			Some(v) => v,
+			None => {
+				return Err(MensagoError::ErrBadValue)
+			}	
+		};
+		
+		let records = match dh.lookup_txt(&testdom) {
+			Ok(v) => v,
+			Err(_) => {
+				continue
+			}
+		};
+
+		out = Some(parse_txt_records(&records)?);
+	}
+
+	match out {
+		Some(v) => Ok(v),
+		None => {
+			Err(MensagoError::ErrNotFound)
+		}
+	}
 }
 
 // This private function just finds the management record items in a list of TXT records
@@ -182,17 +210,17 @@ fn parse_txt_records(records: &Vec::<String>) -> Result<DNSMgmtRecord, MensagoEr
 			return Err(MensagoError::ErrBadValue)
 		}
 
-		match part.to_ascii_lowercase() {
-			x if x.starts_with("pvk=") => {
+		match part.to_ascii_uppercase() {
+			x if x.starts_with("PVK=") => {
 				pvk = CryptoString::from(&x[4..])
 			},
-			x if x.starts_with("svk=") => {
+			x if x.starts_with("SVK=") => {
 				svk = CryptoString::from(&x[4..])
 			},
-			x if x.starts_with("ek=") => {
+			x if x.starts_with("EK=") => {
 				ek = CryptoString::from(&x[3..])
 			},
-			x if x.starts_with("tls=") => {
+			x if x.starts_with("TLS=") => {
 				tls = CryptoString::from(&x[4..])
 			},
 			_ => (),
