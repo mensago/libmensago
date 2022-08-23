@@ -398,8 +398,6 @@ mod test {
 			))
 		}
 
-		// TODO: Finish test_lookup_mgmtrec
-
 		Ok(())
 	}
 }
