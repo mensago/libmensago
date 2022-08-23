@@ -262,7 +262,6 @@ impl KCResolver {
 #[cfg(test)]
 mod test {
     use crate::*;
-	use eznacl::CryptoString;
 	use libkeycard::Domain;
 	use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
