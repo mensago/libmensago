@@ -10,6 +10,7 @@ pub trait DNSHandlerT {
 	fn lookup_a(&self, d: &Domain) -> Result<IpAddr, MensagoError>;
 	fn lookup_aaaa(&self, d: &Domain) -> Result<IpAddr, MensagoError>;
 	fn lookup_txt(&self, d: &Domain) -> Result<Vec<String>, MensagoError>;
+	fn lookup_srv(&self, d: &Domain) -> Result<Vec<(String, String, usize)>, MensagoError>;
 }
 
 /// The DNSHandler type provides a simple DNS API specific to the needs of Mensago clients
@@ -82,6 +83,13 @@ impl DNSHandlerT for DNSHandler {
 		Err(MensagoError::ErrNotFound)
 	}
 
+	/// Returns all service records for the specified domain
+	fn lookup_srv(&self, d: &Domain) -> Result<Vec<(String, String, usize)>, MensagoError> {
+		
+		// TODO: Implement DNSHandler::lookup_srv
+		Err(MensagoError::ErrUnimplemented)
+	}
+
 	/// Returns all text records for the specified domain
 	fn lookup_txt(&self, d: &Domain) -> Result<Vec<String>, MensagoError> {
 		
@@ -128,6 +136,14 @@ impl DNSHandlerT for FakeDNSHandler {
 	/// ::1.
 	fn lookup_aaaa(&self, _d: &Domain) -> Result<IpAddr, MensagoError> {
 		Ok(IpAddr::V6(Ipv6Addr::new(0,0,0,0,0,0,0,1)))
+	}
+
+	/// Normally returns all service records for a domain. This implementation always returns
+	/// mensago.example.com on port 2001 with a TTL of 86400.
+	fn lookup_srv(&self, _d: &Domain) -> Result<Vec<(String, String, usize)>, MensagoError> {
+		Ok(vec![
+			(String::from("mensago.example.com"), String::from("2001"), 86400),
+		])
 	}
 
 	/// Normally returns all text records for a domain. This implementation always returns two
