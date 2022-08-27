@@ -6,10 +6,24 @@ use crate::MensagoError;
 
 /// The DNSHandler trait is an abstraction trait for easy unit testing
 pub trait DNSHandlerT {
+
+	/// Sets configuration for which server will be used to resolve queries and how.
 	fn set_server(&mut self, config: ResolverConfig, opts: ResolverOpts) -> Result<(), MensagoError>;
+
+	/// Turns a domain into an IPv4 address
 	fn lookup_a(&self, d: &Domain) -> Result<IpAddr, MensagoError>;
+
+	/// Turns a domain into an IPv6 address
 	fn lookup_aaaa(&self, d: &Domain) -> Result<IpAddr, MensagoError>;
+
+	/// Returns all text records for a specific domain. This call is primarily intended for
+	/// Mensago management record lookups.
 	fn lookup_txt(&self, d: &Domain) -> Result<Vec<String>, MensagoError>;
+
+	/// Returns service records for a specific domain. The information returned consists of a
+	/// series of tuples containing the domain, the port, and the Time To Live. This call
+	/// internally sorts the records by priority and weight in descending order such that the
+	/// first entry in the returned list has the highest priority.
 	fn lookup_srv(&self, d: &Domain) -> Result<Vec<(String, u16, usize)>, MensagoError>;
 }
 
