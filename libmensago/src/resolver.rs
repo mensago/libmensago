@@ -2,7 +2,7 @@ use std::net::{IpAddr, SocketAddr, ToSocketAddrs, Ipv4Addr, Ipv6Addr};
 use trust_dns_resolver::{Resolver,config::*};
 use eznacl::CryptoString;
 use libkeycard::Domain;
-use crate::MensagoError;
+use crate::{MensagoError, MConn, ServerConnection};
 
 /// The DNSHandler trait is an abstraction trait for easy unit testing
 pub trait DNSHandlerT {
@@ -24,7 +24,7 @@ pub trait DNSHandlerT {
 	/// series of tuples containing the domain, the port, and the Time To Live. This call
 	/// internally sorts the records by priority and weight in descending order such that the
 	/// first entry in the returned list has the highest priority.
-	fn lookup_srv(&self, d: &Domain) -> Result<Vec<(String, u16, usize)>, MensagoError>;
+	fn lookup_srv(&self, d: &Domain) -> Result<Vec<ServiceConfigRecord>, MensagoError>;
 }
 
 /// The DNSHandler type provides a simple DNS API specific to the needs of Mensago clients
@@ -98,7 +98,7 @@ impl DNSHandlerT for DNSHandler {
 	}
 
 	/// Returns all service records for the specified domain
-	fn lookup_srv(&self, d: &Domain) -> Result<Vec<(String, u16, usize)>, MensagoError> {
+	fn lookup_srv(&self, d: &Domain) -> Result<Vec<ServiceConfigRecord>, MensagoError> {
 		
 		// TODO: Implement DNSHandler::lookup_srv
 		Err(MensagoError::ErrUnimplemented)
@@ -154,9 +154,13 @@ impl DNSHandlerT for FakeDNSHandler {
 
 	/// Normally returns all service records for a domain. This implementation always returns
 	/// mensago.example.com on port 2001 with a TTL of 86400.
-	fn lookup_srv(&self, _d: &Domain) -> Result<Vec<(String, u16, usize)>, MensagoError> {
+	fn lookup_srv(&self, _d: &Domain) -> Result<Vec<ServiceConfigRecord>, MensagoError> {
 		Ok(vec![
-			(String::from("mensago.example.com"), 2001, 86400),
+			ServiceConfigRecord {
+				server: Domain::from("mensago.example.com").unwrap(),
+				port: 2001,
+				priority: 0,
+			}
 		])
 	}
 
@@ -170,17 +174,87 @@ impl DNSHandlerT for FakeDNSHandler {
 	}
 }
 
-pub struct ServerConfigRecord {
-	server: Domain,
-	port: u16,
-	priority: u16,
+pub struct ServiceConfigRecord {
+	pub server: Domain,
+	pub port: u16,
+	pub priority: u16,
 }
 
-pub fn get_server_config(d: &Domain) -> Result<Vec<ServerConfigRecord>, MensagoError> {
+/// This function attempts to obtain Mensago server configuration information for the specified
+/// domain using the process documented in the spec:
+/// 
+/// 1. Check for an SRV record with the service type `_mensago._tcp`, and use the supplied FQDN
+/// and port if it exists
+/// 2. Perform an A or AAAA lookup for `mensago.subdomain.example.com`
+/// 3. Perform an A or AAAA lookup for `mensago.example.com`
+/// 4. Attempt to connect to `example.com`
+/// 
+/// If all of these checks fail, then the domain is assumed to not offer Mensago services and
+/// MensagoError::ErrNotFound will be returned.
+pub fn get_server_config<DH: DNSHandlerT>(d: &Domain, dh: &DH)
+-> Result<Vec<ServiceConfigRecord>, MensagoError> {
 
-	// TODO: Implement get_server_config()
+	match dh.lookup_srv(d) {
+		Ok(v) => { return Ok(v) },
+		Err(_) => (),
+	};
 
-	return Err(MensagoError::ErrUnimplemented)
+	let mut tempdom = d.clone();
+	loop {
+		tempdom.push("mensago").unwrap();
+
+		match dh.lookup_a(&d) {
+			Ok(_) => {
+				return Ok(vec![
+					ServiceConfigRecord {
+						server: tempdom.clone(),
+						port: 2001,
+						priority: 0,
+					}
+				])
+			},
+			Err(_) => (),
+		}
+
+		match dh.lookup_aaaa(&d) {
+			Ok(_) => {
+				return Ok(vec![
+					ServiceConfigRecord {
+						server: tempdom.clone(),
+						port: 2001,
+						priority: 0,
+					}
+				])
+			},
+			Err(_) => (),
+		}
+
+		tempdom.pop().unwrap();
+
+		if tempdom.parent().is_none() {
+			break
+		}
+
+		tempdom.pop().unwrap();
+	}
+
+	// Having gotten this far, we have only one other option: attempt to connect to the domain
+	// on port 2001.
+	let mut conn = ServerConnection::new();
+	match conn.connect(tempdom.as_string(), "2001") {
+		Ok(_) => {
+			return Ok(vec![
+				ServiceConfigRecord {
+					server: tempdom.clone(),
+					port: 2001,
+					priority: 0,
+				}
+			])
+		},
+		Err(_) => (),
+	}
+
+	Err(MensagoError::ErrNotFound)
 }
 
 pub struct DNSMgmtRecord {
@@ -440,6 +514,15 @@ mod test {
 			))
 		}
 
+		Ok(())
+	}
+
+	#[test]
+	fn test_get_server_config() -> Result<(), MensagoError> {
+		let testname = "test_get_server_config";
+
+		// TODO: Implement test_get_server_config()
+		
 		Ok(())
 	}
 }
