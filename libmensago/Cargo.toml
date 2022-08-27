@@ -20,7 +20,7 @@ eznacl = "3.2.6"
 hex = "0.4.3"
 iobuffer = "0.2.0"
 lazy_static = "1.4.0"
-libkeycard = "0.1.8"
+libkeycard = "0.1.9"
 os_info = { version = "3", default-features = false }
 rand = "0.8.5"
 regex = "1.5.5"
