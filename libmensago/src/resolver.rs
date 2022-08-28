@@ -1,3 +1,4 @@
+use std::{collections::VecDeque, fmt};
 use std::net::{IpAddr, SocketAddr, ToSocketAddrs, Ipv4Addr, Ipv6Addr};
 use trust_dns_resolver::{Resolver,config::*};
 use eznacl::CryptoString;
@@ -11,20 +12,20 @@ pub trait DNSHandlerT {
 	fn set_server(&mut self, config: ResolverConfig, opts: ResolverOpts) -> Result<(), MensagoError>;
 
 	/// Turns a domain into an IPv4 address
-	fn lookup_a(&self, d: &Domain) -> Result<IpAddr, MensagoError>;
+	fn lookup_a(&mut self, d: &Domain) -> Result<IpAddr, MensagoError>;
 
 	/// Turns a domain into an IPv6 address
-	fn lookup_aaaa(&self, d: &Domain) -> Result<IpAddr, MensagoError>;
+	fn lookup_aaaa(&mut self, d: &Domain) -> Result<IpAddr, MensagoError>;
 
 	/// Returns all text records for a specific domain. This call is primarily intended for
 	/// Mensago management record lookups.
-	fn lookup_txt(&self, d: &Domain) -> Result<Vec<String>, MensagoError>;
+	fn lookup_txt(&mut self, d: &Domain) -> Result<Vec<String>, MensagoError>;
 
 	/// Returns service records for a specific domain. The information returned consists of a
 	/// series of tuples containing the domain, the port, and the Time To Live. This call
 	/// internally sorts the records by priority and weight in descending order such that the
 	/// first entry in the returned list has the highest priority.
-	fn lookup_srv(&self, d: &str) -> Result<Vec<ServiceConfigRecord>, MensagoError>;
+	fn lookup_srv(&mut self, d: &str) -> Result<Vec<ServiceConfigRecord>, MensagoError>;
 }
 
 /// The DNSHandler type provides a simple DNS API specific to the needs of Mensago clients
@@ -70,7 +71,7 @@ impl DNSHandlerT for DNSHandler {
 	}
 
 	/// Resolves a DNS domain to an IPv4 address.
-	fn lookup_a(&self, d: &Domain) -> Result<IpAddr, MensagoError> {
+	fn lookup_a(&mut self, d: &Domain) -> Result<IpAddr, MensagoError> {
 		
 		let addresses: Vec<SocketAddr> = format!("{}:443", d.as_string()).to_socket_addrs()?.collect();
 
@@ -84,7 +85,7 @@ impl DNSHandlerT for DNSHandler {
 	}
 
 	/// Resolves a DNS domain to an IPv6 address.
-	fn lookup_aaaa(&self, d: &Domain) -> Result<IpAddr, MensagoError> {
+	fn lookup_aaaa(&mut self, d: &Domain) -> Result<IpAddr, MensagoError> {
 		
 		let addresses: Vec<SocketAddr> = format!("{}:443", d.as_string()).to_socket_addrs()?.collect();
 
@@ -98,7 +99,7 @@ impl DNSHandlerT for DNSHandler {
 	}
 
 	/// Returns all service records for the specified domain
-	fn lookup_srv(&self, d: &str) -> Result<Vec<ServiceConfigRecord>, MensagoError> {
+	fn lookup_srv(&mut self, d: &str) -> Result<Vec<ServiceConfigRecord>, MensagoError> {
 
 		let mut out = Vec::<ServiceConfigRecord>::new();
 		
@@ -162,7 +163,7 @@ impl DNSHandlerT for DNSHandler {
 	}
 
 	/// Returns all text records for the specified domain
-	fn lookup_txt(&self, d: &Domain) -> Result<Vec<String>, MensagoError> {
+	fn lookup_txt(&mut self, d: &Domain) -> Result<Vec<String>, MensagoError> {
 		
 		let mut out = Vec::<String>::new();
 
@@ -181,17 +182,42 @@ impl DNSHandlerT for DNSHandler {
 	}
 }
 
+/// This enum is for simulating different  FakeDNSHandler error conditions
+#[derive(Debug, Clone, Copy)]
+pub enum FakeDNSError {
+	Empty,
+	NoResponse,
+	Misconfig,
+	NotFound,
+}
+
+impl fmt::Display for FakeDNSError {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			FakeDNSError::Empty => { write!(f, "Empty")	},
+			FakeDNSError::Misconfig => { write!(f, "Misconfig")	},
+			FakeDNSError::NoResponse => { write!(f, "NoResponse")	},
+			FakeDNSError::NotFound => { write!(f, "NotFound")	},
+		}
+	}
+}
+
 /// The FakeDNSHandler type provides mock DNS information for unit testing purposes
 pub struct FakeDNSHandler {
-
+	error_list: VecDeque<FakeDNSError>,
 }
 
 impl FakeDNSHandler {
 
 	pub fn new() -> FakeDNSHandler {
-		FakeDNSHandler {  }
+		FakeDNSHandler { 
+			error_list: VecDeque::new()
+		}
 	}
 
+	pub fn push_error(&mut self, e: FakeDNSError) {
+		self.error_list.push_back(e)
+	}
 }
 
 impl DNSHandlerT for FakeDNSHandler {
@@ -205,19 +231,66 @@ impl DNSHandlerT for FakeDNSHandler {
 
 	/// Normally turns a DNS domain into an IPv4 address. This implementation always returns
 	/// 127.0.0.1.
-	fn lookup_a(&self, _d: &Domain) -> Result<IpAddr, MensagoError> {
+	fn lookup_a(&mut self, _d: &Domain) -> Result<IpAddr, MensagoError> {
+
+		match self.error_list.pop_front() {
+			Some(e) => {
+				match e {
+					FakeDNSError::NoResponse => { return Err(MensagoError::ErrNetworkError) },
+					FakeDNSError::Misconfig => { return Ok(IpAddr::V4(Ipv4Addr::new(0,0,0,0))) },
+					FakeDNSError::Empty => { return Err(MensagoError::ErrEmptyData) },
+					FakeDNSError::NotFound => { return Err(MensagoError::ErrNotFound) },
+				}
+			},
+			None => (),
+		}
+
 		Ok(IpAddr::V4(Ipv4Addr::new(127,0,0,1)))
 	}
 
 	/// Normally turns a DNS domain into an IPv6 address. This implementation always returns
 	/// ::1.
-	fn lookup_aaaa(&self, _d: &Domain) -> Result<IpAddr, MensagoError> {
+	fn lookup_aaaa(&mut self, _d: &Domain) -> Result<IpAddr, MensagoError> {
+
+		match self.error_list.pop_front() {
+			Some(e) => {
+				match e {
+					FakeDNSError::NoResponse => { return Err(MensagoError::ErrNetworkError) },
+					FakeDNSError::Misconfig => { return Ok(IpAddr::V6(Ipv6Addr::new(0,0,0,0,0,0,0,0))) },
+					FakeDNSError::Empty => { return Err(MensagoError::ErrEmptyData) },
+					FakeDNSError::NotFound => { return Err(MensagoError::ErrNotFound) },
+				}
+			},
+			None => (),
+		}
+
 		Ok(IpAddr::V6(Ipv6Addr::new(0,0,0,0,0,0,0,1)))
 	}
 
 	/// Normally returns all service records for a domain. This implementation always returns
 	/// mensago.example.com on port 2001 with a TTL of 86400.
-	fn lookup_srv(&self, _d: &str) -> Result<Vec<ServiceConfigRecord>, MensagoError> {
+	fn lookup_srv(&mut self, _d: &str) -> Result<Vec<ServiceConfigRecord>, MensagoError> {
+
+		match self.error_list.pop_front() {
+			Some(e) => {
+				match e {
+					FakeDNSError::NoResponse => { return Err(MensagoError::ErrNetworkError) },
+					FakeDNSError::Empty => { return Err(MensagoError::ErrEmptyData) },
+					FakeDNSError::NotFound => { return Err(MensagoError::ErrNotFound) },
+					FakeDNSError::Misconfig => { 
+						return Ok(vec![
+							ServiceConfigRecord {
+								server: Domain::from("myhostname").unwrap(),
+								port: 0,
+								priority: 100,
+							},
+						])
+					},
+				}
+			},
+			None => (),
+		}
+
 		Ok(vec![
 			ServiceConfigRecord {
 				server: Domain::from("mensago1.example.com").unwrap(),
@@ -234,7 +307,25 @@ impl DNSHandlerT for FakeDNSHandler {
 
 	/// Normally returns all text records for a domain. This implementation always returns two
 	/// records which contain a PVK and an EK Mensago config item, respectively.
-	fn lookup_txt(&self, _d: &Domain) -> Result<Vec<String>, MensagoError> {
+	fn lookup_txt(&mut self, _d: &Domain) -> Result<Vec<String>, MensagoError> {
+
+		match self.error_list.pop_front() {
+			Some(e) => {
+				match e {
+					FakeDNSError::NoResponse => { return Err(MensagoError::ErrNetworkError) },
+					FakeDNSError::Empty => { return Err(MensagoError::ErrEmptyData) },
+					FakeDNSError::NotFound => { return Err(MensagoError::ErrNotFound) },
+					FakeDNSError::Misconfig => { 
+						return Ok(vec![
+							String::from("pvk=K12:r#r*RiXIN-0n)BzP3bv`LA&t4LFEQNF0Q@$N~RF*"),
+							String::from("svk=CURVE25519:SNhj2K`hgBd8>G>lW$!pXiM7S-B!Fbd9jT2&{{Az"),
+						])
+					},
+				}
+			},
+			None => (),
+		}
+
 		Ok(vec![
 			String::from("pvk=ED25519:r#r*RiXIN-0n)BzP3bv`LA&t4LFEQNF0Q@$N~RF*"),
 			String::from("ek=CURVE25519:SNhj2K`hgBd8>G>lW$!pXiM7S-B!Fbd9jT2&{{Az"),
@@ -259,7 +350,7 @@ pub struct ServiceConfigRecord {
 /// 
 /// If all of these checks fail, then the domain is assumed to not offer Mensago services and
 /// MensagoError::ErrNotFound will be returned.
-pub fn get_server_config<DH: DNSHandlerT>(d: &Domain, dh: &DH)
+pub fn get_server_config<DH: DNSHandlerT>(d: &Domain, dh: &mut DH)
 -> Result<Vec<ServiceConfigRecord>, MensagoError> {
 
 	match dh.lookup_srv(&format!("_mensago._tcp.{}", d.as_string())) {
@@ -332,14 +423,14 @@ pub struct DNSMgmtRecord {
 	pub tls: Option<CryptoString>,
 }
 
-pub fn get_mgmt_record<D: DNSHandlerT>(d: &Domain, dh: &D) -> Result<DNSMgmtRecord, MensagoError> {
+pub fn get_mgmt_record<DH: DNSHandlerT>(d: &Domain, dh: &mut DH) -> Result<DNSMgmtRecord, MensagoError> {
 
 	let domstr = d.to_string();
 	let domparts: Vec::<&str> = domstr.split(".").collect();
 	
 	// This is probably a hostname, so we'll check just the hostname for records
 	if domparts.len() == 1 {
-		return parse_txt_records(&dh.lookup_txt(d)?)
+		return parse_txt_records(&mut dh.lookup_txt(d)?)
 	}
 
 	let mut out: Option<DNSMgmtRecord> = None;
@@ -455,7 +546,7 @@ mod test {
 		let testname = "test_lookup_a";
 
 		let example_com = IpAddr::V4(Ipv4Addr::new(93,184,216,34));
-		let real_handler = DNSHandler::new_default().unwrap();
+		let mut real_handler = DNSHandler::new_default().unwrap();
 		let returned_ip = match real_handler.lookup_a(&Domain::from("example.com").unwrap()) {
 			Ok(v) => v,
 			Err(e) => {
@@ -467,7 +558,7 @@ mod test {
 		assert_eq!(returned_ip, example_com);
 
 		let loopback = IpAddr::V4(Ipv4Addr::new(127,0,0,1));
-		let fake_handler = FakeDNSHandler::new();
+		let mut fake_handler = FakeDNSHandler::new();
 		let returned_ip = match fake_handler.lookup_a(&Domain::from("example.com").unwrap()) {
 			Ok(v) => v,
 			Err(e) => {
@@ -486,7 +577,7 @@ mod test {
 		let testname = "test_lookup_aaaa";
 
 		let example_com = IpAddr::V6(Ipv6Addr::new(0x2606,0x2800,0x220,1,0x248,0x1893,0x25c8,0x1946));
-		let real_handler = DNSHandler::new_default().unwrap();
+		let mut real_handler = DNSHandler::new_default().unwrap();
 		let returned_ip = match real_handler.lookup_aaaa(&Domain::from("example.com").unwrap()) {
 			Ok(v) => v,
 			Err(e) => {
@@ -498,7 +589,7 @@ mod test {
 		assert_eq!(returned_ip, example_com);
 
 		let loopback = IpAddr::V6(Ipv6Addr::new(0,0,0,0,0,0,0,1));
-		let fake_handler = FakeDNSHandler::new();
+		let mut fake_handler = FakeDNSHandler::new();
 		let returned_ip = match fake_handler.lookup_aaaa(&Domain::from("example.com").unwrap()) {
 			Ok(v) => v,
 			Err(e) => {
@@ -516,7 +607,7 @@ mod test {
 	fn test_lookup_srv() -> Result<(), MensagoError> {
 		let testname = "test_lookup_srv";
 
-		let real_handler = DNSHandler::new_default().unwrap();
+		let mut real_handler = DNSHandler::new_default().unwrap();
 
 		// mensago.net is currently used for testing and development purposes, so we can count
 		// on this returning specific values
@@ -532,7 +623,7 @@ mod test {
 			}
 		};
 
-		let fake_handler = FakeDNSHandler::new();
+		let mut fake_handler = FakeDNSHandler::new();
 		let records = match fake_handler.lookup_srv(
 			&String::from("_mensago._tcp.example.com.")) {
 			
@@ -558,7 +649,7 @@ mod test {
 	fn test_lookup_txt() -> Result<(), MensagoError> {
 		let testname = "test_lookup_txt";
 
-		let real_handler = DNSHandler::new_default().unwrap();
+		let mut real_handler = DNSHandler::new_default().unwrap();
 
 		// mensago.net is currently used for testing and development purposes, so we can count
 		// on this returning specific values
@@ -579,7 +670,7 @@ mod test {
 			))
 		}
 
-		let fake_handler = FakeDNSHandler::new();
+		let mut fake_handler = FakeDNSHandler::new();
 		let records = match fake_handler.lookup_txt(
 			&Domain::from("mensago.mensago.net").unwrap()) {
 			
@@ -605,8 +696,8 @@ mod test {
 	fn test_lookup_mgmtrec() -> Result<(), MensagoError> {
 		let testname = "test_lookup_mgmtrec";
 
-		let dh = FakeDNSHandler::new();
-		let rec = match get_mgmt_record(&Domain::from("example.com").unwrap(), &dh) {
+		let mut dh = FakeDNSHandler::new();
+		let rec = match get_mgmt_record(&Domain::from("example.com").unwrap(), &mut dh) {
 			Ok(v) => v,
 			Err(e) => {
 				return Err(MensagoError::ErrProgramException(
