@@ -77,6 +77,9 @@ pub enum MensagoError {
 	// Server exceptions are returned when the server does something wrong to help troubleshoot
 	#[error("Server exception: {0}")]
 	ErrServerException(String),
+	#[error("Network error")]
+	ErrNetworkError,
+
 
 
 	// Passthrough errors
