@@ -24,7 +24,7 @@ pub trait DNSHandlerT {
 	/// series of tuples containing the domain, the port, and the Time To Live. This call
 	/// internally sorts the records by priority and weight in descending order such that the
 	/// first entry in the returned list has the highest priority.
-	fn lookup_srv(&self, d: &Domain) -> Result<Vec<ServiceConfigRecord>, MensagoError>;
+	fn lookup_srv(&self, d: &str) -> Result<Vec<ServiceConfigRecord>, MensagoError>;
 }
 
 /// The DNSHandler type provides a simple DNS API specific to the needs of Mensago clients
@@ -98,10 +98,67 @@ impl DNSHandlerT for DNSHandler {
 	}
 
 	/// Returns all service records for the specified domain
-	fn lookup_srv(&self, d: &Domain) -> Result<Vec<ServiceConfigRecord>, MensagoError> {
+	fn lookup_srv(&self, d: &str) -> Result<Vec<ServiceConfigRecord>, MensagoError> {
+
+		let mut out = Vec::<ServiceConfigRecord>::new();
 		
-		// TODO: Implement DNSHandler::lookup_srv
-		Err(MensagoError::ErrUnimplemented)
+		let result = match self.resolver.srv_lookup(d) {
+			Ok(v) => v,
+			Err(_) => {
+				return Err(MensagoError::ErrNotFound)
+			}
+		};
+
+		// We have at least one record here, so the first thing is to sort the list by priority
+		// and then weight. From there we can construct the list of ServiceConfigRecord objects
+		// to return to the caller.
+
+		let mut records: Vec<&trust_dns_proto::rr::rdata::srv::SRV> = result.iter().collect();
+		records.sort_by(|a, b| {
+			if a.priority() < b.priority() {
+				return std::cmp::Ordering::Less
+			}
+			if a.priority() > b.priority() {
+				return std::cmp::Ordering::Greater
+			}
+			
+			a.weight().cmp(&b.weight())
+		});
+
+		let mut priority: u16 = 0;
+		for record in records.iter() {
+
+			// The Trust DNS crates work best with FQDNs -- domains ending in a period. We don't
+			// do that here. ;)
+			let target = record.target().to_string();
+			let trimmed = target.trim_end_matches(".");
+			
+			// We received records from the server, but it's no guarantee that they're safe to use.
+			// If the server given doesn't actually work, then it's a possibly-intentional
+			// misconfiguration. Skip the record and check afterward to see if we have anything
+			// valid.
+			let s = match Domain::from(trimmed) {
+				Some(v) => v,
+				None => {
+					continue
+				}
+			};
+
+			out.push(ServiceConfigRecord{
+				server: s,
+				port: record.port(),
+				priority,
+			});
+
+			priority += 1;
+		}
+
+		if out.len() == 0 {
+			// We were given records, but none of them were valid, so bomb out here
+			return Err(MensagoError::ErrBadValue)
+		}
+		
+		Ok(out)
 	}
 
 	/// Returns all text records for the specified domain
@@ -109,7 +166,13 @@ impl DNSHandlerT for DNSHandler {
 		
 		let mut out = Vec::<String>::new();
 
-		let result = self.resolver.txt_lookup(&d.to_string())?;
+		let result = match self.resolver.txt_lookup(&d.to_string()) {
+			Ok(v) => v,
+			Err(_) => {
+				return Err(MensagoError::ErrNotFound)
+			}
+		};
+
 		for record in result.iter() {
 			out.push(record.to_string())
 		}
@@ -154,13 +217,18 @@ impl DNSHandlerT for FakeDNSHandler {
 
 	/// Normally returns all service records for a domain. This implementation always returns
 	/// mensago.example.com on port 2001 with a TTL of 86400.
-	fn lookup_srv(&self, _d: &Domain) -> Result<Vec<ServiceConfigRecord>, MensagoError> {
+	fn lookup_srv(&self, _d: &str) -> Result<Vec<ServiceConfigRecord>, MensagoError> {
 		Ok(vec![
 			ServiceConfigRecord {
-				server: Domain::from("mensago.example.com").unwrap(),
+				server: Domain::from("mensago1.example.com").unwrap(),
 				port: 2001,
 				priority: 0,
-			}
+			},
+			ServiceConfigRecord {
+				server: Domain::from("mensago2.example.com").unwrap(),
+				port: 2001,
+				priority: 1,
+			},
 		])
 	}
 
@@ -194,7 +262,7 @@ pub struct ServiceConfigRecord {
 pub fn get_server_config<DH: DNSHandlerT>(d: &Domain, dh: &DH)
 -> Result<Vec<ServiceConfigRecord>, MensagoError> {
 
-	match dh.lookup_srv(d) {
+	match dh.lookup_srv(&format!("_mensago._tcp.{}", d.as_string())) {
 		Ok(v) => { return Ok(v) },
 		Err(_) => (),
 	};
@@ -441,6 +509,48 @@ mod test {
 		};
 		assert_eq!(returned_ip, loopback);
 
+		Ok(())
+	}
+
+	#[test]
+	fn test_lookup_srv() -> Result<(), MensagoError> {
+		let testname = "test_lookup_srv";
+
+		let real_handler = DNSHandler::new_default().unwrap();
+
+		// mensago.net is currently used for testing and development purposes, so we can count
+		// on this returning specific values
+		match real_handler.lookup_srv(
+			&String::from("_mensago._tcp.mensago.net.")) {
+			
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error getting SRV records for mensago.mensago.net: {}", testname,
+						e.to_string())
+				))
+			}
+		};
+
+		let fake_handler = FakeDNSHandler::new();
+		let records = match fake_handler.lookup_srv(
+			&String::from("_mensago._tcp.example.com.")) {
+			
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error getting fake SRV records for example.com: {}", testname,
+						e.to_string())
+				))
+			}
+		};
+
+		if records.len() != 2 {
+			return Err(MensagoError::ErrProgramException(
+				format!("{}: fake record count mismatch: wanted 2, got {}", testname, records.len())
+			))
+		}
+		
 		Ok(())
 	}
 
