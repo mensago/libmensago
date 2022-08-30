@@ -333,6 +333,7 @@ impl DNSHandlerT for FakeDNSHandler {
 	}
 }
 
+#[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub struct ServiceConfigRecord {
 	pub server: Domain,
 	pub port: u16,
@@ -721,6 +722,52 @@ mod test {
 	#[test]
 	fn test_get_server_config() -> Result<(), MensagoError> {
 		let testname = "test_get_server_config";
+
+		// Regular success case
+
+		let mut dh = FakeDNSHandler::new();
+		let mut fakeconfig = match get_server_config(&Domain::from("example.com").unwrap(), &mut dh) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error getting fake server for example.com: {}", testname,
+						e.to_string())
+				))
+			}
+		};
+		let mut fakerec = &fakeconfig[0];
+		if fakerec != &(ServiceConfigRecord {
+				server: Domain::from("mensago1.example.com").unwrap(),
+				port: 2001,
+				priority: 0,
+			}) {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error fake server config value mismatch", testname)
+				))
+		}
+
+		// Test case: no SRV record
+
+		dh.push_error(FakeDNSError::NotFound);
+		fakeconfig = match get_server_config(&Domain::from("example.com").unwrap(), &mut dh) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error getting fake server for example.com: {}", testname,
+						e.to_string())
+				))
+			}
+		};
+		fakerec = &fakeconfig[0];
+		if fakerec != &(ServiceConfigRecord {
+				server: Domain::from("mensago.example.com").unwrap(),
+				port: 2001,
+				priority: 0,
+			}) {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: error fake server config value mismatch", testname)
+				))
+		}
 
 		// TODO: Implement test_get_server_config()
 		
