@@ -432,31 +432,6 @@ mod test {
 				))
 		}
 
-		// Test case: no SRV record, no A/AAAA records. Attempt to connect to bare domain
-
-		dh.push_error(FakeDNSError::NotFound);
-		dh.push_error(FakeDNSError::NotFound);
-		dh.push_error(FakeDNSError::NotFound);
-		fakeconfig = match get_server_config(&Domain::from("example.com").unwrap(), &mut dh) {
-			Ok(v) => v,
-			Err(e) => {
-				return Err(MensagoError::ErrProgramException(
-					format!("{}: error getting fake bare domain record for example.com: {}", testname,
-						e.to_string())
-				))
-			}
-		};
-		fakerec = &fakeconfig[0];
-		if fakerec != &(ServiceConfigRecord {
-				server: Domain::from("example.com").unwrap(),
-				port: 2001,
-				priority: 0,
-			}) {
-				return Err(MensagoError::ErrProgramException(
-					format!("{}: error fake bare domain record mismatch", testname)
-				))
-		}
-		
 		Ok(())
 	}
 }
