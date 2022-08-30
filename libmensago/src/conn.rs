@@ -31,10 +31,20 @@ struct GreetingData {
 /// The MConn trait is for any type which implements the methods needed for connecting to a
 /// Mensago server. It exists mostly for an abstraction to make testing easier.
 pub trait MConn {
+
+	/// Connects to a Mensago server
 	fn connect(&mut self, address: &str, port: &str) -> Result<(), MensagoError>;
+
+	/// Gracefully disconnects from a Mensago server
 	fn disconnect(&mut self) -> Result<(), MensagoError>;
+
+	/// Returns true if connected
 	fn is_connected(&self) -> bool;
+
+	/// Waits for a ServerResponse from a connected Mensago server
 	fn receive(&mut self) -> Result<ServerResponse, MensagoError>;
+
+	/// Sends a ClientRequest to a server
 	fn send(&mut self, msg: &ClientRequest) -> Result<(), MensagoError>;
 }
 
@@ -43,7 +53,7 @@ pub trait MConn {
 #[derive(Debug)]
 pub struct ServerConnection {
 	socket: Option<TcpStream>,
-	buffer: [u8; BUFFER_SIZE],
+	buffer: [u8; BUFFER_SIZE]
 }
 
 impl ServerConnection {
