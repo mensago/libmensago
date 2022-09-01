@@ -209,9 +209,21 @@ impl KCResolver {
 	}
 
 	/// Obtains the workspace ID for a Mensago address
-	pub fn resolve_address(&mut self, addr: &MAddress) -> Result<RandomID, MensagoError> {
+	pub fn resolve_address<DH: DNSHandlerT>(&mut self, addr: &MAddress, dh: &mut DH)
+	-> Result<RandomID, MensagoError> {
 
-		// TODO: Implement KCResolver::resolve_address()
+		if addr.get_uid().get_type() == IDType::WorkspaceID {
+			return Ok(RandomID::from(addr.get_uid().as_string())
+				.expect("BUG: couldn't convert UID to WID in KCResolver::resolve_address()"))
+		}
+
+		// TODO: Add caching to KCResolver::resolve_address()
+
+		let serverconfig = get_server_config(addr.get_domain(), dh)?;
+
+		let conn = ServerConnection::new();
+
+		// TODO: Finish implementing KCResolver::resolve_address()
 
 		Err(MensagoError::ErrUnimplemented)
 	}
