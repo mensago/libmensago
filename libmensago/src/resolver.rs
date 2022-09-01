@@ -1,5 +1,5 @@
 use eznacl::CryptoString;
-use libkeycard::Domain;
+use libkeycard::*;
 use crate::*;
 
 
@@ -186,6 +186,7 @@ pub struct KCResolver {
 
 impl KCResolver {
 
+	/// Creates a new resolver working out of the at the specified profile
 	pub fn new(profile_path: &str) -> Result<KCResolver, MensagoError> {
 
 		if profile_path.len() == 0 {
@@ -193,6 +194,48 @@ impl KCResolver {
 		}
 
 		// TODO: Implement KCResolver::new()
+
+		Err(MensagoError::ErrUnimplemented)
+	}
+
+	/// Returns a keycard belonging to the specified owner. To obtain an organization's keycard,
+	/// pass a domain, e.g. `example.com`. Otherwise obtain a user's keycard by passing either the
+	/// user's Mensago address or its workspace address.
+	pub fn get_card(&mut self, owner: &str) -> Result<Keycard, MensagoError> {
+
+		// TODO: Implement KCResolver::get_card()
+
+		Err(MensagoError::ErrUnimplemented)
+	}
+
+	/// Obtains the workspace ID for a Mensago address
+	pub fn resolve_address(&mut self, addr: &MAddress) -> Result<RandomID, MensagoError> {
+
+		// TODO: Implement KCResolver::resolve_address()
+
+		Err(MensagoError::ErrUnimplemented)
+	}
+
+	/// Obtains a keycard from the database's cache
+	fn get_card_from_db(&self, owner: &str, etype: EntryType) -> Result<Keycard, MensagoError> {
+
+		// TODO: Implement KCResolver::get_card_from_db()
+
+		Err(MensagoError::ErrUnimplemented)
+	}
+
+	/// Adds a keycard to the database's cache
+	fn add_card_to_db(&self, card: &Keycard) -> Result<(), MensagoError> {
+
+		// TODO: Implement KCResolver::add_card_to_db()
+
+		Err(MensagoError::ErrUnimplemented)
+	}
+
+	/// Updates a keycard in the database's cache
+	fn update_card_in_db(&self, card: &Keycard) -> Result<(), MensagoError> {
+
+		// TODO: Implement KCResolver::update_card_in_db()
 
 		Err(MensagoError::ErrUnimplemented)
 	}
