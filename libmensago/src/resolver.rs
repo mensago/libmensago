@@ -220,12 +220,17 @@ impl KCResolver {
 		// TODO: Add caching to KCResolver::resolve_address()
 
 		let serverconfig = get_server_config(addr.get_domain(), dh)?;
+		if serverconfig.len() == 0 {
+			return Err(MensagoError::ErrNoMensago)
+		}
 
-		let conn = ServerConnection::new();
+		let mut conn = ServerConnection::new();
 
-		// TODO: Finish implementing KCResolver::resolve_address()
+		conn.connect(&serverconfig[0].server.to_string(), &serverconfig[0].port.to_string())?;
+		let wid = getwid(&mut conn, addr.get_uid(), Some(addr.get_domain()))?;
+		conn.disconnect()?;
 
-		Err(MensagoError::ErrUnimplemented)
+		Ok(wid)
 	}
 
 	/// Obtains a keycard from the database's cache
