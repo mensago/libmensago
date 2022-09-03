@@ -10,7 +10,7 @@ autotests = false
 glob = "0.3.0"
 eznacl = "3.2.6"
 lazy_static = "1.4.0"
-libkeycard = "0.1.9"
+libkeycard = "0.1.10"
 libmensago = { path = "../libmensago" }
 postgres = "0.19.3"
 toml_edit = "0.14.4"
