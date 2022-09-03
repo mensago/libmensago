@@ -1,5 +1,6 @@
 use eznacl::CryptoString;
 use libkeycard::*;
+use std::path::PathBuf;
 use crate::*;
 
 
@@ -181,21 +182,27 @@ fn parse_txt_records(records: &Vec::<String>) -> Result<DNSMgmtRecord, MensagoEr
 
 /// A caching keycard resolver type
 pub struct KCResolver {
-
+	dbpath: PathBuf,
 }
 
 impl KCResolver {
 
 	/// Creates a new resolver working out of the at the specified profile
-	pub fn new(profile_path: &str) -> Result<KCResolver, MensagoError> {
+	pub fn new(profile_path: &PathBuf) -> Result<KCResolver, MensagoError> {
 
-		if profile_path.len() == 0 {
-			return Err(MensagoError::ErrEmptyData)
+		if !profile_path.exists() {
+			return Err(MensagoError::ErrNotFound)
 		}
 
-		// TODO: Implement KCResolver::new()
+		let mut storage = profile_path.clone();
+		storage.push("storage.db");
+		if !storage.exists() {
+			return Err(MensagoError::ErrNotFound)
+		}
 
-		Err(MensagoError::ErrUnimplemented)
+		return Ok(KCResolver {
+			dbpath: storage,
+		})
 	}
 
 	/// Returns a keycard belonging to the specified owner. To obtain an organization's keycard,
@@ -234,7 +241,8 @@ impl KCResolver {
 	}
 
 	/// Obtains a keycard from the database's cache
-	fn get_card_from_db(&self, owner: &str, etype: EntryType) -> Result<Keycard, MensagoError> {
+	fn get_card_from_db(&self, conn: &rusqlite::Connection, owner: &str, etype: EntryType)
+	-> Result<Keycard, MensagoError> {
 
 		// TODO: Implement KCResolver::get_card_from_db()
 
@@ -242,7 +250,32 @@ impl KCResolver {
 	}
 
 	/// Adds a keycard to the database's cache
-	fn add_card_to_db(&self, card: &Keycard) -> Result<(), MensagoError> {
+	fn add_card_to_db(&self, conn: &rusqlite::Connection, card: &Keycard)
+	-> Result<(), MensagoError> {
+
+		let current = match card.get_current() {
+			Some(v) => v,
+			None => { return Err(MensagoError::ErrEmptyData) },
+		};
+
+		let owner = current.get_owner()?;
+
+		match conn.execute("DELETE FROM keycards WHERE owner=?1", [owner]) {
+			Ok(_) => (),
+			Err(e) => {
+				return Err(MensagoError::ErrDatabaseException(e.to_string()))
+			},
+		}
+
+		// match conn.execute("INSERT INTO keycards(owner, index, entry, fingerprint, expires)
+		// 	VALUES(?1,?2,?3,?4,?5,?6)",
+		// 	[owner, ]) {
+			
+		// 	Ok(_) => Ok(()),
+		// 	Err(e) => {
+		// 		Err(MensagoError::ErrDatabaseException(e.to_string()))
+		// 	},
+		// }
 
 		// TODO: Implement KCResolver::add_card_to_db()
 
@@ -250,11 +283,22 @@ impl KCResolver {
 	}
 
 	/// Updates a keycard in the database's cache
-	fn update_card_in_db(&self, card: &Keycard) -> Result<(), MensagoError> {
+	fn update_card_in_db(&self, conn: &rusqlite::Connection, card: &Keycard)
+	-> Result<(), MensagoError> {
 
 		// TODO: Implement KCResolver::update_card_in_db()
 
 		Err(MensagoError::ErrUnimplemented)
+	}
+
+	pub fn open_storage(&self) -> Result<rusqlite::Connection, MensagoError> {
+		match rusqlite::Connection::open_with_flags(&self.dbpath,
+			rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE) {
+				Ok(v) => Ok(v),
+				Err(e) => {
+					return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())));
+				}
+		}
 	}
 }
 
