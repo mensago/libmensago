@@ -288,9 +288,78 @@ impl KCResolver {
 	fn update_card_in_db(&self, conn: &rusqlite::Connection, card: &Keycard)
 	-> Result<(), MensagoError> {
 
-		// TODO: Implement KCResolver::update_card_in_db()
+		// Because keycards are append-only, we just have to find out what the last index stored
+		// in the database is and then add any remaining entries to the database
 
-		Err(MensagoError::ErrUnimplemented)
+		let current = match card.get_current() {
+			Some(v) => v,
+			None => { return Err(MensagoError::ErrEmptyData) },
+		};
+		let owner = current.get_owner()?;
+
+		let mut stmt = conn.prepare("SELECT index FROM keycards WHERE owner=?1 ORDER BY 'index' 
+		DESC LIMIT 1")?;
+	
+		// Queries with rusqlite are extremely ugly because the results wrapped several layers
+		// deep. The query() call returns a Result containing a Rows() structure. If we get an
+		// error here, there was a problem either with the query or the database.
+		let mut rows = match stmt.query([&owner]) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrDatabaseException(e.to_string()))
+			}
+		};
+
+		// The Rows::next() call returns Result<Some<Result<Row>>>. Seriously. The possible
+		// return values are:
+		//
+		// Err() -> an error occurred getting the next row
+		// Ok(Some(Row)) -> another row was returned
+		// Ok(None) -> all results have been returned
+		
+		let option_row = match rows.next() {
+			Ok(v) => v,
+			Err(_) => {
+				// No rows were found, so we just add all of the card to the database
+				return self.add_card_to_db(conn, card)
+			}
+		};
+
+		// We've actually removed enough layers to get an idea of if we actually were successful
+		// in finding the identity info.
+		if option_row.is_none() {
+			// We have a problem: no identity entry in the database for the workspace.
+			return Err(MensagoError::ErrDatabaseException(
+					String::from("Database has no identity entry in 'workspaces'")));
+		}
+
+		let row = option_row.unwrap();
+		let indexstr = &row.get::<usize,String>(0).unwrap();
+		let index = match indexstr.parse::<usize>() {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrDatabaseException(e.to_string()))
+			},
+		};
+
+		if index < card.entries.len() {
+			for entry in card.entries[index..].iter() {
+				match conn.execute("INSERT INTO keycards(owner, index, entry, fingerprint, expires)
+				VALUES(?1,?2,?3,?4,?5)", [&owner, &entry.get_field("Index").unwrap(),
+					&entry.get_full_text("").unwrap(), 
+					&entry.get_authstr("Hash").unwrap().to_string(),
+					&entry.get_field("Expires").unwrap()]) {
+				
+					Ok(_) => (),
+					Err(e) => {
+						return Err(MensagoError::ErrDatabaseException(e.to_string()))
+					},
+				};
+			}
+		}
+
+
+		Ok(())
 	}
 
 	pub fn open_storage(&self) -> Result<rusqlite::Connection, MensagoError> {
