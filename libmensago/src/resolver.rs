@@ -225,6 +225,7 @@ impl KCResolver {
 		}
 
 		// TODO: Add caching to KCResolver::resolve_address()
+		// TODO: Implement keycard Time-To-Live handling
 
 		let serverconfig = get_server_config(addr.get_domain(), dh)?;
 		if serverconfig.len() == 0 {
@@ -240,13 +241,50 @@ impl KCResolver {
 		Ok(wid)
 	}
 
-	/// Obtains a keycard from the database's cache
+	/// Obtains a keycard from the database's cache if it exists
 	fn get_card_from_db(&self, conn: &rusqlite::Connection, owner: &str, etype: EntryType)
 	-> Result<Keycard, MensagoError> {
 
-		// TODO: Implement KCResolver::get_card_from_db()
+		// TODO: Implement Time-To-Live handling in Keycard::get_card_from_db()
 
-		Err(MensagoError::ErrUnimplemented)
+		let mut card = Keycard::new(etype);
+
+		// This is an internal call and owner has already been validated once, so we don't have to
+		// do it again. Likewise, we validate everything ruthlessly when data is brought in, so
+		// because that's already been done once, we don't need to do it again here -- just create
+		// entries from each row and add them to the card.
+
+		// A huge chunk of rusqlite-related code just to add the entries to the card. :(
+
+		let mut stmt = conn.prepare("SELECT entry FROM keycards WHERE owner=? ORDER BY 'index'")?;
+		
+		let mut rows = match stmt.query([owner]) {
+			Ok(v) => v,
+			Err(e) => { return Err(MensagoError::ErrDatabaseException(e.to_string())) }
+		};
+
+		let mut option_row = match rows.next() {
+			Ok(v) => v,
+			Err(e) => { return Err(MensagoError::ErrDatabaseException(e.to_string())) }
+		};
+
+		while option_row.is_some() {
+			let row = option_row.unwrap();
+
+			let entry = Entry::from(&row.get::<usize,String>(0).unwrap())?;
+			card.entries.push(entry);
+
+			option_row = match rows.next() {
+				Ok(v) => v,
+				Err(e) => { return Err(MensagoError::ErrDatabaseException(e.to_string())) }
+			};
+		}
+
+		if card.entries.len() < 1 {
+			return Err(MensagoError::ErrEmptyData)
+		}
+
+		Ok(card)
 	}
 
 	/// Adds a keycard to the database's cache
