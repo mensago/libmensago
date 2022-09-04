@@ -260,26 +260,28 @@ impl KCResolver {
 
 		let owner = current.get_owner()?;
 
-		match conn.execute("DELETE FROM keycards WHERE owner=?1", [owner]) {
+		match conn.execute("DELETE FROM keycards WHERE owner=?1", [&owner]) {
 			Ok(_) => (),
 			Err(e) => {
 				return Err(MensagoError::ErrDatabaseException(e.to_string()))
 			},
 		}
 
-		// match conn.execute("INSERT INTO keycards(owner, index, entry, fingerprint, expires)
-		// 	VALUES(?1,?2,?3,?4,?5,?6)",
-		// 	[owner, ]) {
+		for entry in card.entries.iter() {
+			match conn.execute("INSERT INTO keycards(owner, index, entry, fingerprint, expires)
+			VALUES(?1,?2,?3,?4,?5)", [&owner, &entry.get_field("Index").unwrap(),
+				&entry.get_full_text("").unwrap(), 
+				&entry.get_authstr("Hash").unwrap().to_string(),
+				&entry.get_field("Expires").unwrap()]) {
 			
-		// 	Ok(_) => Ok(()),
-		// 	Err(e) => {
-		// 		Err(MensagoError::ErrDatabaseException(e.to_string()))
-		// 	},
-		// }
+				Ok(_) => (),
+				Err(e) => {
+					return Err(MensagoError::ErrDatabaseException(e.to_string()))
+				},
+			};
+		}
 
-		// TODO: Implement KCResolver::add_card_to_db()
-
-		Err(MensagoError::ErrUnimplemented)
+		Ok(())
 	}
 
 	/// Updates a keycard in the database's cache
