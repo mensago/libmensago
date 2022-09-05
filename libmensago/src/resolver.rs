@@ -1,4 +1,4 @@
-use chrono::{prelude::*,NaiveDateTime,Duration};
+use chrono::prelude::*;
 use eznacl::CryptoString;
 use libkeycard::*;
 use std::path::PathBuf;
@@ -280,9 +280,6 @@ impl KCResolver {
 			return Ok(RandomID::from(addr.get_uid().as_string())
 				.expect("BUG: couldn't convert UID to WID in KCResolver::resolve_address()"))
 		}
-
-		// TODO: Add caching to KCResolver::resolve_address()
-		// TODO: Implement keycard Time-To-Live handling
 
 		let serverconfig = get_server_config(addr.get_domain(), dh)?;
 		if serverconfig.len() == 0 {
