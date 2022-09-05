@@ -929,6 +929,8 @@ user_regcode: &str, pwhash: &ArgonHash) -> Result<HashMap<&'static str, String>,
 		},
 	}
 	
+	// TODO: add admin account's keycard to database
+
 	Ok(regdata)
 }
 
