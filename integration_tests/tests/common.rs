@@ -1001,8 +1001,8 @@ pub fn full_test_setup(testname: &str) -> Result<(
 	};
 
 	let mut conn = ServerConnection::new();
-	let port = config["network"]["port"].as_integer().unwrap();
-	match conn.connect(config["network"]["listen_ip"].as_str().unwrap(), &port.to_string()) {
+	let port = config["network"]["port"].as_integer().unwrap() as u16;
+	match conn.connect(config["network"]["listen_ip"].as_str().unwrap(), port) {
 		Ok(_) => (),
 		Err(e) => {
 			return Err(MensagoError::ErrProgramException(
