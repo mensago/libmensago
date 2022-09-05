@@ -54,6 +54,8 @@ mod tests {
 			}
 		};
 
+		// TODO: finish implementing test_kcresolver()
+
 		Ok(())
 	}
 }
