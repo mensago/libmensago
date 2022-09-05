@@ -29,7 +29,7 @@ static STORAGE_DB_SETUP_COMMANDS: &str = "
 	CREATE table 'keycards'(
 		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
 		'owner' TEXT NOT NULL,
-		'index' INTEGER,
+		'entryindex' TEXT NOT NULL,
 		'type' TEXT NOT NULL,
 		'entry' BLOB NOT NULL,
 		'textentry' TEXT NOT NULL,
