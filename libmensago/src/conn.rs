@@ -33,7 +33,7 @@ struct GreetingData {
 pub trait MConn {
 
 	/// Connects to a Mensago server
-	fn connect(&mut self, address: &str, port: &str) -> Result<(), MensagoError>;
+	fn connect(&mut self, address: &str, port: u16) -> Result<(), MensagoError>;
 
 	/// Gracefully disconnects from a Mensago server
 	fn disconnect(&mut self) -> Result<(), MensagoError>;
@@ -65,10 +65,11 @@ impl ServerConnection {
 
 impl MConn for ServerConnection {
 
-	/// Connects to a Mensago server given the specified address and port
-	fn connect(&mut self, address: &str, port: &str) -> Result<(), MensagoError> {
+	/// Connects to a Mensago server given the specified address and port. This call takes a string
+	/// for the address so that an IP address or a domain may be used.
+	fn connect(&mut self, address: &str, port: u16) -> Result<(), MensagoError> {
 
-		if address.len() == 0 || port.len() == 0 {
+		if address.len() == 0 {
 			return Err(MensagoError::ErrBadValue)
 		}
 

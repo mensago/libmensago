@@ -3,7 +3,6 @@ use libkeycard::*;
 use std::path::PathBuf;
 use crate::*;
 
-
 /// This function attempts to obtain Mensago server configuration information for the specified
 /// domain using the process documented in the spec:
 /// 
@@ -65,7 +64,7 @@ pub fn get_server_config<DH: DNSHandlerT>(d: &Domain, dh: &mut DH)
 	// Having gotten this far, we have only one other option: attempt to connect to the domain
 	// on port 2001.
 	let mut conn = ServerConnection::new();
-	match conn.connect(tempdom.as_string(), "2001") {
+	match conn.connect(tempdom.as_string(), 2001) {
 		Ok(_) => {
 			return Ok(vec![
 				ServiceConfigRecord {
@@ -208,23 +207,34 @@ impl KCResolver {
 	/// Returns a keycard belonging to the specified owner. To obtain an organization's keycard,
 	/// pass a domain, e.g. `example.com`. Otherwise obtain a user's keycard by passing either the
 	/// user's Mensago address or its workspace address.
-	pub fn get_card(&mut self, owner: &str) -> Result<Keycard, MensagoError> {
+	pub fn get_card<DH: DNSHandlerT>(&mut self, owner: &str, dh: &mut DH)
+	-> Result<Keycard, MensagoError> {
 
 		// First, determine the type of owner. A domain will be passed for an organization, and for
 		// a user card a Mensago address or a workspace address will be given.
+		let domain: Domain;
 		let owner_type: EntryType;
-		if Domain::from(owner).is_some() {
-			owner_type = EntryType::Organization
-		} else if MAddress::from(owner).is_some() {
-			owner_type = EntryType::User
+
+		let isorg = Domain::from(owner);
+		if isorg.is_some() {
+			owner_type = EntryType::Organization;
+			domain = isorg.unwrap();
+		
 		} else {
-			return Err(MensagoError::ErrBadValue)
+			let isuser = MAddress::from(owner);
+			if isuser.is_some() {
+				owner_type = EntryType::User;
+				domain = isuser.unwrap().domain.clone();
+			} else {
+				return Err(MensagoError::ErrBadValue)
+			}
 		}
 
-		// TODO: set up connection to database
-		let conn = self.open_storage()?;
 
-		let card = self.get_card_from_db(&conn, owner, owner_type)?;
+		// TODO: set up connection to database
+		let dbconn = self.open_storage()?;
+
+		let card = self.get_card_from_db(&dbconn, owner, owner_type)?;
 
 		if card.is_some() {
 
@@ -238,9 +248,27 @@ impl KCResolver {
 		// If we've gotten this far, it means that the card isn't in the database cache, so resolve
 		// the card, add it to the database's cache, and return it to the caller.
 
-		// TODO: Implement KCResolver::get_card()
+		let serverconfig = get_server_config(&domain, dh)?;
+		if serverconfig.len() == 0 {
+			return Err(MensagoError::ErrNoMensago)
+		}
 
-		Err(MensagoError::ErrUnimplemented)
+		let mut conn = ServerConnection::new();
+		conn.connect(&serverconfig[0].server.to_string(), serverconfig[0].port)?;
+
+		let card = match owner_type {
+			EntryType::Organization => { orgcard(&mut conn, 1)? },
+			EntryType::User => { usercard(&mut conn, 1)? },
+			_ => {
+				// We should never be here
+				panic!("BUG: Bad owner type in KCResolver::get_card()")
+			},
+		};
+		
+		conn.disconnect()?;
+		
+		self.add_card_to_db(&dbconn, &card)?;
+		Ok(card)
 	}
 
 	/// Obtains the workspace ID for a Mensago address
@@ -262,7 +290,7 @@ impl KCResolver {
 
 		let mut conn = ServerConnection::new();
 
-		conn.connect(&serverconfig[0].server.to_string(), &serverconfig[0].port.to_string())?;
+		conn.connect(&serverconfig[0].server.to_string(), serverconfig[0].port)?;
 		let wid = getwid(&mut conn, addr.get_uid(), Some(addr.get_domain()))?;
 		conn.disconnect()?;
 
