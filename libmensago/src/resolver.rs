@@ -286,9 +286,11 @@ impl KCResolver {
 			return Err(MensagoError::ErrNoMensago)
 		}
 
+		let ip = dh.lookup_a(&serverconfig[0].server)?;
+
 		let mut conn = ServerConnection::new();
 
-		conn.connect(&serverconfig[0].server.to_string(), serverconfig[0].port)?;
+		conn.connect(&ip.to_string(), serverconfig[0].port)?;
 		let wid = getwid(&mut conn, addr.get_uid(), Some(addr.get_domain()))?;
 		conn.disconnect()?;
 
