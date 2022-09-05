@@ -35,7 +35,8 @@ static STORAGE_DB_SETUP_COMMANDS: &str = "
 		'textentry' TEXT NOT NULL,
 		'hash' TEXT NOT NULL,
 		'expires' TEXT NOT NULL,
-		'timestamp' TEXT NOT NULL
+		'timestamp' TEXT NOT NULL,
+		'ttlexpires' TEXT
 	);
 	CREATE table 'messages'(
 		'id' TEXT NOT NULL UNIQUE,
