@@ -231,14 +231,12 @@ impl KCResolver {
 		}
 
 
-		// TODO: set up connection to database
 		let dbconn = self.open_storage()?;
-
 		let card = self.get_card_from_db(&dbconn, owner, owner_type)?;
 
 		if card.is_some() {
 
-			// The card has been returned, so we have *something. It might, however, need updated.
+			// The card has been returned, so we have *something*. It might, however, need updated.
 			// If updates are needed, we'll need to add them to the database and return the updated
 			// card.
 			
@@ -361,12 +359,34 @@ impl KCResolver {
 			},
 		}
 
+		// Calculate the expiration time of the current entries
+		let ttl_offset = current.get_field("Time-To-Live")
+			.unwrap()
+			.parse::<u16>()
+			.unwrap();
+		let ttl_expires = match Timestamp::new().with_offset(i64::from(ttl_offset)) {
+			Some(v) => v,
+			None => {
+				return Err(MensagoError::ErrProgramException(
+					String::from("BUG: timestamp generation failure in KCResolver::add_card_to_db")
+				))
+			}
+		};
+
 		for entry in card.entries.iter() {
-			match conn.execute("INSERT INTO keycards(owner, index, entry, fingerprint, expires)
-			VALUES(?1,?2,?3,?4,?5)", [&owner, &entry.get_field("Index").unwrap(),
-				&entry.get_full_text("").unwrap(), 
-				&entry.get_authstr("Hash").unwrap().to_string(),
-				&entry.get_field("Expires").unwrap()]) {
+			match conn.execute("INSERT INTO keycards(
+				owner, index, type, entry, textentry, hash, expires, timestamp, ttlexpires)
+				VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9)", [
+					&owner,
+					&entry.get_field("Index").unwrap(),
+					&entry.get_field("Type").unwrap(),
+					&entry.get_full_text("").unwrap(), 
+					&entry.get_full_text("").unwrap(), 
+					&entry.get_authstr("Hash").unwrap().to_string(),
+					&entry.get_field("Expires").unwrap(),
+					&entry.get_field("Timestamp").unwrap(),
+					&ttl_expires.to_string(),
+				]) {
 			
 				Ok(_) => (),
 				Err(e) => {
