@@ -1,3 +1,4 @@
+use chrono::{prelude::*,NaiveDateTime,Duration};
 use eznacl::CryptoString;
 use libkeycard::*;
 use std::path::PathBuf;
@@ -299,8 +300,6 @@ impl KCResolver {
 	fn get_card_from_db(&self, conn: &rusqlite::Connection, owner: &str, etype: EntryType)
 	-> Result<Option<Keycard>, MensagoError> {
 
-		// TODO: Implement Time-To-Live handling in Keycard::get_card_from_db()
-
 		let mut card = Keycard::new(etype);
 
 		// This is an internal call and owner has already been validated once, so we don't have to
@@ -338,7 +337,27 @@ impl KCResolver {
 			return Ok(None)
 		}
 
-		Ok(Some(card))
+		let current = card.get_current().unwrap();
+		let mut stmt = conn.prepare("SELECT ttlexpires FROM keycards WHERE owner=?1 AND index=?2")?;
+		let ttlstr = stmt.query_row([&owner, current.get_field("Index").unwrap().as_str()], |row| {
+			Ok(row.get::<usize,String>(0).unwrap())
+		})?;
+		
+		let exptime = match NaiveDate::parse_from_str(&ttlstr, "%Y%m%dT%H%M%SZ") {
+			Ok(d) => d,
+			Err(e) => {
+				// We should never be here
+				return Err(MensagoError::ErrProgramException(e.to_string()))
+			}
+		};
+
+		let now = Utc::now().date().naive_utc();
+
+		if now > exptime {
+			Ok(None)
+		} else {
+			Ok(Some(card))
+		}
 	}
 
 	/// Adds a keycard to the database's cache or updates it if it already exists
