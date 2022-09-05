@@ -16,7 +16,9 @@ mod tests {
 		let (_, _, _, profile_folder, _, _, mut conn, _) = full_test_setup(testname)?;
 		conn.disconnect()?;
 
-		let profile_path = PathBuf::from(profile_folder);
+		let mut profile_path = PathBuf::from(profile_folder);
+		profile_path.push("primary");
+
 		let mut resolver = match KCResolver::new(&profile_path) {
 			Ok(v) => v,
 			Err(e) => {
@@ -25,6 +27,23 @@ mod tests {
 				))
 			}
 		};
+
+		let mut dh = FakeDNSHandler::new();
+		let admin_addr = match resolver.resolve_address(
+			&MAddress::from("admin/example.com").unwrap(), &mut dh) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: failed to resolve admin address: {}", testname, e.to_string())
+				))
+			}
+		};
+
+		if admin_addr != RandomID::from("ae406c5e-2673-4d3e-af20-91325d9623ca").unwrap() {
+			return Err(MensagoError::ErrProgramException(
+				format!("{}: admin address mismatch: {}", testname, admin_addr.to_string())
+			))
+	}
 
 		Ok(())
 	}
