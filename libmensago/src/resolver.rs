@@ -1,4 +1,3 @@
-use chrono::prelude::*;
 use eznacl::CryptoString;
 use libkeycard::*;
 use std::path::PathBuf;
@@ -233,11 +232,11 @@ impl KCResolver {
 		}
 
 
-		let dbconn = self.open_storage()?;
+		let dbconn = open_storage_db(&self.dbpath)?;
 		let mut card: Option<Keycard> = None;
 		
 		if !force_update {
-			card = self.get_card_from_db(&dbconn, owner, owner_type)?;
+			card = get_card_from_db(&dbconn, owner, owner_type, true)?;
 		}
 
 		// If we got a card from the call, it means a successful cache hit and the TTL timestamp
@@ -270,7 +269,7 @@ impl KCResolver {
 		
 		conn.disconnect()?;
 		
-		self.update_card_in_db(&dbconn, &card)?;
+		update_keycard_in_db(&dbconn, &card, true)?;
 		Ok(card)
 	}
 
@@ -297,137 +296,6 @@ impl KCResolver {
 		conn.disconnect()?;
 
 		Ok(wid)
-	}
-
-	/// Obtains a keycard from the database's cache if it exists
-	fn get_card_from_db(&self, conn: &rusqlite::Connection, owner: &str, etype: EntryType)
-	-> Result<Option<Keycard>, MensagoError> {
-
-		let mut card = Keycard::new(etype);
-
-		// This is an internal call and owner has already been validated once, so we don't have to
-		// do it again. Likewise, we validate everything ruthlessly when data is brought in, so
-		// because that's already been done once, we don't need to do it again here -- just create
-		// entries from each row and add them to the card.
-
-		// A huge chunk of rusqlite-related code just to add the entries to the card. :(
-
-		let mut stmt = conn.prepare("SELECT entry FROM keycards WHERE owner=? ORDER BY 'index'")?;
-		
-		let mut rows = match stmt.query([owner]) {
-			Ok(v) => v,
-			Err(e) => { return Err(MensagoError::ErrDatabaseException(e.to_string())) }
-		};
-
-		let mut option_row = match rows.next() {
-			Ok(v) => v,
-			Err(e) => { return Err(MensagoError::ErrDatabaseException(e.to_string())) }
-		};
-
-		while option_row.is_some() {
-			let row = option_row.unwrap();
-
-			let entry = Entry::from(&row.get::<usize,String>(0).unwrap())?;
-			card.entries.push(entry);
-
-			option_row = match rows.next() {
-				Ok(v) => v,
-				Err(e) => { return Err(MensagoError::ErrDatabaseException(e.to_string())) }
-			};
-		}
-
-		if card.entries.len() < 1 {
-			return Ok(None)
-		}
-
-		let current = card.get_current().unwrap();
-		let mut stmt = conn.prepare("SELECT ttlexpires FROM keycards WHERE owner=?1 AND index=?2")?;
-		let ttlstr = stmt.query_row([&owner, current.get_field("Index").unwrap().as_str()], |row| {
-			Ok(row.get::<usize,String>(0).unwrap())
-		})?;
-		
-		let exptime = match NaiveDate::parse_from_str(&ttlstr, "%Y%m%dT%H%M%SZ") {
-			Ok(d) => d,
-			Err(e) => {
-				// We should never be here
-				return Err(MensagoError::ErrProgramException(e.to_string()))
-			}
-		};
-
-		let now = Utc::now().date().naive_utc();
-
-		if now > exptime {
-			Ok(None)
-		} else {
-			Ok(Some(card))
-		}
-	}
-
-	/// Adds a keycard to the database's cache or updates it if it already exists
-	fn update_card_in_db(&self, conn: &rusqlite::Connection, card: &Keycard)
-	-> Result<(), MensagoError> {
-
-		let current = match card.get_current() {
-			Some(v) => v,
-			None => { return Err(MensagoError::ErrEmptyData) },
-		};
-
-		let owner = current.get_owner()?;
-
-		match conn.execute("DELETE FROM keycards WHERE owner=?1", [&owner]) {
-			Ok(_) => (),
-			Err(e) => {
-				return Err(MensagoError::ErrDatabaseException(e.to_string()))
-			},
-		}
-
-		// Calculate the expiration time of the current entries
-		let ttl_offset = current.get_field("Time-To-Live")
-			.unwrap()
-			.parse::<u16>()
-			.unwrap();
-		let ttl_expires = match Timestamp::new().with_offset(i64::from(ttl_offset)) {
-			Some(v) => v,
-			None => {
-				return Err(MensagoError::ErrProgramException(
-					String::from("BUG: timestamp generation failure in KCResolver::update_card_in_db")
-				))
-			}
-		};
-
-		for entry in card.entries.iter() {
-			match conn.execute("INSERT INTO keycards(
-				owner, index, type, entry, textentry, hash, expires, timestamp, ttlexpires)
-				VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9)", [
-					&owner,
-					&entry.get_field("Index").unwrap(),
-					&entry.get_field("Type").unwrap(),
-					&entry.get_full_text("").unwrap(), 
-					&entry.get_full_text("").unwrap(), 
-					&entry.get_authstr("Hash").unwrap().to_string(),
-					&entry.get_field("Expires").unwrap(),
-					&entry.get_field("Timestamp").unwrap(),
-					&ttl_expires.to_string(),
-				]) {
-			
-				Ok(_) => (),
-				Err(e) => {
-					return Err(MensagoError::ErrDatabaseException(e.to_string()))
-				},
-			};
-		}
-
-		Ok(())
-	}
-
-	pub fn open_storage(&self) -> Result<rusqlite::Connection, MensagoError> {
-		match rusqlite::Connection::open_with_flags(&self.dbpath,
-			rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE) {
-				Ok(v) => Ok(v),
-				Err(e) => {
-					return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())));
-				}
-		}
 	}
 }
 
