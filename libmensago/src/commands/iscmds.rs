@@ -805,3 +805,55 @@ pub fn unregister(conn: &mut ServerConnection, pwhash: &ArgonHash)
 	Ok(resp.as_status())
 }
 
+/// Obtains keycard entries for a user. This command is usually called to get a user's entire
+/// keycard or to get updates to it. The start_index parameter refers to the Index field in 
+/// the keycard entry. To obtain the entire keycard, use an index of 1. To obtain only the current
+/// entry, use an index of 0. Specifying another value will result in the server returning all
+/// entries from the specified index through the current one. If an index which is out of range is
+/// specified, the server will return 404 NOT FOUND.
+pub fn usercard(conn: &mut ServerConnection, start_index: usize)
+-> Result<Keycard, MensagoError> {
+
+	let req = ClientRequest::from(
+		"USERCARD", &vec![("Start-Index", start_index.to_string().as_str())]
+	);
+
+	conn.send(&req)?;
+
+	let resp = conn.receive()?;
+	if resp.code != 104 {
+		return Err(MensagoError::ErrProtocol(resp.as_status()))
+	}
+
+	if !resp.check_fields(&vec![
+		("Total-Size", true),
+		("Item-Count", true),
+	]) {
+		return Err(MensagoError::ErrSchemaFailure)
+	}
+
+	// Although we check to ensure that the server sticks to the spec for the fields in the
+	// response, this client library is intended for desktops and mobile devices, so even a card
+	// which is a few hundred KB is no big deal.
+	
+	// Send an empty TRANSFER request to confirm that we are ready to accept the card data
+	conn.send(&ClientRequest::new("TRANSFER"))?;
+
+	let resp = conn.receive()?;
+	if resp.code != 104 {
+		return Err(MensagoError::ErrProtocol(resp.as_status()))
+	}
+
+	if !resp.check_fields(&vec![
+		("Total-Size", true),
+		("Item-Count", true),
+		("Card-Data", true),
+	]) {
+		return Err(MensagoError::ErrSchemaFailure)
+	}
+
+	let mut out = Keycard::new(EntryType::User);
+	out.entries.append(&mut parse_entries(&resp.data["Card-Data"])?);
+
+	Ok(out)
+}
