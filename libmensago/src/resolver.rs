@@ -207,8 +207,9 @@ impl KCResolver {
 
 	/// Returns a keycard belonging to the specified owner. To obtain an organization's keycard,
 	/// pass a domain, e.g. `example.com`. Otherwise obtain a user's keycard by passing either the
-	/// user's Mensago address or its workspace address.
-	pub fn get_card<DH: DNSHandlerT>(&mut self, owner: &str, dh: &mut DH)
+	/// user's Mensago address or its workspace address. When `force_update` is true, a lookup is
+	/// forced and the cache is updated regardless of the keycard's TTL expiration status.
+	pub fn get_card<DH: DNSHandlerT>(&mut self, owner: &str, dh: &mut DH, force_update: bool)
 	-> Result<Keycard, MensagoError> {
 
 		// First, determine the type of owner. A domain will be passed for an organization, and for
@@ -233,15 +234,16 @@ impl KCResolver {
 
 
 		let dbconn = self.open_storage()?;
-		let card = self.get_card_from_db(&dbconn, owner, owner_type)?;
+		let mut card: Option<Keycard> = None;
+		
+		if !force_update {
+			card = self.get_card_from_db(&dbconn, owner, owner_type)?;
+		}
 
+		// If we got a card from the call, it means a successful cache hit and the TTL timestamp
+		// hasn't been reached yet.
 		if card.is_some() {
-
-			// The card has been returned, so we have *something*. It might, however, need updated.
-			// If updates are needed, we'll need to add them to the database and return the updated
-			// card.
-			
-			// TODO: Implement Time to Live handling in KCResolver::get_card()
+			return Ok(card.unwrap())
 		}
 
 		// If we've gotten this far, it means that the card isn't in the database cache, so resolve
