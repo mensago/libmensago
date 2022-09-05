@@ -43,7 +43,16 @@ mod tests {
 			return Err(MensagoError::ErrProgramException(
 				format!("{}: admin address mismatch: {}", testname, admin_addr.to_string())
 			))
-	}
+		}
+
+		let orgcard = match resolver.get_card("example.com", &mut dh, false) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: failed to get org card: {}", testname, e.to_string())
+				))
+			}
+		};
 
 		Ok(())
 	}
