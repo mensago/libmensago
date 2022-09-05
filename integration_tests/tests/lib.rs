@@ -2,3 +2,4 @@
 //! themselves
 mod common;
 mod iscmds;
+mod resolver;
