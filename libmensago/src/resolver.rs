@@ -210,6 +210,34 @@ impl KCResolver {
 	/// user's Mensago address or its workspace address.
 	pub fn get_card(&mut self, owner: &str) -> Result<Keycard, MensagoError> {
 
+		// First, determine the type of owner. A domain will be passed for an organization, and for
+		// a user card a Mensago address or a workspace address will be given.
+		let owner_type: EntryType;
+		if Domain::from(owner).is_some() {
+			owner_type = EntryType::Organization
+		} else if MAddress::from(owner).is_some() {
+			owner_type = EntryType::User
+		} else {
+			return Err(MensagoError::ErrBadValue)
+		}
+
+		// TODO: set up connection to database
+		let conn = self.open_storage()?;
+
+		let card = self.get_card_from_db(&conn, owner, owner_type)?;
+
+		if card.is_some() {
+
+			// The card has been returned, so we have *something. It might, however, need updated.
+			// If updates are needed, we'll need to add them to the database and return the updated
+			// card.
+			
+			// TODO: Implement Time to Live handling in KCResolver::get_card()
+		}
+
+		// If we've gotten this far, it means that the card isn't in the database cache, so resolve
+		// the card, add it to the database's cache, and return it to the caller.
+
 		// TODO: Implement KCResolver::get_card()
 
 		Err(MensagoError::ErrUnimplemented)
@@ -243,7 +271,7 @@ impl KCResolver {
 
 	/// Obtains a keycard from the database's cache if it exists
 	fn get_card_from_db(&self, conn: &rusqlite::Connection, owner: &str, etype: EntryType)
-	-> Result<Keycard, MensagoError> {
+	-> Result<Option<Keycard>, MensagoError> {
 
 		// TODO: Implement Time-To-Live handling in Keycard::get_card_from_db()
 
@@ -281,10 +309,10 @@ impl KCResolver {
 		}
 
 		if card.entries.len() < 1 {
-			return Err(MensagoError::ErrEmptyData)
+			return Ok(None)
 		}
 
-		Ok(card)
+		Ok(Some(card))
 	}
 
 	/// Adds a keycard to the database's cache
