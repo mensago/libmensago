@@ -254,8 +254,10 @@ impl KCResolver {
 			return Err(MensagoError::ErrNoMensago)
 		}
 
+		let ip = dh.lookup_a(&serverconfig[0].server)?;
+
 		let mut conn = ServerConnection::new();
-		conn.connect(&serverconfig[0].server.to_string(), serverconfig[0].port)?;
+		conn.connect(&ip.to_string(), serverconfig[0].port)?;
 
 		let card = match owner_type {
 			EntryType::Organization => { orgcard(&mut conn, 1)? },
