@@ -929,7 +929,30 @@ user_regcode: &str, pwhash: &ArgonHash) -> Result<HashMap<&'static str, String>,
 		},
 	}
 	
-	// TODO: add admin account's keycard to database
+	// Add the user's keycard to the database
+	
+	let mut admincard = Keycard::new(EntryType::User);
+	admincard.entries.push(entry);
+
+	let mut dbpath = PathBuf::from(&profile.path);
+	dbpath.push("storage.db");
+	let dbconn = match open_storage_db(&dbpath) {
+		Ok(v) => (v),
+		Err(e) => {
+			return Err(MensagoError::ErrProgramException(
+				format!("regcode_user: couldn't open db: {}", e.to_string())
+			))
+		}
+	};
+
+	match update_keycard_in_db(&dbconn, &admincard, false) {
+		Ok(v) => (v),
+		Err(e) => {
+			return Err(MensagoError::ErrProgramException(
+				format!("regcode_user: update_keycard_in_db error: {}", e.to_string())
+			))
+		}
+	}
 
 	Ok(regdata)
 }
