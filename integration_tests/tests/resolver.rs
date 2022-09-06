@@ -54,7 +54,30 @@ mod tests {
 			}
 		};
 
-		// TODO: finish implementing test_kcresolver()
+		// Just do a basic check that we got what we expected
+		if orgcard.entries.len() != 2 {
+			return Err(MensagoError::ErrProgramException(
+				format!("{}: wrong org card entry count: wanted 2, got {}", testname,
+					orgcard.entries.len())
+			))
+		}
+
+		let usercard = match resolver.get_card("admin/example.com", &mut dh, false) {
+			Ok(v) => v,
+			Err(e) => {
+				return Err(MensagoError::ErrProgramException(
+					format!("{}: failed to get user card: {}", testname, e.to_string())
+				))
+			}
+		};
+
+		// Just do a basic check that we got what we expected
+		if usercard.entries.len() != 1 {
+			return Err(MensagoError::ErrProgramException(
+				format!("{}: wrong user card entry count: wanted 1, got {}", testname,
+					orgcard.entries.len())
+			))
+		}
 
 		Ok(())
 	}

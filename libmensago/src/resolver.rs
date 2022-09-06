@@ -260,7 +260,7 @@ impl KCResolver {
 
 		let card = match owner_type {
 			EntryType::Organization => { orgcard(&mut conn, 1)? },
-			EntryType::User => { usercard(&mut conn, 1)? },
+			EntryType::User => { usercard(&mut conn, &MAddress::from(owner).unwrap(), 1)? },
 			_ => {
 				// We should never be here
 				panic!("BUG: Bad owner type in KCResolver::get_card()")

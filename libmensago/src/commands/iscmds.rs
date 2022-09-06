@@ -811,11 +811,14 @@ pub fn unregister(conn: &mut ServerConnection, pwhash: &ArgonHash)
 /// entry, use an index of 0. Specifying another value will result in the server returning all
 /// entries from the specified index through the current one. If an index which is out of range is
 /// specified, the server will return 404 NOT FOUND.
-pub fn usercard(conn: &mut ServerConnection, start_index: usize)
+pub fn usercard(conn: &mut ServerConnection, owner: &MAddress, start_index: usize)
 -> Result<Keycard, MensagoError> {
 
 	let req = ClientRequest::from(
-		"USERCARD", &vec![("Start-Index", start_index.to_string().as_str())]
+		"USERCARD", &vec![
+			("Owner", owner.to_string().as_str()),
+			("Start-Index", start_index.to_string().as_str())
+		]
 	);
 
 	conn.send(&req)?;
