@@ -10,6 +10,7 @@ pub struct Client {
 	pman: ProfileManager,
 	test_mode: bool,
 	is_admin: bool,
+	login_active: bool,
 }
 
 impl Client {
@@ -25,6 +26,7 @@ impl Client {
 			pman,
 			test_mode: false,
 			is_admin: false,
+			login_active: false,
 		})
 	}
 
@@ -122,6 +124,33 @@ impl Client {
 		self.is_admin = device(&mut self.conn, waddr.get_wid(), &devpair)?;
 
 		Ok(())
+	}
+
+	/// Returns true if the client is connected to an active login session
+	pub fn is_logged_in(&mut self) -> bool {
+		if self.is_connected() {
+			return self.login_active;
+		}
+		self.login_active = false;
+		return false;
+	}
+
+	/// Returns true if the client is connected to an active login session and the user has
+	/// administrator rights in the session.
+	pub fn is_admin(&mut self) -> bool {
+		return self.is_logged_in() && self.is_admin
+	}
+
+	/// Logs out of any active login sessions. This does not disconnect from the server itself;
+	/// instead it reverts the session to an unauthenticated state.
+	pub fn logout(&mut self) -> Result<(), MensagoError> {
+		self.login_active = false;
+		self.is_admin = false;
+		if self.is_connected() {
+			logout(&mut self.conn)
+		} else {
+			Ok(())
+		}
 	}
 
 	// TODO: Finish implementing Client class. Depends on keycard resolver.
