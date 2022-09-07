@@ -1,5 +1,6 @@
 use crate::*;
-use libkeycard::Domain;
+use eznacl::{Encryptor,EncryptionKey};
+use libkeycard::*;
 use std::path::PathBuf;
 
 /// The Client type primary interface to the entire library.
@@ -8,6 +9,7 @@ pub struct Client {
 	conn: ServerConnection,
 	pman: ProfileManager,
 	test_mode: bool,
+	is_admin: bool,
 }
 
 impl Client {
@@ -22,6 +24,7 @@ impl Client {
 			conn: ServerConnection::new(),
 			pman,
 			test_mode: false,
+			is_admin: false,
 		})
 	}
 
@@ -66,6 +69,7 @@ impl Client {
 		self.conn.is_connected()
 	}
 
+	/// Gracefully closes a connection with a Mensago server.
 	pub fn disconnect(&mut self) -> Result<(), MensagoError> {
 
 		if self.is_connected() {
@@ -73,6 +77,51 @@ impl Client {
 		} else {
 			Ok(())
 		}
+	}
+
+	/// Logs into a server. Note that while logging in and connecting are not the same, if this
+	/// call is made while not connected to a server, an attempt to connect will be made.
+	pub fn login(&mut self, address: &MAddress) -> Result<(), MensagoError> {
+		if !self.is_connected() {
+			self.connect(address.get_domain())?;
+		}
+
+		let mut dh: Box<dyn DNSHandlerT> = if self.test_mode {
+			Box::<FakeDNSHandler>::new(FakeDNSHandler::new())
+		} else {
+			Box::<DNSHandler>::new(DNSHandler::new_default()?)
+		};
+
+		let record = get_mgmt_record(address.get_domain(), dh.as_mut())?;
+		let profile = match self.pman.get_active_profile() {
+			Some(v) => v,
+			None => {
+				return Err(MensagoError::ErrNoProfile)
+			}
+		};
+
+		let waddr = match address.get_uid().get_type() {
+			IDType::WorkspaceID => {
+				WAddress::from_maddress(&address).unwrap()
+			},
+			IDType::UserID => {
+				let mut resolver = KCResolver::new(&profile)?;
+				let wid = resolver.resolve_address(&address, dh.as_mut())?;
+				WAddress::from_parts(&wid, address.get_domain())
+			},
+		};
+		
+		let serverkey = EncryptionKey::from(&record.ek)?;
+		login(&mut self.conn, waddr.get_wid(), &serverkey)?;
+
+		let secrets = open_secrets_db(&profile)?;
+		let passhash = get_credentials(&secrets, &waddr)?;
+		password(&mut self.conn, &passhash)?;
+		
+		let devpair = get_session_keypair(&secrets, &waddr)?;
+		self.is_admin = device(&mut self.conn, waddr.get_wid(), &devpair)?;
+
+		Ok(())
 	}
 
 	// TODO: Finish implementing Client class. Depends on keycard resolver.
