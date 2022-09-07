@@ -1,5 +1,5 @@
 use crate::*;
-use eznacl::{Encryptor,EncryptionKey};
+use eznacl::EncryptionKey;
 use libkeycard::*;
 use std::path::PathBuf;
 
@@ -42,7 +42,7 @@ impl Client {
 	/// Establishes a network connection to a Mensago server. Logging in is not performed.
 	pub fn connect(&mut self, domain: &Domain) -> Result<(), MensagoError> {
 
-		self.disconnect();
+		_ = self.disconnect();
 
 		if self.test_mode {
 			let mut dh = FakeDNSHandler::new();
