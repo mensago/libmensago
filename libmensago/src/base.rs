@@ -31,6 +31,8 @@ pub enum MensagoError {
 	// General error codes
 	#[error("Empty data error")]
 	ErrEmptyData,
+	#[error("Not initialized")]
+	ErrNoInit,
 	#[error("Bad value")]
 	ErrBadValue,
 	#[error("Resource already exists")]
@@ -49,6 +51,10 @@ pub enum MensagoError {
 	ErrUnimplemented,
 	#[error("UTF-8 error")]
 	ErrUTF8,
+
+	// Client-specific errors
+	#[error("No profile")]
+	ErrNoProfile,
 
 	// Network and protocol errors
 	#[error("Mensago not available")]
