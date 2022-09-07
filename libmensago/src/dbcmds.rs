@@ -3,7 +3,7 @@
 use chrono::prelude::*;
 use libkeycard::*;
 use std::path::PathBuf;
-use crate::base::MensagoError;
+use crate::{base::MensagoError, Profile};
 
 /// Obtains a keycard from the database. An error will be returned if something goes wrong in the
 /// lookup. A lack of an entry in the database is not considered an error and if no matching
@@ -83,8 +83,25 @@ check_ttl: bool) -> Result<Option<Keycard>, MensagoError> {
 	Ok(Some(card))
 }
 
-pub fn open_storage_db(dbpath: &PathBuf) -> Result<rusqlite::Connection, MensagoError> {
+pub fn open_secrets_db(profile: &Profile) -> Result<rusqlite::Connection, MensagoError> {
+	let mut dbpath = PathBuf::from(profile.path);
+	dbpath.push("secrets.db");
+	
 	match rusqlite::Connection::open_with_flags(dbpath,
+		rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE) {
+
+		Ok(v) => Ok(v),
+		Err(e) => {
+			return Err(MensagoError::ErrDatabaseException(String::from(e.to_string())));
+		}
+	}
+}
+
+pub fn open_storage_db(profile: &Profile) -> Result<rusqlite::Connection, MensagoError> {
+	let mut dbpath = PathBuf::from(profile.path);
+	dbpath.push("storage.db");
+	
+	match rusqlite::Connection::open_with_flags(dbpath, 
 		rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE) {
 
 		Ok(v) => Ok(v),

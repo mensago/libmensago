@@ -1,6 +1,5 @@
 use eznacl::CryptoString;
 use libkeycard::*;
-use std::path::PathBuf;
 use crate::*;
 
 /// This function attempts to obtain Mensago server configuration information for the specified
@@ -183,26 +182,16 @@ fn parse_txt_records(records: &Vec::<String>) -> Result<DNSMgmtRecord, MensagoEr
 
 /// A caching keycard resolver type
 pub struct KCResolver {
-	dbpath: PathBuf,
+	profile: Profile,
 }
 
 impl KCResolver {
 
 	/// Creates a new resolver working out of the at the specified profile
-	pub fn new(profile_path: &PathBuf) -> Result<KCResolver, MensagoError> {
-
-		if !profile_path.exists() {
-			return Err(MensagoError::ErrNotFound)
-		}
-
-		let mut storage = profile_path.clone();
-		storage.push("storage.db");
-		if !storage.exists() {
-			return Err(MensagoError::ErrNotFound)
-		}
+	pub fn new(profile: &Profile) -> Result<KCResolver, MensagoError> {
 
 		return Ok(KCResolver {
-			dbpath: storage,
+			profile: profile.clone(),
 		})
 	}
 
@@ -235,7 +224,7 @@ impl KCResolver {
 		}
 
 
-		let dbconn = open_storage_db(&self.dbpath)?;
+		let dbconn = open_storage_db(&self.profile)?;
 		let mut card: Option<Keycard> = None;
 		
 		if !force_update {
