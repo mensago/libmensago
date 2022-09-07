@@ -5,7 +5,7 @@ use std::path::PathBuf;
 /// The Client type primary interface to the entire library.
 #[derive(Debug)]
 pub struct Client {
-	conn: Option<ServerConnection>,
+	conn: ServerConnection,
 	pman: ProfileManager,
 	test_mode: bool,
 }
@@ -19,7 +19,7 @@ impl Client {
 		pman.load_profiles(Some(&PathBuf::from(&profile_folder)))?;
 		
 		Ok(Client {
-			conn: None,
+			conn: ServerConnection::new(),
 			pman,
 			test_mode: false,
 		})
@@ -31,7 +31,7 @@ impl Client {
 	pub fn enable_test_mode(&mut self, use_test_mode: bool) {
 
 		if self.is_connected() {
-			self.disconnect()
+			_ = self.disconnect();
 		}
 		self.test_mode = use_test_mode;
 	}
@@ -39,24 +39,39 @@ impl Client {
 	/// Establishes a network connection to a Mensago server. Logging in is not performed.
 	pub fn connect(&mut self, domain: &Domain) -> Result<(), MensagoError> {
 
-		if self.is_connected() {
-			self.disconnect()
+		self.disconnect();
+
+		if self.test_mode {
+			let mut dh = FakeDNSHandler::new();
+			let serverconfig = get_server_config(domain, &mut dh)?;
+			if serverconfig.len() == 0 {
+				return Err(MensagoError::ErrNotFound)
+			}
+			let ip = dh.lookup_a(&serverconfig[0].server)?;
+			self.conn.connect(&ip.to_string(), serverconfig[0].port)
+		} else {
+			let mut dh = DNSHandler::new_default()?;
+			let serverconfig = get_server_config(domain, &mut dh)?;
+			if serverconfig.len() == 0 {
+				return Err(MensagoError::ErrNotFound)
+			}
+			let ip = dh.lookup_a(&serverconfig[0].server)?;
+			self.conn.connect(&ip.to_string(), serverconfig[0].port)
 		}
-
-		// TODO: finish client::connect()
-
-		Err(MensagoError::ErrUnimplemented)
 	}
 
 	/// Returns true if the client is connected to a Mensago server.
 	#[inline]
 	pub fn is_connected(&self) -> bool {
-		self.conn.is_some() && self.conn.as_ref().unwrap().is_connected()
+		self.conn.is_connected()
 	}
 
-	pub fn disconnect(&mut self) {
+	pub fn disconnect(&mut self) -> Result<(), MensagoError> {
+
 		if self.is_connected() {
-			self.conn.as_mut().unwrap().disconnect();
+			self.conn.disconnect()
+		} else {
+			Ok(())
 		}
 	}
 
