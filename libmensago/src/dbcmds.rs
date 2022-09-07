@@ -84,7 +84,7 @@ check_ttl: bool) -> Result<Option<Keycard>, MensagoError> {
 }
 
 pub fn open_secrets_db(profile: &Profile) -> Result<rusqlite::Connection, MensagoError> {
-	let mut dbpath = PathBuf::from(profile.path);
+	let mut dbpath = PathBuf::from(&profile.path);
 	dbpath.push("secrets.db");
 	
 	match rusqlite::Connection::open_with_flags(dbpath,
@@ -98,7 +98,7 @@ pub fn open_secrets_db(profile: &Profile) -> Result<rusqlite::Connection, Mensag
 }
 
 pub fn open_storage_db(profile: &Profile) -> Result<rusqlite::Connection, MensagoError> {
-	let mut dbpath = PathBuf::from(profile.path);
+	let mut dbpath = PathBuf::from(&profile.path);
 	dbpath.push("storage.db");
 	
 	match rusqlite::Connection::open_with_flags(dbpath, 
