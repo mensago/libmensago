@@ -51,7 +51,7 @@ struct ConfigField {
 
 /// The Config class is just a hash map for holding strings containing app configuration
 /// information with some methods to make usage easier
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Config {
 	data: HashMap::<String, ConfigField>,
 	modified: Vec::<String>,

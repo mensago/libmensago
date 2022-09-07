@@ -127,7 +127,7 @@ static SECRETS_DB_SETUP_COMMANDS: &str = "
 /// database is encrypted currently, but will be a future date. Each profile also contains a
 /// folder called 'files' for storing files outside the databases to cut down on bloat and make
 /// it easier for the user to access attachments with other programs in the OS.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Profile {
 	pub name: String,
 	pub path: PathBuf,
