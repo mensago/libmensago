@@ -14,8 +14,9 @@ use crate::*;
 /// 
 /// If all of these checks fail, then the domain is assumed to not offer Mensago services and
 /// MensagoError::ErrNotFound will be returned.
-pub fn get_server_config<DH: DNSHandlerT>(d: &Domain, dh: &mut DH)
--> Result<Vec<ServiceConfigRecord>, MensagoError> {
+pub fn get_server_config<DH>(d: &Domain, dh: &mut DH)
+-> Result<Vec<ServiceConfigRecord>, MensagoError> 
+where DH: DNSHandlerT + ?Sized {
 
 	match dh.lookup_srv(&format!("_mensago._tcp.{}", d.as_string())) {
 		Ok(v) => { return Ok(v) },
@@ -87,7 +88,8 @@ pub struct DNSMgmtRecord {
 	pub tls: Option<CryptoString>,
 }
 
-pub fn get_mgmt_record<DH: DNSHandlerT>(d: &Domain, dh: &mut DH) -> Result<DNSMgmtRecord, MensagoError> {
+pub fn get_mgmt_record<DH>(d: &Domain, dh: &mut DH) -> Result<DNSMgmtRecord, MensagoError>
+	where DH: DNSHandlerT + ?Sized {
 
 	let domstr = d.to_string();
 	let domparts: Vec::<&str> = domstr.split(".").collect();
@@ -208,8 +210,9 @@ impl KCResolver {
 	/// pass a domain, e.g. `example.com`. Otherwise obtain a user's keycard by passing either the
 	/// user's Mensago address or its workspace address. When `force_update` is true, a lookup is
 	/// forced and the cache is updated regardless of the keycard's TTL expiration status.
-	pub fn get_card<DH: DNSHandlerT>(&mut self, owner: &str, dh: &mut DH, force_update: bool)
-	-> Result<Keycard, MensagoError> {
+	pub fn get_card<DH>(&mut self, owner: &str, dh: &mut DH, force_update: bool)
+	-> Result<Keycard, MensagoError>
+	where DH: DNSHandlerT + ?Sized {
 
 		// First, determine the type of owner. A domain will be passed for an organization, and for
 		// a user card a Mensago address or a workspace address will be given.
@@ -274,8 +277,9 @@ impl KCResolver {
 	}
 
 	/// Obtains the workspace ID for a Mensago address
-	pub fn resolve_address<DH: DNSHandlerT>(&mut self, addr: &MAddress, dh: &mut DH)
-	-> Result<RandomID, MensagoError> {
+	pub fn resolve_address<DH>(&mut self, addr: &MAddress, dh: &mut DH)
+	-> Result<RandomID, MensagoError>
+	where DH: DNSHandlerT + ?Sized {
 
 		if addr.get_uid().get_type() == IDType::WorkspaceID {
 			return Ok(RandomID::from(addr.get_uid().as_string())
