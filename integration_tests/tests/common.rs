@@ -934,9 +934,7 @@ user_regcode: &str, pwhash: &ArgonHash) -> Result<HashMap<&'static str, String>,
 	let mut admincard = Keycard::new(EntryType::User);
 	admincard.entries.push(entry);
 
-	let mut dbpath = PathBuf::from(&profile.path);
-	dbpath.push("storage.db");
-	let dbconn = match open_storage_db(&dbpath) {
+	let dbconn = match open_storage_db(&profile) {
 		Ok(v) => (v),
 		Err(e) => {
 			return Err(MensagoError::ErrProgramException(

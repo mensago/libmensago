@@ -3,7 +3,6 @@
 mod tests {
 	use libkeycard::*;
 	use libmensago::*;
-	use std::path::PathBuf;
 	use crate::common::*;
 	
 	#[test]
@@ -13,13 +12,11 @@ mod tests {
 		// The list of full data is as follows:
 		// let (config, db, dbdata, profile_folder, pwhash, profman, mut conn, admin_regdata) = 
 		// 	full_test_setup(testname)?;
-		let (_, _, _, profile_folder, _, _, mut conn, _) = full_test_setup(testname)?;
+		let (_, _, _, _, _, profman, mut conn, _) = full_test_setup(testname)?;
 		conn.disconnect()?;
 
-		let mut profile_path = PathBuf::from(profile_folder);
-		profile_path.push("primary");
-
-		let mut resolver = match KCResolver::new(&profile_path) {
+		let profile = profman.get_active_profile().unwrap();
+		let mut resolver = match KCResolver::new(&profile) {
 			Ok(v) => v,
 			Err(e) => {
 				return Err(MensagoError::ErrProgramException(
