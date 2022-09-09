@@ -2,7 +2,7 @@ use libkeycard::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LabeledString {
+pub struct StringField {
 	#[serde(rename="Label")]
 	pub label: String,
 	#[serde(rename="Value")]
@@ -10,22 +10,7 @@ pub struct LabeledString {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LabeledMensagoAddr {
-	#[serde(rename="Label")]
-	pub label: String,
-	
-	// TODO: Add serde support to libkeycard types
-	
-	// #[serde(rename="UserID")]
-	// pub uid: UserID,
-	// #[serde(rename="Workspace")]
-	// pub wid: RandomID,
-	// #[serde(rename="Domain")]
-	// pub domain: Domain,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Header {
+pub struct HeaderField {
 	#[serde(rename="Version")]
 	pub version: String,
 	#[serde(rename="EntityType")]
@@ -35,7 +20,7 @@ pub struct Header {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Name {
+pub struct NameField {
 	#[serde(rename="FormattedName")]
 	pub formatted_name: String,
 
@@ -56,12 +41,82 @@ pub struct Name {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MensagoField {
+	#[serde(rename="Label")]
+	pub label: String,
+	
+	// TODO: Add serde support to libkeycard types
+	
+	// #[serde(rename="UserID")]
+	// pub uid: UserID,
+	// #[serde(rename="Workspace")]
+	// pub wid: RandomID,
+	// #[serde(rename="Domain")]
+	// pub domain: Domain,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KeyField {
+	#[serde(rename="Label")]
+	pub label: String,
+
+	#[serde(rename="KeyType")]
+	pub keytype: String,
+	#[serde(rename="KeyHash")]
+	pub keyhash: String,
+	#[serde(rename="Value")]
+	pub value: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MailingAddr {
+	#[serde(rename="Label")]
+	pub label: String,
+	
+	#[serde(rename="StreetAddress")]
+	pub street: String,
+	#[serde(rename="ExtendedAddress")]
+	pub extended: String,
+	#[serde(rename="Locality")]
+	pub locality: String,
+	#[serde(rename="Region")]
+	pub region: String,
+	#[serde(rename="PostalCode")]
+	pub postalcode: String,
+	#[serde(rename="Country")]
+	pub country: String,
+	
+	#[serde(rename="Preferred")]
+	pub preferred: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PhotoField {
+	#[serde(rename="Version")]
+	pub version: String,
+	#[serde(rename="EntityType")]
+	pub entity_type: String,
+	#[serde(rename="Source")]
+	pub source: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FileField {
+	#[serde(rename="Name")]
+	pub name: String,
+	#[serde(rename="Mime")]
+	pub mime: String,
+	#[serde(rename="Data")]
+	pub data: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Contact {
 	#[serde(rename="Header")]
-	header: Header,
+	pub header: HeaderField,
 	
 	#[serde(rename="Name")]
-	pub name: Name,
+	pub name: NameField,
 
 	#[serde(rename="Gender")]
 	pub gender: String,
@@ -69,29 +124,56 @@ pub struct Contact {
 	pub bio: String,
 
 	#[serde(rename="Social")]
-	pub social: Vec<LabeledString>,
+	pub social: Vec<StringField>,
 	
 	#[serde(rename="Mensago")]
-	pub mensago: Vec<LabeledMensagoAddr>,
+	pub mensago: Vec<MensagoField>,
 
-	// Keys: Vec<HashMap<&str, String>>
-	// Messaging: Vec<HashMap<&str, String>>
-	// MailingAddresses: Vec<HashMap<&str, String>>
-	// Phone: Vec<HashMap<&str, String>>
+	#[serde(rename="Keys")]
+	pub keys: Vec<KeyField>,
 
-	// Anniversary: String
-	// Birthday: Date
-	// E-mail: Vec<HashMap<&str, String>>
-	// Organization: String
-	// OrgUnits: Vec<String>
-	// Title: String
+	#[serde(rename="Messaging")]
+	pub messaging: Vec<StringField>,
 
-	// Categories: Vec<String>
+	#[serde(rename="MailingAddresses")]
+	pub addresses: Vec<MailingAddr>,
 
-	// Websites: Vec<HashMap<&str, String>>
-	// Photo: HashMap<&str, String>
-	// Languages: Vec<String>
-	// Notes: String
-	// Attachments: Vec<HashMap<&str, String>>
-	// Custom: Vec<HashMap<&str, String>>
+	#[serde(rename="Phone")]
+	pub phone: Vec<StringField>,
+
+	#[serde(rename="Anniversary")]
+	pub anniversary: String,
+	#[serde(rename="Birthday")]
+	pub birthday: String,
+
+	#[serde(rename="Email")]
+	pub email: Vec<StringField>,
+
+	#[serde(rename="Organization")]
+	pub organization: String,
+	#[serde(rename="OrgUnits")]
+	pub orgunits: Vec<String>,
+	#[serde(rename="Title")]
+	pub title: String,
+
+	#[serde(rename="Categories")]
+	pub categories: Vec<String>,
+
+	#[serde(rename="Websites")]
+	pub websites: Vec<StringField>,
+
+	#[serde(rename="Photo")]
+	photo: PhotoField,
+
+	#[serde(rename="Languages")]
+	pub languages: Vec<StringField>,
+
+	#[serde(rename="Notes")]
+	pub notes: String,
+
+	#[serde(rename="Attachments")]
+	pub attachments: Vec<FileField>,
+
+	#[serde(rename="Custom")]
+	pub custom: Vec<StringField>,
 }
