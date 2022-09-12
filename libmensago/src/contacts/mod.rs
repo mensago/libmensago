@@ -1,5 +1,5 @@
-//! This crate contains integration tests which ensure that both mensagod and libmensago behave
-//! themselves
+//! This module contains code for interacting with contact information
+
 mod types;
 
 pub use types::*;
