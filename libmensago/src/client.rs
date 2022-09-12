@@ -1,5 +1,6 @@
 use crate::*;
-use eznacl::EncryptionKey;
+use crate::contacts::NameField;
+use eznacl::{EncryptionKey, EncryptionPair};
 use libkeycard::*;
 use std::path::PathBuf;
 
@@ -153,5 +154,79 @@ impl Client {
 		}
 	}
 
+	/// Create a new user account on the specified server.
+	/// 
+	/// There are a lot of ways this method can fail. It will return ErrNoProfile if a user profile
+	/// has not yet been created. ErrExists will be returned if an individual workspace has already
+	/// been created in this profile.
+	pub fn register(&mut self, dom: &Domain, userpass: &str, uid: Option<&UserID>,
+	name: Option<&NameField>) -> Result<RegInfo, MensagoError> {
+
+		// Process for registration of a new account:
+		
+		// Check to see if we already have a workspace allocated on this profile. Because we don't
+		// yet support shared workspaces, it means that there are only individual ones right now.
+		// Each profile can have only one individual workspace.
+		
+		// Check active profile for an existing workspace entry
+		// Get the password from the user
+		// Check active workspace for device entries. Because we are registering, existing device
+		// 	 entries should be removed.
+		// Add a device entry to the workspace. This includes both an encryption keypair and 
+		//   a UUID for the device
+		// Connect to requested server
+		// Send registration request to server, which requires a hash of the user's supplied
+		// 	 password
+		// Close the connection to the server
+		// If the server returns an error, such as 304 REGISTRATION CLOSED, then return an error.
+		// If the server has returned anything else, including a 101 PENDING, begin the 
+		// 	 client-side workspace information to generate.
+		// Generate new workspace data, which includes the associated crypto keys
+		// Add the device ID and session to the profile and the server
+		// Create, upload, and cross-sign the first keycard entry
+		// Create the necessary client-side folders
+		// Generate the folder mappings
+
+		// If the server returned 201 REGISTERED, we can proceed with the server-side setup
+		
+		// Create the server-side folders based on the mappings on the client side
+		// Save all encryption keys into an encrypted 7-zip archive which uses the hash of the 
+		// user's password has the archive encryption password and upload the archive to the server.
+
+		let profile = match self.pman.get_active_profile() {
+			Some(v) => v,
+			None => { return Err(MensagoError::ErrNoProfile) }
+		};
+		if profile.domain.is_some() {
+			return Err(MensagoError::ErrExists)
+		}
+
+		// TODO: Finish implementing Client::register()
+		Err(MensagoError::ErrUnimplemented)
+	}
+
 	// TODO: Finish implementing Client class. Depends on keycard resolver.
+}
+
+/// The RegInfo structure is to pass around account registration information, particularly from the
+/// method Client::register().
+pub struct RegInfo {
+
+	/// The user's workspace ID
+	pub wid: RandomID,
+
+	/// The RandomID assigned to this device
+	pub devid: RandomID,
+
+	/// The domain for the account
+	pub domain: Domain,
+
+	/// The user ID for the account
+	pub uid: Option<UserID>,
+
+	/// The hash of the user's password string
+	pub password: ArgonHash,
+
+	/// The asymmetric encryption keypair unique to the device
+	pub devpair: EncryptionPair,
 }
