@@ -1,6 +1,6 @@
 use crate::*;
 use crate::contacts::NameField;
-use eznacl::{EncryptionKey, EncryptionPair};
+use eznacl::{EncryptionKey, EncryptionPair, PublicKey};
 use libkeycard::*;
 use std::path::PathBuf;
 
@@ -159,7 +159,7 @@ impl Client {
 	/// There are a lot of ways this method can fail. It will return ErrNoProfile if a user profile
 	/// has not yet been created. ErrExists will be returned if an individual workspace has already
 	/// been created in this profile.
-	pub fn register(&mut self, dom: &Domain, userpass: &str, uid: Option<&UserID>,
+	pub fn register_user(&mut self, dom: &Domain, userpass: &str, uid: Option<&UserID>,
 	name: Option<&NameField>) -> Result<RegInfo, MensagoError> {
 
 		// Process for registration of a new account:
@@ -194,12 +194,31 @@ impl Client {
 		// user's password has the archive encryption password and upload the archive to the server.
 
 		let profile = match self.pman.get_active_profile() {
-			Some(v) => v,
+			Some(v) => v.clone(),
 			None => { return Err(MensagoError::ErrNoProfile) }
 		};
 		if profile.domain.is_some() {
 			return Err(MensagoError::ErrExists)
 		}
+
+		let pwhash = ArgonHash::from(userpass);
+
+		// TODO: use EzNaCl's preferred asymmetric algorithm once implemented
+		let devpair = EncryptionPair::generate("CURVE25519")?;
+
+		if !self.is_connected() {
+			self.connect(dom)?;
+		}
+
+		let regdata = match uid {
+			Some(u) => {
+				register(&mut self.conn, Some(u), &pwhash.to_string(),
+					profile.devid.as_ref().unwrap(), &devpair.get_public_key());
+			},
+			None => {
+
+			}
+		};
 
 		// TODO: Finish implementing Client::register()
 		Err(MensagoError::ErrUnimplemented)
