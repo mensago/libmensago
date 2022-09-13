@@ -159,7 +159,7 @@ impl Client {
 	/// There are a lot of ways this method can fail. It will return ErrNoProfile if a user profile
 	/// has not yet been created. ErrExists will be returned if an individual workspace has already
 	/// been created in this profile.
-	pub fn register_user(&mut self, dom: &Domain, userpass: &str, uid: Option<&UserID>)
+	pub fn register(&mut self, dom: &Domain, userpass: &str, uid: Option<&UserID>)
 	-> Result<RegInfo, MensagoError> {
 
 		// Process for registration of a new account:
@@ -247,7 +247,7 @@ impl Client {
 		if uid.is_some() {
 			out.uid = Some(uid.unwrap().clone());
 		}
-		
+
 		Ok(out)
 	}
 
