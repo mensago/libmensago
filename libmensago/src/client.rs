@@ -1,5 +1,4 @@
 use crate::*;
-use crate::contacts::NameField;
 use eznacl::{EncryptionKey, EncryptionPair, PublicKey};
 use libkeycard::*;
 use std::path::PathBuf;
