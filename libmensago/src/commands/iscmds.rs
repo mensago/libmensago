@@ -583,7 +583,9 @@ devid: &RandomID, devpubkey: &CryptoString) -> Result<HashMap<&'static str,Strin
 }
 
 /// Creates an account on the server. The response received depends on a number of factors,
-/// including the registration mode of the server.
+/// including the registration mode of the server. Upon success, this function will return at least
+/// 3 string fields: "wid", "devid", and "domain". If a user ID was supplied, it will also be
+/// returned in the field "uid".
 pub fn register(conn: &mut ServerConnection, uid: Option<&UserID>, pwhash: &str, devid: &RandomID,
 devicekey: &CryptoString) -> Result<HashMap<&'static str,String>, MensagoError> {
 
