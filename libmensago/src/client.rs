@@ -159,8 +159,8 @@ impl Client {
 	/// There are a lot of ways this method can fail. It will return ErrNoProfile if a user profile
 	/// has not yet been created. ErrExists will be returned if an individual workspace has already
 	/// been created in this profile.
-	pub fn register_user(&mut self, dom: &Domain, userpass: &str, uid: Option<&UserID>,
-	name: Option<&NameField>) -> Result<RegInfo, MensagoError> {
+	pub fn register_user(&mut self, dom: &Domain, userpass: &str, uid: Option<&UserID>)
+	-> Result<RegInfo, MensagoError> {
 
 		// Process for registration of a new account:
 		
@@ -210,18 +210,45 @@ impl Client {
 			self.connect(dom)?;
 		}
 
-		let regdata = match uid {
-			Some(u) => {
-				register(&mut self.conn, Some(u), &pwhash.to_string(),
-					profile.devid.as_ref().unwrap(), &devpair.get_public_key());
+		let regdata = register(&mut self.conn, uid, &pwhash.to_string(),
+			profile.devid.as_ref().unwrap(), &devpair.get_public_key())?;
+
+		let wid = match regdata.get("wid") {
+			Some(v) => {
+				match RandomID::from(v) {
+					Some(w) => w,
+					None => {
+						return Err(
+							MensagoError::ErrServerException(
+								String::from("bad workspace ID in server response")
+							)
+						)
+					}
+				}
 			},
 			None => {
-
+				return Err(
+					MensagoError::ErrServerException(
+						String::from("missing workspace ID in server response")
+					)
+				)
 			}
 		};
+		
+		let mut out = RegInfo {
+			wid,
+			devid: profile.devid.unwrap().clone(),
+			domain: dom.clone(),
+			uid: None,
+			password: pwhash,
+			devpair,
+		};
 
-		// TODO: Finish implementing Client::register()
-		Err(MensagoError::ErrUnimplemented)
+		if uid.is_some() {
+			out.uid = Some(uid.unwrap().clone());
+		}
+		
+		Ok(out)
 	}
 
 	// TODO: Finish implementing Client class. Depends on keycard resolver.
