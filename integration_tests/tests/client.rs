@@ -5,6 +5,20 @@ mod tests {
 	use crate::common::*;
 	
 	#[test]
+	fn test_preregister() -> Result<(), MensagoError> {
+		let testname = "test_preregister";
+
+		// The list of full data is as follows:
+		// let (config, db, dbdata, profile_folder, pwhash, profman, mut conn, admin_regdata) = 
+		// 	full_test_setup(testname)?;
+		let (_, _, _, _, _, _, mut conn, _) = full_test_setup(testname)?;
+
+		// TODO: implement test_preregister
+
+		conn.disconnect()
+	}
+
+	#[test]
 	fn test_register() -> Result<(), MensagoError> {
 		let testname = "test_register";
 
@@ -68,3 +82,4 @@ mod tests {
 		Ok(())
 	}
 }
+

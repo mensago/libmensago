@@ -159,6 +159,18 @@ impl Client {
 		&mut self.pman
 	}
 
+	/// Administrator command which preprovisions a new account on the server.
+	/// 
+	/// This is a simple command because it is not meant to create a local profile. It is only meant
+	/// to provision the account on the server side. The administrator receives the information in
+	/// the PreRegInfo structure and gives it to the user to finish account setup.
+	pub fn preregister(&mut self, uid: Option<&UserID>, domain: Option<&Domain>)
+	-> Result<PreregInfo, MensagoError> {
+
+		// TODO: Implement Client::preregister()
+		Err(MensagoError::ErrUnimplemented)
+	}
+
 	/// Create a new user account on the specified server.
 	/// 
 	/// There are a lot of ways this method can fail. It will return ErrNoProfile if a user profile
@@ -257,6 +269,23 @@ impl Client {
 	}
 
 	// TODO: Finish implementing Client class. Depends on keycard resolver.
+}
+
+/// The PreRegInfo structure is to pass around account preregistration information, particularly
+/// from the method Client::preregister().
+pub struct PreregInfo {
+
+	/// The user's workspace ID
+	pub wid: RandomID,
+
+	/// The domain for the account
+	pub domain: Domain,
+
+	/// The user ID for the account
+	pub uid: Option<UserID>,
+
+	/// The user's registration code
+	pub regcode: String,
 }
 
 /// The RegInfo structure is to pass around account registration information, particularly from the
