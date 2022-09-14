@@ -15,7 +15,8 @@ pub struct Client {
 
 impl Client {
 	
-	/// Instantiates a new Mensago client instance
+	/// Instantiates a new Mensago client instance. The profile folder passed to the method is the
+	/// location of the top-level folder that contains all profiles.
 	pub fn new(profile_folder: &str) -> Result<Client, MensagoError> {
 
 		let mut pman = ProfileManager::new(&PathBuf::from(&profile_folder));
@@ -151,6 +152,11 @@ impl Client {
 		} else {
 			Ok(())
 		}
+	}
+
+	/// Returns a reference to the client's profile manager
+	pub fn get_profile_manager(&mut self) -> &mut ProfileManager {
+		&mut self.pman
 	}
 
 	/// Create a new user account on the specified server.
