@@ -1,6 +1,6 @@
 [package]
 name = "libmensago"
-version = "0.1.0"
+version = "0.0.1"
 edition = "2021"
 authors = [ "Jon Yoder <jon@yoder.cloud>"]
 description = "A library for implementing clients for the Mensago platform"
