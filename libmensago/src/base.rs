@@ -51,10 +51,14 @@ pub enum MensagoError {
 	ErrUnimplemented,
 	#[error("UTF-8 error")]
 	ErrUTF8,
-
+	
 	// Client-specific errors
 	#[error("No profile")]
 	ErrNoProfile,
+	#[error("Login required")]
+	ErrNoLogin,
+	#[error("Admin privileges required")]
+	ErrNotAdmin,
 
 	// Network and protocol errors
 	#[error("Mensago not available")]
