@@ -167,7 +167,17 @@ impl Client {
             return Err(MensagoError::ErrNotAdmin);
         }
 
-        preregister(&mut self.conn, None, uid, domain)
+        if uid.is_none() {
+            return preregister(&mut self.conn, None, None, domain);
+        }
+
+        match uid.unwrap().get_type() {
+            IDType::WorkspaceID => {
+                let wid = RandomID::from_userid(uid.as_ref().unwrap()).unwrap();
+                preregister(&mut self.conn, Some(&wid), None, domain)
+            }
+            IDType::UserID => preregister(&mut self.conn, None, uid, domain),
+        }
     }
 
     /// Create a new user account on the specified server.
