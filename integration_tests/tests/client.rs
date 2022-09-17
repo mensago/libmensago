@@ -11,11 +11,86 @@ mod tests {
         // The list of full data is as follows:
         // let (config, db, dbdata, profile_folder, pwhash, profman, mut conn, admin_regdata) =
         // 	full_test_setup(testname)?;
-        let (_, _, _, _, _, _, mut conn, _) = full_test_setup(testname)?;
+        let (_, _, _, profile_folder, _, _, mut conn, _) = full_test_setup(testname)?;
+        conn.disconnect()?;
 
-        // TODO: implement test_preregister
+        let mut client = match Client::new(&profile_folder.to_string()) {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: error initializing client: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        };
+        client.enable_test_mode(true);
 
-        conn.disconnect()
+        let example_com = Domain::from("example.com").unwrap();
+        match client.connect(&example_com) {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: error connecting to example.com: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        }
+
+        match client.login(&MAddress::from("admin/example.com").unwrap()) {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: error logging in as admin/example.com: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        }
+
+        // Test Case #1: No data supplied
+        match client.preregister(None, None) {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: empty prereg failed: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        };
+
+        // Test Case #2: Workspace ID supplied
+        let uid =
+            UserID::from_wid(&RandomID::from("33333333-3333-3333-3333-333333333333").unwrap());
+        match client.preregister(Some(&uid), None) {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: wid prereg failed: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        };
+
+        // Test Case #3: User ID supplied
+        let uid = UserID::from("csimons").unwrap();
+        match client.preregister(Some(&uid), None) {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: wid prereg failed: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        };
+
+        client.disconnect()?;
+
+        Ok(())
     }
 
     #[test]
@@ -26,7 +101,6 @@ mod tests {
         // let (config, db, dbdata, profile_folder, pwhash, profman, mut conn, admin_regdata) =
         // 	full_test_setup(testname)?;
         let (_, _, _, profile_folder, _, _, mut conn, _) = full_test_setup(testname)?;
-
         conn.disconnect()?;
 
         let mut client = match Client::new(&profile_folder.to_string()) {
