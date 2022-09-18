@@ -26,10 +26,12 @@ use lazy_static::lazy_static;
 use libkeycard::*;
 use libmensago::*;
 use postgres::{Client, NoTls};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::{env, fs, path::PathBuf, str::FromStr};
 use std::{thread, time};
 use toml_edit::{value, Document};
+use trust_dns_resolver::config::*;
 
 lazy_static! {
 
@@ -1189,6 +1191,129 @@ pub fn full_test_setup(
         conn,
         admin_regdata,
     ))
+}
+
+/// The FakeDNSHandler type provides mock DNS information for unit testing purposes
+pub struct FakeDNSHandler {
+    error_list: VecDeque<FakeDNSError>,
+}
+
+impl FakeDNSHandler {
+    pub fn new() -> FakeDNSHandler {
+        FakeDNSHandler {
+            error_list: VecDeque::new(),
+        }
+    }
+
+    // NOTE: Currently push_error() isn't used, but is disabled instead of removed because future
+    // integration tests will use it.
+
+    // pub fn push_error(&mut self, e: FakeDNSError) {
+    //     self.error_list.push_back(e)
+    // }
+}
+
+impl DNSHandlerT for FakeDNSHandler {
+    /// Normally sets the server and configuration information. This call for FakeDNSHandler is
+    /// a no-op
+    fn set_server(
+        &mut self,
+        _config: ResolverConfig,
+        _opts: ResolverOpts,
+    ) -> Result<(), MensagoError> {
+        Ok(())
+    }
+
+    /// Normally turns a DNS domain into an IPv4 address. This implementation always returns
+    /// 127.0.0.1.
+    fn lookup_a(&mut self, _d: &Domain) -> Result<IpAddr, MensagoError> {
+        match self.error_list.pop_front() {
+            Some(e) => match e {
+                FakeDNSError::NoResponse => return Err(MensagoError::ErrNetworkError),
+                FakeDNSError::Misconfig => return Ok(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0))),
+                FakeDNSError::Empty => return Err(MensagoError::ErrEmptyData),
+                FakeDNSError::NotFound => return Err(MensagoError::ErrNotFound),
+            },
+            None => (),
+        }
+
+        Ok(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)))
+    }
+
+    /// Normally turns a DNS domain into an IPv6 address. This implementation always returns
+    /// ::1.
+    fn lookup_aaaa(&mut self, _d: &Domain) -> Result<IpAddr, MensagoError> {
+        match self.error_list.pop_front() {
+            Some(e) => match e {
+                FakeDNSError::NoResponse => return Err(MensagoError::ErrNetworkError),
+                FakeDNSError::Misconfig => {
+                    return Ok(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 0)))
+                }
+                FakeDNSError::Empty => return Err(MensagoError::ErrEmptyData),
+                FakeDNSError::NotFound => return Err(MensagoError::ErrNotFound),
+            },
+            None => (),
+        }
+
+        Ok(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)))
+    }
+
+    /// Normally returns all service records for a domain. This implementation always returns
+    /// mensago.example.com on port 2001 with a TTL of 86400.
+    fn lookup_srv(&mut self, _d: &str) -> Result<Vec<ServiceConfigRecord>, MensagoError> {
+        match self.error_list.pop_front() {
+            Some(e) => match e {
+                FakeDNSError::NoResponse => return Err(MensagoError::ErrNetworkError),
+                FakeDNSError::Empty => return Err(MensagoError::ErrEmptyData),
+                FakeDNSError::NotFound => return Err(MensagoError::ErrNotFound),
+                FakeDNSError::Misconfig => {
+                    return Ok(vec![ServiceConfigRecord {
+                        server: Domain::from("myhostname").unwrap(),
+                        port: 0,
+                        priority: 100,
+                    }])
+                }
+            },
+            None => (),
+        }
+
+        Ok(vec![
+            ServiceConfigRecord {
+                server: Domain::from("mensago1.example.com").unwrap(),
+                port: 2001,
+                priority: 0,
+            },
+            ServiceConfigRecord {
+                server: Domain::from("mensago2.example.com").unwrap(),
+                port: 2001,
+                priority: 1,
+            },
+        ])
+    }
+
+    /// Normally returns all text records for a domain. This implementation always returns two
+    /// records which contain a PVK and an EK Mensago config item, respectively.
+    fn lookup_txt(&mut self, _d: &Domain) -> Result<Vec<String>, MensagoError> {
+        match self.error_list.pop_front() {
+            Some(e) => match e {
+                FakeDNSError::NoResponse => return Err(MensagoError::ErrNetworkError),
+                FakeDNSError::Empty => return Err(MensagoError::ErrEmptyData),
+                FakeDNSError::NotFound => return Err(MensagoError::ErrNotFound),
+                FakeDNSError::Misconfig => {
+                    return Ok(vec![
+                        String::from("pvk=K12:r#r*RiXIN-0n)BzP3bv`LA&t4LFEQNF0Q@$N~RF*"),
+                        String::from("svk=CURVE25519:SNhj2K`hgBd8>G>lW$!pXiM7S-B!Fbd9jT2&{{Az"),
+                    ])
+                }
+            },
+            None => (),
+        }
+
+        Ok(vec![
+            String::from("pvk=ED25519:r#r*RiXIN-0n)BzP3bv`LA&t4LFEQNF0Q@$N~RF*"),
+            String::from("ek=CURVE25519:SNhj2K`hgBd8>G>lW$!pXiM7S-B!Fbd9jT2&{{Az"),
+        ])
+    }
 }
 
 #[cfg(test)]
