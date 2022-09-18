@@ -14,7 +14,8 @@ mod tests {
         let (_, _, _, profile_folder, _, _, mut conn, _) = full_test_setup(testname)?;
         conn.disconnect()?;
 
-        let mut client = match Client::new(&profile_folder.to_string()) {
+        let dns = FakeDNSHandler::new();
+        let mut client = match Client::new(&profile_folder.to_string(), Box::new(dns)) {
             Ok(v) => v,
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
@@ -24,7 +25,6 @@ mod tests {
                 )))
             }
         };
-        client.enable_test_mode(true);
 
         let example_com = Domain::from("example.com").unwrap();
         match client.connect(&example_com) {
@@ -64,7 +64,8 @@ mod tests {
         let (_, _, _, profile_folder, _, _, mut conn, _) = full_test_setup(testname)?;
         conn.disconnect()?;
 
-        let mut client = match Client::new(&profile_folder.to_string()) {
+        let dns = FakeDNSHandler::new();
+        let mut client = match Client::new(&profile_folder.to_string(), Box::new(dns)) {
             Ok(v) => v,
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
@@ -74,7 +75,6 @@ mod tests {
                 )))
             }
         };
-        client.enable_test_mode(true);
 
         let example_com = Domain::from("example.com").unwrap();
         match client.connect(&example_com) {
@@ -153,7 +153,8 @@ mod tests {
         let (_, _, _, profile_folder, _, _, mut conn, _) = full_test_setup(testname)?;
         conn.disconnect()?;
 
-        let mut client = match Client::new(&profile_folder.to_string()) {
+        let dns = FakeDNSHandler::new();
+        let mut client = match Client::new(&profile_folder.to_string(), Box::new(dns)) {
             Ok(v) => v,
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
@@ -163,7 +164,6 @@ mod tests {
                 )))
             }
         };
-        client.enable_test_mode(true);
 
         match client.get_profile_manager().create_profile("user") {
             Ok(_) => (),
