@@ -254,6 +254,16 @@ impl Client {
         Ok(out)
     }
 
+    pub fn update_keycard(
+        &mut self,
+        profile: &Profile,
+        reginfo: &RegInfo,
+    ) -> Result<(), MensagoError> {
+        // TODO: Implement update_keycard()
+
+        Err(MensagoError::ErrUnimplemented)
+    }
+
     // TODO: Finish implementing Client class. Depends on keycard resolver.
 }
 
