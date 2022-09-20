@@ -1196,12 +1196,34 @@ pub fn full_test_setup(
 /// The FakeDNSHandler type provides mock DNS information for unit testing purposes
 pub struct FakeDNSHandler {
     error_list: VecDeque<FakeDNSError>,
+    db_str: String,
 }
 
 impl FakeDNSHandler {
     pub fn new() -> FakeDNSHandler {
+        // We need to be able to connect to the
+        let config = match load_server_config(true) {
+            Ok(v) => v,
+            Err(e) => panic!("{}", e.to_string()),
+        };
+
+        // postgres::connect requires escaping backslashes and single quotes.
+        let password = config["database"]["password"]
+            .as_str()
+            .unwrap()
+            .replace(r#"\"#, r#"\\"#)
+            .replace("'", r#"\'"#);
+
         FakeDNSHandler {
             error_list: VecDeque::new(),
+            db_str: format!(
+                "host='{}' port='{}' dbname='{}' user='{}' password='{}'",
+                config["database"]["ip"].as_str().unwrap(),
+                config["database"]["port"].as_str().unwrap(),
+                config["database"]["name"].as_str().unwrap(),
+                config["database"]["user"].as_str().unwrap(),
+                password
+            ),
         }
     }
 
@@ -1306,10 +1328,48 @@ impl DNSHandlerT for FakeDNSHandler {
             None => (),
         }
 
-        Ok(vec![
-            String::from("pvk=ED25519:r#r*RiXIN-0n)BzP3bv`LA&t4LFEQNF0Q@$N~RF*"),
-            String::from("ek=CURVE25519:SNhj2K`hgBd8>G>lW$!pXiM7S-B!Fbd9jT2&{{Az"),
-        ])
+        let mut db = match Client::connect(&self.db_str, NoTls) {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "couldn't connect to postgres database: {}",
+                    e.to_string()
+                )))
+            }
+        };
+
+        let ek = match db.query("SELECT pubkey FROM orgkeys WHERE purpose = 'encrypt'", &[]) {
+            Ok(rows) => CryptoString::from(rows[0].get(0)).expect("failed to get ek from postgres"),
+            Err(e) => {
+                return Err(MensagoError::ErrDatabaseException(format!(
+                    "Query error looking for org keys: {}",
+                    e.to_string()
+                )))
+            }
+        };
+
+        let pvk = match db.query("SELECT pubkey FROM orgkeys WHERE purpose = 'sign'", &[]) {
+            Ok(rows) => CryptoString::from(rows[0].get(0)).expect("failed to get sk from postgres"),
+            Err(e) => {
+                return Err(MensagoError::ErrDatabaseException(format!(
+                    "Query error looking for org keys: {}",
+                    e.to_string()
+                )))
+            }
+        };
+
+        let avk: Option<CryptoString> = match db
+            .query("SELECT pubkey FROM orgkeys WHERE purpose = 'altsign'", &[])
+        {
+            Ok(rows) => Some(CryptoString::from(rows[0].get(0)).expect("bad altsk in postgres")),
+            Err(_) => None,
+        };
+
+        let mut out = vec![format!("pvk={}", pvk), format!("ek={}", ek)];
+        if avk.is_some() {
+            out.push(format!("avk={}", avk.unwrap()))
+        }
+        Ok(out)
     }
 }
 
