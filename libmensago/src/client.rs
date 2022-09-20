@@ -80,13 +80,16 @@ impl Client {
         let serverkey = EncryptionKey::from(&record.ek)?;
         login(&mut self.conn, waddr.get_wid(), &serverkey)?;
 
+        let storage = open_storage_db(&profile)?;
+        let passhash = get_credentials(&storage, &waddr)?;
+
         let secrets = open_secrets_db(&profile)?;
-        let passhash = get_credentials(&secrets, &waddr)?;
         password(&mut self.conn, &passhash)?;
 
         let devpair = get_session_keypair(&secrets, &waddr)?;
         self.is_admin = device(&mut self.conn, waddr.get_wid(), &devpair)?;
 
+        self.login_active = true;
         Ok(())
     }
 
