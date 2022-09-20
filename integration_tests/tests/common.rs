@@ -1205,12 +1205,9 @@ impl FakeDNSHandler {
         }
     }
 
-    // NOTE: Currently push_error() isn't used, but is disabled instead of removed because future
-    // integration tests will use it.
-
-    // pub fn push_error(&mut self, e: FakeDNSError) {
-    //     self.error_list.push_back(e)
-    // }
+    pub fn push_error(&mut self, e: FakeDNSError) {
+        self.error_list.push_back(e)
+    }
 }
 
 impl DNSHandlerT for FakeDNSHandler {
