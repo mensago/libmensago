@@ -1,6 +1,7 @@
 use crate::*;
-use eznacl::{EncryptionKey, EncryptionPair, PublicKey};
+use eznacl::*;
 use libkeycard::*;
+use std::collections::HashMap;
 use std::path::PathBuf;
 
 /// The Client type primary interface to the entire library.
@@ -10,6 +11,7 @@ pub struct Client {
     is_admin: bool,
     login_active: bool,
     dns: Box<dyn DNSHandlerT>,
+    expiration: u16,
 }
 
 impl Client {
@@ -25,6 +27,7 @@ impl Client {
             is_admin: false,
             login_active: false,
             dns,
+            expiration: 90,
         })
     }
 
@@ -38,6 +41,13 @@ impl Client {
         }
         let ip = self.dns.lookup_a(&serverconfig[0].server)?;
         self.conn.connect(&ip.to_string(), serverconfig[0].port)
+    }
+
+    /// Returns the number of days after which new keycard entries will expire. The default is the
+    /// recommended value of 90.
+    #[inline]
+    pub fn get_expiration(&self) -> u16 {
+        self.expiration
     }
 
     /// Returns true if the client is connected to a Mensago server.
@@ -254,17 +264,77 @@ impl Client {
         Ok(out)
     }
 
-    pub fn update_keycard(
-        &mut self,
-        profile: &Profile,
-        reginfo: &RegInfo,
-    ) -> Result<(), MensagoError> {
-        // TODO: Implement update_keycard()
+    /// Sets the expiration time limit for new keycard entries. If given a value less than 1, it
+    /// will be set to 1, and if greater than 1095 (the maximum as per the spec), it will be set to
+    /// 1095.
+    #[inline]
+    pub fn set_expiration(&mut self, days: u16) {
+        self.expiration = match days {
+            v if v < 1 => 1,
+            v if v > 1095 => 1095,
+            v => v,
+        };
+    }
+
+    /// Creates a new entry in the user's keycard. New keys are created and added to the database
+    pub fn update_keycard(&mut self) -> Result<(), MensagoError> {
+        let profile = match self.pman.get_active_profile_mut() {
+            Some(v) => v,
+            None => return Err(MensagoError::ErrNoProfile),
+        };
+
+        let db = open_storage_db(&profile)?;
+
+        let mut card = get_card_from_db(
+            &db,
+            &profile.get_identity()?.to_string(),
+            EntryType::User,
+            false,
+        )?;
+
+        let mut entry = Entry::new(EntryType::User).unwrap();
+        entry.set_expiration(self.expiration)?;
+
+        let keys = match card {
+            Some(mut c) => {
+                c.verify()?;
+                let cstemp = get_keypair_by_category(&db, &KeyCategory::ConReqSigning)?;
+                let crspair = match SigningPair::from(&cstemp[0], &cstemp[1]) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        return Err(MensagoError::ErrDatabaseException(format!(
+                            "BUG: bad CR signing pair obtained in update_keycard: {}",
+                            e
+                        )))
+                    }
+                };
+
+                c.chain(&crspair, self.expiration)?
+            }
+            None => {
+                // Create the user's first keycard entry. It's not valid until it's been
+                // cross-signed by both the client and the organization, though.
+                let mut cstemp = get_keypair_by_category(&db, &KeyCategory::ConReqSigning)?;
+                let crspair = match SigningPair::from(&cstemp[0], &cstemp[1]) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        return Err(MensagoError::ErrDatabaseException(format!(
+                            "BUG: bad CR signing pair obtained in update_keycard: {}",
+                            e
+                        )))
+                    }
+                };
+
+                // TODO: finish update_keycard
+
+                HashMap::new()
+            }
+        };
 
         Err(MensagoError::ErrUnimplemented)
     }
 
-    // TODO: Finish implementing Client class. Depends on keycard resolver.
+    // TODO: Finish implementing Client class.
 }
 
 /// The RegInfo structure is to pass around account registration information, particularly from the
