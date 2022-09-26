@@ -1,5 +1,6 @@
 use crate::*;
 use eznacl::*;
+use hostname;
 use libkeycard::*;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -207,7 +208,7 @@ impl Client {
         // Save all encryption keys into an encrypted 7-zip archive which uses the hash of the
         // user's password has the archive encryption password and upload the archive to the server.
 
-        let profile = match self.pman.get_active_profile() {
+        let mut profile = match self.pman.get_active_profile_mut() {
             Some(v) => v.clone(),
             None => return Err(MensagoError::ErrNoProfile),
         };
@@ -250,7 +251,7 @@ impl Client {
 
         let mut out = RegInfo {
             wid,
-            devid: profile.devid.unwrap().clone(),
+            devid: profile.devid.as_ref().unwrap().clone(),
             domain: dom.clone(),
             uid: None,
             password: pwhash,
@@ -260,6 +261,8 @@ impl Client {
         if uid.is_some() {
             out.uid = Some(uid.unwrap().clone());
         }
+
+        self.setup_workspace(&mut profile, &out)?;
 
         Ok(out)
     }
@@ -332,6 +335,41 @@ impl Client {
         };
 
         Err(MensagoError::ErrUnimplemented)
+    }
+
+    /// Internal method which finishes all the profile and workspace setup common to standard
+    /// registration and registration via a code.
+    fn setup_workspace(
+        &mut self,
+        profile: &mut Profile,
+        reginfo: &RegInfo,
+    ) -> Result<(), MensagoError> {
+        let mut w = Workspace::new(&profile.path);
+        w.generate(
+            reginfo.uid.as_ref(),
+            &reginfo.domain,
+            &reginfo.wid,
+            &reginfo.password.to_string(),
+        )?;
+
+        profile.set_identity(w, &reginfo.password)?;
+
+        // TODO: figure out where to set the name of the user in the workspace
+        // Original code in pymensago calls userinfo.py::save_name() here
+
+        let storage = open_storage_db(&profile)?;
+
+        let tempname = hostname::get()?;
+        let devicename = tempname.to_string_lossy();
+        add_device_session(
+            &storage,
+            &WAddress::from_parts(&reginfo.wid, &reginfo.domain),
+            &reginfo.devid,
+            &reginfo.devpair,
+            Some(&devicename),
+        )?;
+
+        self.update_keycard()
     }
 
     // TODO: Finish implementing Client class.
