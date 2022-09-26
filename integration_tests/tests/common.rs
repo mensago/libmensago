@@ -863,7 +863,7 @@ pub fn setup_profile(
 
     let mut w = Workspace::new(&profile.path);
     w.generate(
-        &UserID::from(&profile_data.get("uid").as_ref().unwrap()).unwrap(),
+        Some(&UserID::from(&profile_data.get("uid").as_ref().unwrap()).unwrap()),
         &Domain::from(&profile_data.get("domain").as_ref().unwrap()).unwrap(),
         &RandomID::from(&profile_data.get("wid").as_ref().unwrap()).unwrap(),
         &profile_data.get("passhash").as_ref().unwrap(),
