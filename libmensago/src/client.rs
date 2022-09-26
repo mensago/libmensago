@@ -295,44 +295,74 @@ impl Client {
             false,
         )?;
 
+        if card.is_some() {
+            card.as_ref().unwrap().verify()?;
+            let cstemp = get_keypair_by_category(&db, &KeyCategory::ConReqSigning)?;
+            let crspair = match SigningPair::from(&cstemp[0], &cstemp[1]) {
+                Ok(v) => v,
+                Err(e) => {
+                    return Err(MensagoError::ErrDatabaseException(format!(
+                        "BUG: bad CR signing pair obtained in update_keycard: {}",
+                        e
+                    )))
+                }
+            };
+
+            card.as_mut().unwrap().chain(&crspair, self.expiration)?;
+
+            // TODO: update keys in database
+            // TODO: get mgmt record and call add_entry()
+
+            return Ok(());
+        };
+
+        // `card` is none, so it means that we need to create a new root keycard entry for the user.
+        let cstemp = get_keypair_by_category(&db, &KeyCategory::ConReqSigning)?;
+        let crspair = match SigningPair::from(&cstemp[0], &cstemp[1]) {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(MensagoError::ErrDatabaseException(format!(
+                    "BUG: bad CR signing pair obtained in update_keycard: {}",
+                    e
+                )))
+            }
+        };
+
+        let crekey =
+            match EncryptionKey::from(&get_key_by_category(&db, &KeyCategory::ConReqEncryption)?) {
+                Ok(v) => v,
+                Err(e) => {
+                    return Err(MensagoError::ErrDatabaseException(format!(
+                        "BUG: bad CR encryption key obtained in update_keycard: {}",
+                        e
+                    )))
+                }
+            };
+
+        let ekey = match EncryptionKey::from(&get_key_by_category(&db, &KeyCategory::Encryption)?) {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(MensagoError::ErrDatabaseException(format!(
+                    "BUG: bad encryption key obtained in update_keycard: {}",
+                    e
+                )))
+            }
+        };
+
+        let vkey = match EncryptionKey::from(&get_key_by_category(&db, &KeyCategory::Signing)?) {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(MensagoError::ErrDatabaseException(format!(
+                    "BUG: bad verification key obtained in update_keycard: {}",
+                    e
+                )))
+            }
+        };
+
         let mut entry = Entry::new(EntryType::User).unwrap();
         entry.set_expiration(self.expiration)?;
 
-        let keys = match card {
-            Some(mut c) => {
-                c.verify()?;
-                let cstemp = get_keypair_by_category(&db, &KeyCategory::ConReqSigning)?;
-                let crspair = match SigningPair::from(&cstemp[0], &cstemp[1]) {
-                    Ok(v) => v,
-                    Err(e) => {
-                        return Err(MensagoError::ErrDatabaseException(format!(
-                            "BUG: bad CR signing pair obtained in update_keycard: {}",
-                            e
-                        )))
-                    }
-                };
-
-                c.chain(&crspair, self.expiration)?
-            }
-            None => {
-                // Create the user's first keycard entry. It's not valid until it's been
-                // cross-signed by both the client and the organization, though.
-                let mut cstemp = get_keypair_by_category(&db, &KeyCategory::ConReqSigning)?;
-                let crspair = match SigningPair::from(&cstemp[0], &cstemp[1]) {
-                    Ok(v) => v,
-                    Err(e) => {
-                        return Err(MensagoError::ErrDatabaseException(format!(
-                            "BUG: bad CR signing pair obtained in update_keycard: {}",
-                            e
-                        )))
-                    }
-                };
-
-                // TODO: finish update_keycard
-
-                HashMap::new()
-            }
-        };
+        // TODO: finish update_keycard
 
         Err(MensagoError::ErrUnimplemented)
     }
