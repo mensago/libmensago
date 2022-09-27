@@ -622,15 +622,15 @@ pub fn regcode(
     code: &str,
     pwhash: &ArgonHash,
     devid: &RandomID,
-    devpubkey: &CryptoString,
-) -> Result<HashMap<&'static str, String>, MensagoError> {
+    devpair: &EncryptionPair,
+) -> Result<RegInfo, MensagoError> {
     let mut req = ClientRequest::from(
         "REGCODE",
         &vec![
             ("Reg-Code", code),
             ("Password-Hash", &pwhash.to_string()),
             ("Device-ID", &devid.to_string()),
-            ("Device-Key", &devpubkey.to_string()),
+            ("Device-Key", &devpair.get_public_str()),
             ("Domain", &address.domain.to_string()),
         ],
     );
@@ -659,13 +659,28 @@ pub fn regcode(
         return Err(MensagoError::ErrSchemaFailure);
     }
 
-    let mut out = HashMap::<&'static str, String>::new();
-    out.insert("devid", devid.to_string());
-    out.insert("wid", resp.data["Workspace-ID"].clone());
-    out.insert("uid", resp.data["User-ID"].clone());
-    out.insert("domain", resp.data["Domain"].clone());
+    let wid = RandomID::from(&resp.data["Workspace-ID"]).unwrap();
+    let domain = Domain::from(&resp.data["Domain"]).unwrap();
+    let uid = match resp.data.get("User-ID") {
+        Some(v) => match UserID::from(&v) {
+            Some(uid) => Some(uid),
+            None => {
+                return Err(MensagoError::ErrServerException(String::from(
+                    "Bad user ID received from server",
+                )))
+            }
+        },
+        None => None,
+    };
 
-    Ok(out)
+    return Ok(RegInfo {
+        wid,
+        devid: devid.clone(),
+        domain,
+        uid,
+        password: pwhash.clone(),
+        devpair: devpair.clone(),
+    });
 }
 
 /// Creates an account on the server. The response received depends on a number of factors,

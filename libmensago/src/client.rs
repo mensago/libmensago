@@ -211,7 +211,7 @@ impl Client {
             user_regcode,
             &pw,
             profile.devid.as_ref().unwrap(),
-            &devpair.get_public_key(),
+            &devpair,
         )?;
 
         // TODO: Finish implementing Client::redeem_regcode()

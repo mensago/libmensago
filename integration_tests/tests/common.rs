@@ -932,17 +932,21 @@ pub fn regcode_user(
     profile_data: &HashMap<&'static str, String>,
     user_regcode: &str,
     pwhash: &ArgonHash,
-) -> Result<HashMap<&'static str, String>, MensagoError> {
+) -> Result<RegInfo, MensagoError> {
     let profile = profman.get_active_profile().unwrap();
 
     let devid = RandomID::from(&profile_data["devid"]).unwrap();
-    let mut regdata = match regcode(
+    let regdata = match regcode(
         conn,
         MAddress::from(&profile_data["address"]).as_ref().unwrap(),
         user_regcode,
         pwhash,
         &devid,
-        &CryptoString::from(&profile_data["device.public"]).unwrap(),
+        &EncryptionPair::from_strings(
+            &USER1_PROFILE_DATA["device.public"],
+            &USER1_PROFILE_DATA["device.private"],
+        )
+        .unwrap(),
     ) {
         Ok(v) => v,
         Err(e) => {
@@ -952,7 +956,6 @@ pub fn regcode_user(
             )))
         }
     };
-    regdata.insert("devid", devid.to_string());
 
     let waddr = WAddress::from(&ADMIN_PROFILE_DATA["waddress"]).unwrap();
     let devpair = EncryptionPair::from_strings(
@@ -1092,7 +1095,7 @@ pub fn full_test_setup(
         ArgonHash,
         ProfileManager,
         ServerConnection,
-        HashMap<&'static str, String>,
+        RegInfo,
     ),
     MensagoError,
 > {

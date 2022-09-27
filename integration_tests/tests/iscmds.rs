@@ -24,7 +24,7 @@ mod tests {
             ADMIN_PROFILE_DATA["device.private"].as_str(),
         )?;
         let newpair = EncryptionPair::generate("CURVE25519").unwrap();
-        let devid = RandomID::from(admin_regdata["devid"].as_str()).unwrap();
+        let devid = RandomID::from(&admin_regdata.devid.to_string()).unwrap();
 
         match devkey(&mut conn, &devid, &oldpair, &newpair) {
             Ok(v) => v,
@@ -152,9 +152,13 @@ mod tests {
             &userregdata.regcode,
             &pwhash,
             &devid,
-            &CryptoString::from(&USER1_PROFILE_DATA["device.public"]).unwrap(),
+            &EncryptionPair::from_strings(
+                &USER1_PROFILE_DATA["device.public"],
+                &USER1_PROFILE_DATA["device.private"],
+            )
+            .unwrap(),
         ) {
-            Ok(v) => v,
+            Ok(_) => (),
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
                     "use regcode failed in regcode_user: {}",
