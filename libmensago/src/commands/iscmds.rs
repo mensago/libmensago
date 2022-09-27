@@ -382,7 +382,7 @@ pub fn login<E: Encryptor>(
 
 /// Logs the current user out without disconnecting
 pub fn logout(conn: &mut ServerConnection) -> Result<(), MensagoError> {
-    let req = ClientRequest::new("QUIT");
+    let req = ClientRequest::new("LOGOUT");
     conn.send(&req)?;
 
     let resp = conn.receive()?;
