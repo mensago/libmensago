@@ -2,7 +2,6 @@ use crate::*;
 use eznacl::*;
 use hostname;
 use libkeycard::*;
-use std::collections::HashMap;
 use std::path::PathBuf;
 
 /// The Client type primary interface to the entire library.
@@ -13,12 +12,17 @@ pub struct Client {
     login_active: bool,
     dns: Box<dyn DNSHandlerT>,
     expiration: u16,
+    use_certified: bool,
 }
 
 impl Client {
     /// Instantiates a new Mensago client instance. The profile folder passed to the method is the
     /// location of the top-level folder that contains all profiles.
-    pub fn new(profile_folder: &str, dns: Box<dyn DNSHandlerT>) -> Result<Client, MensagoError> {
+    pub fn new(
+        profile_folder: &str,
+        dns: Box<dyn DNSHandlerT>,
+        use_certified: bool,
+    ) -> Result<Client, MensagoError> {
         let mut pman = ProfileManager::new(&PathBuf::from(&profile_folder));
         pman.load_profiles(Some(&PathBuf::from(&profile_folder)))?;
 
@@ -29,6 +33,7 @@ impl Client {
             login_active: false,
             dns,
             expiration: 90,
+            use_certified,
         })
     }
 
@@ -279,25 +284,36 @@ impl Client {
         };
     }
 
-    /// Creates a new entry in the user's keycard. New keys are created and added to the database
+    /// Creates a new entry in the user's keycard. New keys are created and added to the database.
     pub fn update_keycard(&mut self) -> Result<(), MensagoError> {
+        if !self.is_connected() {
+            return Err(MensagoError::ErrNotConnected);
+        }
+        if !self.is_logged_in() {
+            return Err(MensagoError::ErrNoLogin);
+        }
+
         let profile = match self.pman.get_active_profile_mut() {
             Some(v) => v,
             None => return Err(MensagoError::ErrNoProfile),
         };
 
-        let db = open_storage_db(&profile)?;
+        let storage = profile.open_storage()?;
+        let mut secrets = profile.open_secrets()?;
 
         let mut card = get_card_from_db(
-            &db,
+            &storage,
             &profile.get_identity()?.to_string(),
             EntryType::User,
             false,
         )?;
 
+        let mgmtrec = get_mgmt_record(profile.domain.as_ref().unwrap(), self.dns.as_mut())?;
+        let ovkey = VerificationKey::from(&mgmtrec.pvk);
+
         if card.is_some() {
             card.as_ref().unwrap().verify()?;
-            let cstemp = get_keypair_by_category(&db, &KeyCategory::ConReqSigning)?;
+            let cstemp = get_keypair_by_category(&secrets, &KeyCategory::ConReqSigning)?;
             let crspair = match SigningPair::from(&cstemp[0], &cstemp[1]) {
                 Ok(v) => v,
                 Err(e) => {
@@ -308,16 +324,55 @@ impl Client {
                 }
             };
 
-            card.as_mut().unwrap().chain(&crspair, self.expiration)?;
+            let keys = card.as_mut().unwrap().chain(&crspair, self.expiration)?;
 
-            // TODO: update keys in database
-            // TODO: get mgmt record and call add_entry()
+            let mut entry = card.as_mut().unwrap().get_current_mut().unwrap();
+            addentry(&mut self.conn, &mut entry, &ovkey, &crspair)?;
+
+            add_keypair(
+                &mut secrets,
+                &profile.get_waddress().unwrap(),
+                &keys["crsigning.public"],
+                &keys["crsigning.private"],
+                get_preferred_hash_algorithm(self.use_certified),
+                &KeyType::SigningKey,
+                &KeyCategory::ConReqSigning,
+            )?;
+            add_keypair(
+                &mut secrets,
+                &profile.get_waddress().unwrap(),
+                &keys["crencryption.public"],
+                &keys["crencryption.private"],
+                get_preferred_hash_algorithm(self.use_certified),
+                &KeyType::AsymEncryptionKey,
+                &KeyCategory::ConReqEncryption,
+            )?;
+            add_keypair(
+                &mut secrets,
+                &profile.get_waddress().unwrap(),
+                &keys["signing.public"],
+                &keys["signing.private"],
+                get_preferred_hash_algorithm(self.use_certified),
+                &KeyType::SigningKey,
+                &KeyCategory::Signing,
+            )?;
+            add_keypair(
+                &mut secrets,
+                &profile.get_waddress().unwrap(),
+                &keys["encryption.public"],
+                &keys["encryption.private"],
+                get_preferred_hash_algorithm(self.use_certified),
+                &KeyType::AsymEncryptionKey,
+                &KeyCategory::Encryption,
+            )?;
 
             return Ok(());
         };
 
         // `card` is none, so it means that we need to create a new root keycard entry for the user.
-        let cstemp = get_keypair_by_category(&db, &KeyCategory::ConReqSigning)?;
+        // We also don't need to generate any new keys because that was done when the workspace was
+        // provisioned -- just pull them from the database and go. :)
+        let cstemp = get_keypair_by_category(&secrets, &KeyCategory::ConReqSigning)?;
         let crspair = match SigningPair::from(&cstemp[0], &cstemp[1]) {
             Ok(v) => v,
             Err(e) => {
@@ -328,28 +383,32 @@ impl Client {
             }
         };
 
-        let crekey =
-            match EncryptionKey::from(&get_key_by_category(&db, &KeyCategory::ConReqEncryption)?) {
-                Ok(v) => v,
-                Err(e) => {
-                    return Err(MensagoError::ErrDatabaseException(format!(
-                        "BUG: bad CR encryption key obtained in update_keycard: {}",
-                        e
-                    )))
-                }
-            };
-
-        let ekey = match EncryptionKey::from(&get_key_by_category(&db, &KeyCategory::Encryption)?) {
+        let crekey = match EncryptionKey::from(&get_key_by_category(
+            &secrets,
+            &KeyCategory::ConReqEncryption,
+        )?) {
             Ok(v) => v,
             Err(e) => {
                 return Err(MensagoError::ErrDatabaseException(format!(
-                    "BUG: bad encryption key obtained in update_keycard: {}",
+                    "BUG: bad CR encryption key obtained in update_keycard: {}",
                     e
                 )))
             }
         };
 
-        let vkey = match EncryptionKey::from(&get_key_by_category(&db, &KeyCategory::Signing)?) {
+        let ekey =
+            match EncryptionKey::from(&get_key_by_category(&secrets, &KeyCategory::Encryption)?) {
+                Ok(v) => v,
+                Err(e) => {
+                    return Err(MensagoError::ErrDatabaseException(format!(
+                        "BUG: bad encryption key obtained in update_keycard: {}",
+                        e
+                    )))
+                }
+            };
+
+        let vkey = match EncryptionKey::from(&get_key_by_category(&secrets, &KeyCategory::Signing)?)
+        {
             Ok(v) => v,
             Err(e) => {
                 return Err(MensagoError::ErrDatabaseException(format!(
@@ -360,11 +419,38 @@ impl Client {
         };
 
         let mut entry = Entry::new(EntryType::User).unwrap();
-        entry.set_expiration(self.expiration)?;
+        entry.set_fields(&vec![
+            (String::from("Index"), String::from("1")),
+            (String::from("Name"), profile.name.clone()),
+            (
+                String::from("Workspace-ID"),
+                profile.wid.as_ref().unwrap().to_string(),
+            ),
+            (
+                String::from("Domain"),
+                profile.domain.as_ref().unwrap().to_string(),
+            ),
+            (
+                String::from("Contact-Request-Verification-Key"),
+                crspair.get_public_str(),
+            ),
+            (
+                String::from("Contact-Request-Encryption-Key"),
+                crekey.get_public_str(),
+            ),
+            (String::from("Encryption-Key"), ekey.get_public_str()),
+            (String::from("Verification-Key"), vkey.get_public_str()),
+        ])?;
 
-        // TODO: finish update_keycard
+        if profile.uid.is_some() {
+            entry.set_field(
+                "User-ID",
+                profile.uid.as_ref().unwrap().to_string().as_str(),
+            )?;
+        }
 
-        Err(MensagoError::ErrUnimplemented)
+        // We don't worry about checking entry compliance because addentry() handles it
+        addentry(&mut self.conn, &mut entry, &ovkey, &crspair)
     }
 
     /// Internal method which finishes all the profile and workspace setup common to standard

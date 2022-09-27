@@ -15,7 +15,7 @@ mod tests {
         conn.disconnect()?;
 
         let dns = FakeDNSHandler::new();
-        let mut client = match Client::new(&profile_folder.to_string(), Box::new(dns)) {
+        let mut client = match Client::new(&profile_folder.to_string(), Box::new(dns), false) {
             Ok(v) => v,
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
@@ -65,7 +65,7 @@ mod tests {
         conn.disconnect()?;
 
         let dns = FakeDNSHandler::new();
-        let mut client = match Client::new(&profile_folder.to_string(), Box::new(dns)) {
+        let mut client = match Client::new(&profile_folder.to_string(), Box::new(dns), false) {
             Ok(v) => v,
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
@@ -154,7 +154,7 @@ mod tests {
         conn.disconnect()?;
 
         let dns = FakeDNSHandler::new();
-        let mut client = match Client::new(&profile_folder.to_string(), Box::new(dns)) {
+        let mut client = match Client::new(&profile_folder.to_string(), Box::new(dns), false) {
             Ok(v) => v,
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
