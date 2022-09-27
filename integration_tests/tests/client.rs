@@ -255,11 +255,33 @@ mod tests {
             }
         }
 
+        match client.login(&MAddress::from(&USER1_PROFILE_DATA["address"]).unwrap()) {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: error logging in as user: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        }
+
         match client.update_keycard() {
             Ok(_) => (),
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
                     "{}: error updating keycard: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        }
+
+        match client.update_keycard() {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: error updating keycard (second time): {}",
                     testname,
                     e.to_string()
                 )))
@@ -341,6 +363,17 @@ mod tests {
                 )))
             }
         };
+
+        match client.login(&MAddress::from(&USER1_PROFILE_DATA["address"]).unwrap()) {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: error logging in as user: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        }
 
         match client.update_keycard() {
             Ok(_) => (),
