@@ -4,7 +4,8 @@ use crate::base::MensagoError;
 use chrono::prelude::*;
 use libkeycard::*;
 
-/// Obtains a keycard from the database. An error will be returned if something goes wrong in the
+/// Obtains a keycard from the database. `owner` is expected to be either a workspace address for a
+/// user or a domain for an organization. An error will be returned if something goes wrong in the
 /// lookup. A lack of an entry in the database is not considered an error and if no matching
 /// keycard exists in the local database, Ok(None) is returned. If managing the user's keycard,
 /// check_ttl should be false. It should be set to true only if you are looking to look up a

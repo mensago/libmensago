@@ -323,7 +323,7 @@ impl Client {
 
         let mut card = get_card_from_db(
             &storage,
-            &profile.get_identity()?.to_string(),
+            &profile.get_waddress().unwrap().to_string(),
             EntryType::User,
             false,
         )?;
@@ -386,7 +386,7 @@ impl Client {
                 &KeyCategory::Encryption,
             )?;
 
-            return Ok(());
+            return update_keycard_in_db(&storage, card.as_ref().unwrap(), false);
         };
 
         // `card` is none, so it means that we need to create a new root keycard entry for the user.
@@ -470,7 +470,11 @@ impl Client {
         }
 
         // We don't worry about checking entry compliance because addentry() handles it
-        addentry(&mut self.conn, &mut entry, &ovkey, &crspair)
+        addentry(&mut self.conn, &mut entry, &ovkey, &crspair)?;
+
+        let mut card = Keycard::new(EntryType::User);
+        card.entries.push(entry);
+        update_keycard_in_db(&storage, &card, false)
     }
 
     /// Internal method which finishes all the profile and workspace setup common to standard
