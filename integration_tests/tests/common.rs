@@ -1045,7 +1045,7 @@ pub fn regcode_user(
     let mut admincard = Keycard::new(EntryType::User);
     admincard.entries.push(entry);
 
-    let dbconn = match open_storage_db(&profile) {
+    let dbconn = match profile.open_storage() {
         Ok(v) => (v),
         Err(e) => {
             return Err(MensagoError::ErrProgramException(format!(

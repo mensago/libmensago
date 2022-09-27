@@ -1,9 +1,8 @@
 // This module contains miscellaneous commands related to the local profile database
 
-use crate::{base::MensagoError, Profile};
+use crate::base::MensagoError;
 use chrono::prelude::*;
 use libkeycard::*;
-use std::path::PathBuf;
 
 /// Obtains a keycard from the database. An error will be returned if something goes wrong in the
 /// lookup. A lack of an entry in the database is not considered an error and if no matching
@@ -86,38 +85,6 @@ pub fn get_card_from_db(
     }
 
     Ok(Some(card))
-}
-
-// TODO: Migrate calls to dbcmds::open_secrets_db() to Profile::open_secrets()
-pub fn open_secrets_db(profile: &Profile) -> Result<rusqlite::Connection, MensagoError> {
-    let mut dbpath = PathBuf::from(&profile.path);
-    dbpath.push("secrets.db");
-
-    match rusqlite::Connection::open_with_flags(dbpath, rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE)
-    {
-        Ok(v) => Ok(v),
-        Err(e) => {
-            return Err(MensagoError::ErrDatabaseException(String::from(
-                e.to_string(),
-            )));
-        }
-    }
-}
-
-// TODO: Migrate calls to dbcmds::open_storage_db() to Profile::open_storage()
-pub fn open_storage_db(profile: &Profile) -> Result<rusqlite::Connection, MensagoError> {
-    let mut dbpath = PathBuf::from(&profile.path);
-    dbpath.push("storage.db");
-
-    match rusqlite::Connection::open_with_flags(dbpath, rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE)
-    {
-        Ok(v) => Ok(v),
-        Err(e) => {
-            return Err(MensagoError::ErrDatabaseException(String::from(
-                e.to_string(),
-            )));
-        }
-    }
 }
 
 /// Adds a keycard to the database's cache or updates it if it already exists. This call is used

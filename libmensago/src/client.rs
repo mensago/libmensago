@@ -96,10 +96,10 @@ impl Client {
         let serverkey = EncryptionKey::from(&record.ek)?;
         login(&mut self.conn, waddr.get_wid(), &serverkey)?;
 
-        let storage = open_storage_db(&profile)?;
+        let storage = profile.open_storage()?;
         let passhash = get_credentials(&storage, &waddr)?;
 
-        let secrets = open_secrets_db(&profile)?;
+        let secrets = profile.open_secrets()?;
         password(&mut self.conn, &passhash)?;
 
         let devpair = get_session_keypair(&secrets, &waddr)?;
@@ -473,7 +473,7 @@ impl Client {
         // TODO: figure out where to set the name of the user in the workspace
         // Original code in pymensago calls userinfo.py::save_name() here
 
-        let storage = open_storage_db(&profile)?;
+        let storage = profile.open_storage()?;
 
         let tempname = hostname::get()?;
         let devicename = tempname.to_string_lossy();
