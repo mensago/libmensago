@@ -264,8 +264,15 @@ impl Client {
             Some(v) => v.clone(),
             None => return Err(MensagoError::ErrNoProfile),
         };
+
+        // The domain for a profile will be non-None if there is already an identity workspace
+        // created
         if profile.domain.is_some() {
             return Err(MensagoError::ErrExists);
+        }
+
+        if !self.is_connected() {
+            self.connect(dom)?;
         }
 
         let pwhash = ArgonHash::from(userpass);
@@ -273,50 +280,17 @@ impl Client {
         // TODO: use EzNaCl's preferred asymmetric algorithm once implemented
         let devpair = EncryptionPair::generate("CURVE25519")?;
 
-        if !self.is_connected() {
-            self.connect(dom)?;
-        }
-
         let regdata = register(
             &mut self.conn,
             uid,
-            &pwhash.to_string(),
+            &pwhash,
             profile.devid.as_ref().unwrap(),
-            &devpair.get_public_key(),
+            &devpair,
         )?;
 
-        let wid = match regdata.get("wid") {
-            Some(v) => match RandomID::from(v) {
-                Some(w) => w,
-                None => {
-                    return Err(MensagoError::ErrServerException(String::from(
-                        "bad workspace ID in server response",
-                    )))
-                }
-            },
-            None => {
-                return Err(MensagoError::ErrServerException(String::from(
-                    "missing workspace ID in server response",
-                )))
-            }
-        };
+        self.setup_workspace(&mut profile, &regdata)?;
 
-        let mut out = RegInfo {
-            wid,
-            devid: profile.devid.as_ref().unwrap().clone(),
-            domain: dom.clone(),
-            uid: None,
-            password: pwhash,
-            devpair,
-        };
-
-        if uid.is_some() {
-            out.uid = Some(uid.unwrap().clone());
-        }
-
-        self.setup_workspace(&mut profile, &out)?;
-
-        Ok(out)
+        Ok(regdata)
     }
 
     /// Sets the expiration time limit for new keycard entries. If given a value less than 1, it
@@ -538,26 +512,4 @@ impl Client {
     }
 
     // TODO: Finish implementing Client class.
-}
-
-/// The RegInfo structure is to pass around account registration information, particularly from the
-/// method Client::register().
-pub struct RegInfo {
-    /// The user's workspace ID
-    pub wid: RandomID,
-
-    /// The RandomID assigned to this device
-    pub devid: RandomID,
-
-    /// The domain for the account
-    pub domain: Domain,
-
-    /// The user ID for the account
-    pub uid: Option<UserID>,
-
-    /// The hash of the user's password string
-    pub password: ArgonHash,
-
-    /// The asymmetric encryption keypair unique to the device
-    pub devpair: EncryptionPair,
 }

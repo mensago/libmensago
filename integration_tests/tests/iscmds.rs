@@ -182,9 +182,9 @@ mod tests {
         match register(
             &mut conn,
             UserID::from("csimons").as_ref(),
-            &pwhash.to_string(),
+            &pwhash,
             &devid,
-            &devpair.get_public_key(),
+            &devpair,
         ) {
             Ok(_) => (),
             Err(e) => {
