@@ -491,9 +491,6 @@ impl Client {
 
         profile.set_identity(w, &reginfo.password)?;
 
-        // TODO: figure out where to set the name of the user in the workspace
-        // Original code in pymensago calls userinfo.py::save_name() here
-
         let storage = profile.open_storage()?;
 
         let tempname = hostname::get()?;
