@@ -491,12 +491,12 @@ impl Client {
 
         profile.set_identity(w, &reginfo.password)?;
 
-        let storage = profile.open_storage()?;
+        let secrets = profile.open_secrets()?;
 
         let tempname = hostname::get()?;
         let devicename = tempname.to_string_lossy();
         add_device_session(
-            &storage,
+            &secrets,
             &WAddress::from_parts(&reginfo.wid, &reginfo.domain),
             &reginfo.devid,
             &reginfo.devpair,
