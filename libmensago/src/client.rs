@@ -184,7 +184,7 @@ impl Client {
         address: &MAddress,
         user_regcode: &str,
         userpass: &str,
-    ) -> Result<PreregInfo, MensagoError> {
+    ) -> Result<(), MensagoError> {
         if !self.is_connected() {
             return Err(MensagoError::ErrNotConnected);
         }
@@ -205,7 +205,7 @@ impl Client {
         // TODO: use EzNaCl's preferred asymmetric algorithm once implemented
         let devpair = EncryptionPair::generate("CURVE25519")?;
 
-        let info = regcode(
+        let reginfo = regcode(
             &mut self.conn,
             address,
             user_regcode,
@@ -214,8 +214,7 @@ impl Client {
             &devpair,
         )?;
 
-        // TODO: Finish implementing Client::redeem_regcode()
-        Err(MensagoError::ErrUnimplemented)
+        self.setup_workspace(&reginfo)
     }
 
     /// Create a new user account on the specified server.
@@ -228,7 +227,7 @@ impl Client {
         dom: &Domain,
         userpass: &str,
         uid: Option<&UserID>,
-    ) -> Result<RegInfo, MensagoError> {
+    ) -> Result<(), MensagoError> {
         // Process for registration of a new account:
 
         // Check to see if we already have a workspace allocated on this profile. Because we don't
@@ -260,7 +259,7 @@ impl Client {
         // Save all encryption keys into an encrypted 7-zip archive which uses the hash of the
         // user's password has the archive encryption password and upload the archive to the server.
 
-        let mut profile = match self.pman.get_active_profile_mut() {
+        let profile = match self.pman.get_active_profile() {
             Some(v) => v.clone(),
             None => return Err(MensagoError::ErrNoProfile),
         };
@@ -288,9 +287,9 @@ impl Client {
             &devpair,
         )?;
 
-        self.setup_workspace(&mut profile, &regdata)?;
+        self.setup_workspace(&regdata)?;
 
-        Ok(regdata)
+        Ok(())
     }
 
     /// Sets the expiration time limit for new keycard entries. If given a value less than 1, it
@@ -476,11 +475,12 @@ impl Client {
 
     /// Internal method which finishes all the profile and workspace setup common to standard
     /// registration and registration via a code.
-    fn setup_workspace(
-        &mut self,
-        profile: &mut Profile,
-        reginfo: &RegInfo,
-    ) -> Result<(), MensagoError> {
+    fn setup_workspace(&mut self, reginfo: &RegInfo) -> Result<(), MensagoError> {
+        let profile = match self.pman.get_active_profile_mut() {
+            Some(v) => v,
+            None => return Err(MensagoError::ErrNoProfile),
+        };
+
         let mut w = Workspace::new(&profile.path);
         w.generate(
             reginfo.uid.as_ref(),
