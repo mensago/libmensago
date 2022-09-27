@@ -229,6 +229,13 @@ mod tests {
         let (_, _, _, profile_folder, _, _, mut conn, _) = full_test_setup(testname)?;
         conn.disconnect()?;
 
+        // This test is *involved*:
+        // 1. Log in as admin, prereg user csimons/example.com, and log out.
+        // 2. Create a second profile for the user
+        // 3. Use the regcode from earlier to register the user's first device
+        // 4. Log in as the user and call update_keycard() twice, once to upload the root and a
+        //    second time to chain and upload a second one
+
         let dns = FakeDNSHandler::new();
         let mut client = match Client::new(&profile_folder.to_string(), Box::new(dns), false) {
             Ok(v) => v,
@@ -275,7 +282,50 @@ mod tests {
             }
         }
 
-        // TODO: finish test_client_update_keycard()
+        match client.login(&MAddress::from("admin/example.com").unwrap()) {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: error logging in as admin/example.com: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        }
+
+        let uid = UserID::from("csimons").unwrap();
+        match client.preregister(Some(&uid), None) {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: wid prereg failed: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        };
+
+        match client.logout() {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: error logging out from admin/example.com: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        }
+
+        match client.update_keycard() {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: error updating keycard: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        }
 
         client.disconnect()?;
 
