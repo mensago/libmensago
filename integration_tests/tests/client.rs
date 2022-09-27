@@ -172,28 +172,6 @@ mod tests {
             }
         };
 
-        match client.get_profile_manager().create_profile("user") {
-            Ok(_) => (),
-            Err(e) => {
-                return Err(MensagoError::ErrProgramException(format!(
-                    "{}: error creating test user profile: {}",
-                    testname,
-                    e.to_string()
-                )))
-            }
-        }
-
-        match client.get_profile_manager().activate_profile("user") {
-            Ok(_) => (),
-            Err(e) => {
-                return Err(MensagoError::ErrProgramException(format!(
-                    "{}: error activating test user profile: {}",
-                    testname,
-                    e.to_string()
-                )))
-            }
-        }
-
         let example_com = Domain::from("example.com").unwrap();
         match client.connect(&example_com) {
             Ok(_) => (),
@@ -234,6 +212,28 @@ mod tests {
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
                     "{}: error logging out from admin/example.com: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        }
+
+        match client.get_profile_manager().create_profile("user") {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: error creating test user profile: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        }
+
+        match client.get_profile_manager().activate_profile("user") {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: error activating test user profile: {}",
                     testname,
                     e.to_string()
                 )))
