@@ -171,6 +171,53 @@ impl Client {
         }
     }
 
+    /// Completes setup of a preregistered account. The call requires information that the account
+    /// administrator would have given to the user: the account address, the registration code from
+    /// `preregister()`, and the user's cleartext password.
+    ///
+    /// This command initializes the user's local profile and does almost everything needed for the
+    /// user to get to work. It does _not_ set the user's personal information, such as their name.
+    /// If the user wants their name in their keycard, this will need to be set before calling
+    /// `update_keycard()`, which is the final step in setting up a user profile.
+    pub fn redeem_regcode(
+        &mut self,
+        address: &MAddress,
+        user_regcode: &str,
+        userpass: &str,
+    ) -> Result<PreregInfo, MensagoError> {
+        if !self.is_connected() {
+            return Err(MensagoError::ErrNotConnected);
+        }
+
+        let profile = match self.pman.get_active_profile() {
+            Some(v) => v,
+            None => return Err(MensagoError::ErrNoProfile),
+        };
+
+        // The domain for a profile will be non-None if there is already an identity workspace
+        // created
+        if profile.domain.is_some() {
+            return Err(MensagoError::ErrExists);
+        }
+
+        let pw = ArgonHash::from(userpass);
+
+        // TODO: use EzNaCl's preferred asymmetric algorithm once implemented
+        let devpair = EncryptionPair::generate("CURVE25519")?;
+
+        let info = regcode(
+            &mut self.conn,
+            address,
+            user_regcode,
+            &pw,
+            profile.devid.as_ref().unwrap(),
+            &devpair.get_public_key(),
+        )?;
+
+        // TODO: Finish implementing Client::redeem_regcode()
+        Err(MensagoError::ErrUnimplemented)
+    }
+
     /// Create a new user account on the specified server.
     ///
     /// There are a lot of ways this method can fail. It will return ErrNoProfile if a user profile
@@ -483,9 +530,11 @@ impl Client {
             &reginfo.devid,
             &reginfo.devpair,
             Some(&devicename),
-        )?;
+        )
 
-        self.update_keycard()
+        // NOTE: we do not update the keycard here because the caller needs to do this. The user
+        // may need/want to set their name information for their keycard and this must be done
+        // dealing with their keycard
     }
 
     // TODO: Finish implementing Client class.
