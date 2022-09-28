@@ -321,7 +321,7 @@ impl Client {
         let storage = profile.open_storage()?;
         let mut secrets = profile.open_secrets()?;
 
-        let mut card = get_card_from_db(
+        let cardopt = get_card_from_db(
             &storage,
             &profile.get_waddress().unwrap().to_string(),
             EntryType::User,
@@ -331,8 +331,9 @@ impl Client {
         let mgmtrec = get_mgmt_record(profile.domain.as_ref().unwrap(), self.dns.as_mut())?;
         let ovkey = VerificationKey::from(&mgmtrec.pvk);
 
-        if card.is_some() {
-            card.as_ref().unwrap().verify()?;
+        if cardopt.is_some() {
+            let mut card = cardopt.unwrap();
+            card.verify()?;
             let cstemp = get_keypair_by_category(&secrets, &KeyCategory::ConReqSigning)?;
             let crspair = match SigningPair::from(&cstemp[0], &cstemp[1]) {
                 Ok(v) => v,
@@ -344,9 +345,9 @@ impl Client {
                 }
             };
 
-            let keys = card.as_mut().unwrap().chain(&crspair, self.expiration)?;
+            let keys = card.chain(&crspair, self.expiration)?;
 
-            let mut entry = card.as_mut().unwrap().get_current_mut().unwrap();
+            let mut entry = card.get_current_mut().unwrap();
             addentry(&mut self.conn, &mut entry, &ovkey, &crspair)?;
 
             add_keypair(
@@ -386,7 +387,8 @@ impl Client {
                 &KeyCategory::Encryption,
             )?;
 
-            return update_keycard_in_db(&storage, card.as_ref().unwrap(), false);
+            // return update_keycard_in_db(&storage, card.as_ref().unwrap(), false);
+            return update_keycard_in_db(&storage, &card, false);
         };
 
         // `card` is none, so it means that we need to create a new root keycard entry for the user.
