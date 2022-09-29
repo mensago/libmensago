@@ -35,7 +35,7 @@ pub fn addentry<V: VerifySignature>(
         "ADDENTRY",
         &vec![(
             "Base-Entry",
-            entry.get_full_text("Custody-Signature")?.as_str(),
+            entry.get_full_text("Organization-Signature")?.as_str(),
         )],
     );
     conn.send(&req)?;
