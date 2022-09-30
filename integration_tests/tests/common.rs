@@ -534,7 +534,7 @@ pub fn init_server(
     // Chain new entry to the root and add to the database
 
     let keys = match orgcard.chain(&initial_ospair, 365) {
-        Ok(v) => (v),
+        Ok(v) => v,
         Err(e) => {
             return Err(MensagoError::ErrProgramException(format!(
                 "error chaining org root entry: {}",
@@ -1049,7 +1049,7 @@ pub fn regcode_user(
     admincard.entries.push(entry);
 
     let dbconn = match profile.open_storage() {
-        Ok(v) => (v),
+        Ok(v) => v,
         Err(e) => {
             return Err(MensagoError::ErrProgramException(format!(
                 "regcode_user: couldn't open db: {}",
@@ -1059,7 +1059,7 @@ pub fn regcode_user(
     };
 
     match update_keycard_in_db(&dbconn, &admincard, false) {
-        Ok(v) => (v),
+        Ok(v) => v,
         Err(e) => {
             return Err(MensagoError::ErrProgramException(format!(
                 "regcode_user: update_keycard_in_db error: {}",
@@ -1174,7 +1174,7 @@ pub fn full_test_setup(
         &dbdata["admin_regcode"],
         &pwhash,
     ) {
-        Ok(v) => (v),
+        Ok(v) => v,
         Err(e) => {
             return Err(MensagoError::ErrProgramException(format!(
                 "{}: regcode_user error: {}",
