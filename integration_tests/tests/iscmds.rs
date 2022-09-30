@@ -211,33 +211,144 @@ mod tests {
         // The list of full data is as follows:
         // let (config, db, dbdata, profile_folder, pwhash, profman, mut conn, admin_regdata) =
         // 	full_test_setup(testname)?;
-        let (_, _, _, _, _, _, mut conn, _) = full_test_setup(testname)?;
+        let (_, _, _, profile_folder, _, _, mut conn, _) = full_test_setup(testname)?;
 
-        // Preregister the regular user
-        let userwid = RandomID::from(&USER1_PROFILE_DATA["wid"]);
-        let useruid = UserID::from(&USER1_PROFILE_DATA["uid"]);
-        let userdomain = Domain::from(&USER1_PROFILE_DATA["domain"]);
-        // let userregdata = match preregister(&mut conn, userwid.as_ref(), useruid.as_ref(),
-        match preregister(
+        // Now that the admin has been registered and is logged in, prereg a regular user
+        let prinfo = match preregister(
             &mut conn,
-            userwid.as_ref(),
-            useruid.as_ref(),
-            userdomain.as_ref(),
+            Some(&RandomID::from(&USER1_PROFILE_DATA["wid"]).unwrap()),
+            Some(&UserID::from(&USER1_PROFILE_DATA["uid"]).unwrap()),
+            Some(&Domain::from(&USER1_PROFILE_DATA["domain"]).unwrap()),
         ) {
             Ok(v) => v,
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
-                    "preregister() failed in {}: {}",
+                    "{}: error preregistering test user: {}",
                     testname,
                     e.to_string()
                 )))
             }
         };
+
         conn.disconnect()?;
 
-        // Log in as the user and set up the profile
+        let dns = FakeDNSHandler::new();
+        let mut client = match Client::new(&profile_folder.to_string(), Box::new(dns), false) {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: error initializing client: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        };
 
-        // TODO: finish test_reset_password() once client type is implemented
+        match client.get_profile_manager().create_profile("user") {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: error creating test user profile: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        }
+
+        match client.get_profile_manager().activate_profile("user") {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: error activating test user profile: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        }
+
+        let example_com = Domain::from("example.com").unwrap();
+        match client.connect(&example_com) {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: error connecting to example.com: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        }
+
+        match client.redeem_regcode(
+            &MAddress::from(&USER1_PROFILE_DATA["address"]).unwrap(),
+            &prinfo.regcode,
+            &USER1_PROFILE_DATA["password"],
+        ) {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: error redeeming reg code: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        }
+
+        match client.get_profile_manager().activate_profile("primary") {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: error reactivating admin profile: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        }
+
+        match client.login(&MAddress::from("admin/example.com").unwrap()) {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: error logging in as admin/example.com: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        }
+
+        let userwid = &RandomID::from(USER1_PROFILE_DATA.get("wid").unwrap()).unwrap();
+        let resetdata = reset_password(client.get_connection_mut(), &userwid, None, None)?;
+
+        client.logout()?;
+
+        match client.get_profile_manager().activate_profile("user") {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: error reactivating test user profile: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        }
+
+        let newhash = ArgonHash::from_hashstr("$argon2id$v=19$m=65536,t=2,p=1$1ShuDYxOfXPXQeojGGkVZA$5O/qmjf2xJYAixoy2foWNlf9+K8zXs2/zs8XMKNvc8I");
+        match passcode(
+            client.get_connection_mut(),
+            &userwid,
+            &resetdata["resetcode"],
+            &newhash.to_string(),
+        ) {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: error applying passcode: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        }
+
+        client.disconnect()?;
 
         Ok(())
     }
