@@ -355,34 +355,175 @@ mod tests {
             }
         }
 
-        // match regcode_user(&mut conn, &mut profman, &dbdata, &ADMIN_PROFILE_DATA,
-        // 	&dbdata["admin_regcode"], &pwhash) {
-        // 	Ok(_) => (),
-        // 	Err(e) => {
-        // 		return Err(MensagoError::ErrProgramException(
-        // 			format!("{}: regcode_user error: {}", testname, e.to_string())
-        // 		))
-        // 	}
-        // };
+        match regcode_user(
+            &mut conn,
+            &mut profman,
+            &dbdata,
+            &ADMIN_PROFILE_DATA,
+            &dbdata["admin_regcode"],
+            &pwhash,
+        ) {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: regcode_user error: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        };
 
-        // // Now that the admin has been registered and is logged in, prereg a regular user
-        // let user_regdata = match preregister(&mut conn,
-        // 	Some(&RandomID::from(&USER1_PROFILE_DATA["wid"]).unwrap()),
-        // 	Some(&UserID::from(&USER1_PROFILE_DATA["uid"]).unwrap()),
-        // 	Some(&Domain::from(&USER1_PROFILE_DATA["domain"]).unwrap())) {
-        // 	Ok(v) => (v),
-        // 	Err(e) => {
-        // 		return Err(MensagoError::ErrProgramException(
-        // 			format!("{}: error preregistering test user: {}", testname, e.to_string())
-        // 		))
-        // 	}
-        // };
+        // Now that the admin has been registered and is logged in, prereg a regular user
+        let prinfo = match preregister(
+            &mut conn,
+            Some(&RandomID::from(&USER1_PROFILE_DATA["wid"]).unwrap()),
+            Some(&UserID::from(&USER1_PROFILE_DATA["uid"]).unwrap()),
+            Some(&Domain::from(&USER1_PROFILE_DATA["domain"]).unwrap()),
+        ) {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: error preregistering test user: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        };
 
         conn.disconnect()?;
 
-        // TODO: finish test_usercard() once the client front is started
+        let dns = FakeDNSHandler::new();
+        let mut client = match Client::new(&profile_folder.to_string(), Box::new(dns), false) {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: error initializing client: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        };
 
-        // Log in as the test user and set up a complete profile
+        match client.get_profile_manager().create_profile("user") {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: error creating test user profile: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        }
+
+        match client.get_profile_manager().activate_profile("user") {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: error activating test user profile: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        }
+
+        let example_com = Domain::from("example.com").unwrap();
+        match client.connect(&example_com) {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: error connecting to example.com: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        }
+
+        match client.redeem_regcode(
+            &MAddress::from(&USER1_PROFILE_DATA["address"]).unwrap(),
+            &prinfo.regcode,
+            &USER1_PROFILE_DATA["password"],
+        ) {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: error redeeming reg code: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        }
+
+        match client.login(&MAddress::from(&USER1_PROFILE_DATA["address"]).unwrap()) {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: error logging in as user: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        }
+
+        match client.update_keycard() {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: error updating keycard: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        }
+
+        match client.update_keycard() {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: error updating keycard (second time): {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        }
+
+        client.logout()?;
+        client.disconnect()?;
+
+        match conn.connect(config["network"]["listen_ip"].as_str().unwrap(), port) {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: error reconnecting to server: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        }
+
+        let card = match usercard(
+            &mut conn,
+            &MAddress::from(&USER1_PROFILE_DATA["address"]).unwrap(),
+            1,
+        ) {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: error getting user keycard: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        };
+
+        if card.entries.len() != 2 {
+            return Err(MensagoError::ErrProgramException(format!(
+                "{}: expected 2 usercard entries, got: {}",
+                testname,
+                card.entries.len()
+            )));
+        }
+
+        conn.disconnect()?;
 
         Ok(())
     }
