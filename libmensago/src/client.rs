@@ -49,17 +49,22 @@ impl Client {
         self.conn.connect(&ip.to_string(), serverconfig[0].port)
     }
 
-    /// Returns the number of days after which new keycard entries will expire. The default is the
-    /// recommended value of 90.
-    #[inline]
-    pub fn get_expiration(&self) -> u16 {
-        self.expiration
-    }
-
     /// Returns true if the client is connected to a Mensago server.
     #[inline]
     pub fn is_connected(&self) -> bool {
         self.conn.is_connected()
+    }
+
+    /// Returns a reference to the client's ServerConnection instance
+    #[inline]
+    pub fn get_connection(&self) -> &ServerConnection {
+        &self.conn
+    }
+
+    /// Returns a mutable reference to the client's ServerConnection instance
+    #[inline]
+    pub fn get_connection_mut(&mut self) -> &mut ServerConnection {
+        &mut self.conn
     }
 
     /// Gracefully closes a connection with a Mensago server.
@@ -69,6 +74,13 @@ impl Client {
         } else {
             Ok(())
         }
+    }
+
+    /// Returns the number of days after which new keycard entries will expire. The default is the
+    /// recommended value of 90.
+    #[inline]
+    pub fn get_expiration(&self) -> u16 {
+        self.expiration
     }
 
     /// Logs into a server. Note that while logging in and connecting are not the same, if this
