@@ -75,7 +75,7 @@ pub struct MailingAddr {
     pub country: Option<String>,
 
     #[serde(rename = "Preferred")]
-    pub preferred: Option<bool>,
+    pub preferred: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -98,6 +98,8 @@ pub struct FileField {
     pub data: String,
 }
 
+/// The Contact type is used for contact information exchange, such as sending a contact info
+/// update.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Contact {
     #[serde(rename = "Version")]
@@ -156,7 +158,7 @@ pub struct Contact {
     pub websites: Option<Vec<StringField>>,
 
     #[serde(rename = "Photo")]
-    photo: Option<PhotoField>,
+    pub photo: Option<PhotoField>,
 
     #[serde(rename = "Languages")]
     pub languages: Option<Vec<StringField>>,

@@ -50,22 +50,61 @@ static STORAGE_DB_SETUP_COMMANDS: &str = "
 		'body' TEXT,
 		'attachments' TEXT
 	);
-	CREATE TABLE 'contactinfo' (
-		'id' TEXT NOT NULL,
-		'fieldname' TEXT NOT NULL,
-		'fieldvalue' TEXT,
-		'contactgroup' TEXT
+	CREATE TABLE 'contacts' (
+		'conid' TEXT NOT NULL,
+		'entitytype' TEXT NOT NULL,
+        'group' TEXT NOT NULL,
+        'gender' TEXT,
+        'bio' TEXT,
+        'anniversary' TEXT,
+        'birthday' TEXT,
+        'organization' TEXT,
+        'title' TEXT,
+        'notes' TEXT,
+        'annotation' BOOL
 	);
-	CREATE TABLE 'userinfo' (
-		'fieldname' TEXT NOT NULL,
-		'fieldvalue' TEXT
-	);
-	CREATE TABLE 'annotations' (
-		'id' TEXT NOT NULL,
-		'fieldname' TEXT NOT NULL,
-		'fieldvalue' TEXT,
-		'contactgroup' TEXT
-	);
+    CREATE TABLE 'contact_names' (
+        'conid' TEXT NOT NULL,
+        'formatted_name' TEXT NOT NULL,
+        'given_name' TEXT NOT NULL,
+        'family_name' TEXT,
+        'prefix' TEXT
+    );
+    CREATE TABLE 'contact_nameparts' (
+        'conid' TEXT NOT NULL,
+        'parttype' TEXT NOT NULL,
+        'value' TEXT NOT NULL,
+        'priority' TEXT NOT NULL
+    );
+    CREATE TABLE 'contact_mensago' (
+        'conid' TEXT NOT NULL,
+        'label' TEXT NOT NULL,
+        'uid' TEXT NOT NULL,
+        'wid' TEXT NOT NULL,
+        'domain' TEXT NOT NULL
+    );
+    CREATE TABLE 'contact_address' (
+        'conid' TEXT NOT NULL,
+        'label' TEXT NOT NULL,
+        'street' TEXT,
+        'extended' TEXT,
+        'locality' TEXT,
+        'region' TEXT,
+        'postalcode' TEXT,
+        'country' TEXT,
+        'preferred' BOOL
+    );
+    CREATE TABLE 'contact_photo' (
+        'conid' TEXT NOT NULL UNIQUE,
+        'mime' TEXT NOT NULL,
+        'data' BLOB
+    );
+    CREATE TABLE 'contact_files' (
+        'conid' TEXT NOT NULL,
+        'name' TEXT NOT NULL UNIQUE,
+        'mime' TEXT NOT NULL,
+        'data' BLOB
+    );
 	CREATE TABLE 'updates' (
 		'id' TEXT NOT NULL UNIQUE,
 		'type' TEXT NOT NULL,
@@ -117,7 +156,13 @@ static SECRETS_DB_SETUP_COMMANDS: &str = "
 		'private_key' TEXT NOT NULL,
 		'os' TEXT NOT NULL
 	);
-	COMMIT;
+    CREATE TABLE 'contact_keys' (
+        'conid' TEXT NOT NULL,
+        'category' TEXT NOT NULL,
+        'value' TEXT NOT NULL,
+		'timestamp' TEXT NOT NULL
+    );
+    COMMIT;
 ";
 
 /// The Profile type is the client's entry point to interacting with local storage. A profile
