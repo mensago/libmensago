@@ -10,16 +10,6 @@ pub struct StringField {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct HeaderField {
-    #[serde(rename = "Version")]
-    pub version: String,
-    #[serde(rename = "EntityType")]
-    pub entity_type: String,
-    #[serde(rename = "Source")]
-    pub source: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NameField {
     #[serde(rename = "FormattedName")]
     pub formatted_name: String,
@@ -110,8 +100,12 @@ pub struct FileField {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Contact {
-    #[serde(rename = "Header")]
-    pub header: HeaderField,
+    #[serde(rename = "Version")]
+    pub version: String,
+    #[serde(rename = "EntityType")]
+    pub entity_type: String,
+    #[serde(rename = "Source")]
+    pub source: String,
 
     #[serde(rename = "Name")]
     pub name: NameField,
