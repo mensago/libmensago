@@ -17,17 +17,17 @@ pub struct NameField {
     #[serde(rename = "GivenName")]
     pub given_name: String,
     #[serde(rename = "FamilyName")]
-    pub family_name: String,
+    pub family_name: Option<String>,
     #[serde(rename = "AdditionalNames")]
-    pub additional_names: Vec<String>,
+    pub additional_names: Option<Vec<String>>,
 
     #[serde(rename = "Nicknames")]
-    pub nicknames: Vec<String>,
+    pub nicknames: Option<Vec<String>>,
 
     #[serde(rename = "Prefix")]
-    pub prefix: String,
+    pub prefix: Option<String>,
     #[serde(rename = "Suffixes")]
-    pub suffixes: Vec<String>,
+    pub suffixes: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -62,20 +62,20 @@ pub struct MailingAddr {
     pub label: String,
 
     #[serde(rename = "StreetAddress")]
-    pub street: String,
+    pub street: Option<String>,
     #[serde(rename = "ExtendedAddress")]
-    pub extended: String,
+    pub extended: Option<String>,
     #[serde(rename = "Locality")]
-    pub locality: String,
+    pub locality: Option<String>,
     #[serde(rename = "Region")]
-    pub region: String,
+    pub region: Option<String>,
     #[serde(rename = "PostalCode")]
-    pub postalcode: String,
+    pub postalcode: Option<String>,
     #[serde(rename = "Country")]
-    pub country: String,
+    pub country: Option<String>,
 
     #[serde(rename = "Preferred")]
-    pub preferred: bool,
+    pub preferred: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -102,70 +102,74 @@ pub struct FileField {
 pub struct Contact {
     #[serde(rename = "Version")]
     pub version: String,
+    #[serde(rename = "Update")]
+    pub update: String,
+
     #[serde(rename = "EntityType")]
     pub entity_type: String,
-    #[serde(rename = "Source")]
-    pub source: String,
 
     #[serde(rename = "Name")]
     pub name: NameField,
 
     #[serde(rename = "Gender")]
-    pub gender: String,
+    pub gender: Option<String>,
     #[serde(rename = "Bio")]
-    pub bio: String,
+    pub bio: Option<String>,
 
     #[serde(rename = "Social")]
-    pub social: Vec<StringField>,
+    pub social: Option<Vec<StringField>>,
 
     #[serde(rename = "Mensago")]
-    pub mensago: Vec<MensagoField>,
+    pub mensago: Option<Vec<MensagoField>>,
 
     #[serde(rename = "Keys")]
-    pub keys: Vec<KeyField>,
+    pub keys: Option<Vec<KeyField>>,
 
     #[serde(rename = "Messaging")]
-    pub messaging: Vec<StringField>,
+    pub messaging: Option<Vec<StringField>>,
 
     #[serde(rename = "MailingAddresses")]
-    pub addresses: Vec<MailingAddr>,
+    pub addresses: Option<Vec<MailingAddr>>,
 
     #[serde(rename = "Phone")]
-    pub phone: Vec<StringField>,
+    pub phone: Option<Vec<StringField>>,
 
     #[serde(rename = "Anniversary")]
-    pub anniversary: String,
+    pub anniversary: Option<String>,
     #[serde(rename = "Birthday")]
-    pub birthday: String,
+    pub birthday: Option<String>,
 
     #[serde(rename = "Email")]
-    pub email: Vec<StringField>,
+    pub email: Option<Vec<StringField>>,
 
     #[serde(rename = "Organization")]
-    pub organization: String,
+    pub organization: Option<String>,
     #[serde(rename = "OrgUnits")]
-    pub orgunits: Vec<String>,
+    pub orgunits: Option<Vec<String>>,
     #[serde(rename = "Title")]
-    pub title: String,
+    pub title: Option<String>,
 
     #[serde(rename = "Categories")]
-    pub categories: Vec<String>,
+    pub categories: Option<Vec<String>>,
 
     #[serde(rename = "Websites")]
-    pub websites: Vec<StringField>,
+    pub websites: Option<Vec<StringField>>,
 
     #[serde(rename = "Photo")]
-    photo: PhotoField,
+    photo: Option<PhotoField>,
 
     #[serde(rename = "Languages")]
-    pub languages: Vec<StringField>,
+    pub languages: Option<Vec<StringField>>,
 
     #[serde(rename = "Notes")]
-    pub notes: String,
+    pub notes: Option<String>,
 
     #[serde(rename = "Attachments")]
-    pub attachments: Vec<FileField>,
+    pub attachments: Option<Vec<FileField>>,
 
     #[serde(rename = "Custom")]
-    pub custom: Vec<StringField>,
+    pub custom: Option<Vec<StringField>>,
+
+    #[serde(rename = "Annotations")]
+    pub annotations: Option<Box<Self>>,
 }
