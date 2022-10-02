@@ -1,13 +1,28 @@
+use crate::base::*;
 use libkeycard::*;
+use rusqlite;
+
+pub trait DBModel {
+    fn load_from_db<T: DBModel>(conn: &mut rusqlite::Connection) -> Result<T, MensagoError>;
+
+    fn add_to_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError>;
+    fn refresh_from_db(&mut self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError>;
+    fn update_in_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError>;
+    fn delete_from_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError>;
+}
 
 #[derive(Debug, Clone)]
 pub struct StringModel {
+    pub id: RandomID,
+
     pub label: String,
     pub value: String,
 }
 
 #[derive(Debug, Clone)]
 pub struct NamePartModel {
+    pub id: RandomID,
+
     pub part_type: String,
     pub value: String,
     pub priority: String,
@@ -15,6 +30,8 @@ pub struct NamePartModel {
 
 #[derive(Debug, Clone)]
 pub struct NameModel {
+    pub id: RandomID,
+
     pub formatted_name: String,
 
     pub given_name: String,
@@ -29,6 +46,8 @@ pub struct NameModel {
 
 #[derive(Debug, Clone)]
 pub struct MensagoModel {
+    pub id: RandomID,
+
     pub label: String,
 
     pub uid: UserID,
@@ -38,6 +57,8 @@ pub struct MensagoModel {
 
 #[derive(Debug, Clone)]
 pub struct KeyModel {
+    pub id: RandomID,
+
     pub label: String,
 
     pub keytype: String,
@@ -47,6 +68,8 @@ pub struct KeyModel {
 
 #[derive(Debug, Clone)]
 pub struct AddressModel {
+    pub id: RandomID,
+
     pub label: String,
 
     pub street: String,
@@ -61,12 +84,16 @@ pub struct AddressModel {
 
 #[derive(Debug, Clone)]
 pub struct PhotoModel {
+    pub id: RandomID,
+
     pub mime_type: String,
     pub data: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
 pub struct FileModel {
+    pub id: RandomID,
+
     pub name: String,
     pub mime_type: String,
     pub data: Vec<u8>,
