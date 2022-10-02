@@ -3,7 +3,10 @@ use libkeycard::*;
 use rusqlite;
 
 pub trait DBModel {
-    fn load_from_db<T: DBModel>(conn: &mut rusqlite::Connection) -> Result<T, MensagoError>;
+    fn load_from_db<T: DBModel>(
+        contact_id: &RandomID,
+        conn: &mut rusqlite::Connection,
+    ) -> Result<T, MensagoError>;
 
     fn add_to_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError>;
     fn refresh_from_db(&mut self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError>;
@@ -14,14 +17,60 @@ pub trait DBModel {
 #[derive(Debug, Clone)]
 pub struct StringModel {
     pub id: RandomID,
+    pub table: String,
+    pub contact_id: RandomID,
 
     pub label: String,
     pub value: String,
 }
 
+impl StringModel {
+    /// Creates a new empty StringModel
+    pub fn new(contact_id: &RandomID, table: &str) -> StringModel {
+        StringModel {
+            id: RandomID::generate(),
+            table: String::from(table),
+            contact_id: contact_id.clone(),
+            label: String::new(),
+            value: String::new(),
+        }
+    }
+}
+
+impl DBModel for StringModel {
+    fn load_from_db<T: DBModel>(
+        contact_id: &RandomID,
+        conn: &mut rusqlite::Connection,
+    ) -> Result<T, MensagoError> {
+        // TODO: Implement StringModel::load_from_db
+        Err(MensagoError::ErrUnimplemented)
+    }
+
+    fn add_to_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+        // TODO: Implement StringModel::add_to_db
+        Err(MensagoError::ErrUnimplemented)
+    }
+
+    fn refresh_from_db(&mut self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+        // TODO: Implement StringModel::refresh_from_db
+        Err(MensagoError::ErrUnimplemented)
+    }
+
+    fn update_in_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+        // TODO: Implement StringModel::update_in_db
+        Err(MensagoError::ErrUnimplemented)
+    }
+
+    fn delete_from_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+        // TODO: Implement StringModel::delete_from_db
+        Err(MensagoError::ErrUnimplemented)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct NamePartModel {
     pub id: RandomID,
+    pub contact_id: RandomID,
 
     pub part_type: String,
     pub value: String,
@@ -31,6 +80,7 @@ pub struct NamePartModel {
 #[derive(Debug, Clone)]
 pub struct NameModel {
     pub id: RandomID,
+    pub contact_id: RandomID,
 
     pub formatted_name: String,
 
@@ -47,6 +97,7 @@ pub struct NameModel {
 #[derive(Debug, Clone)]
 pub struct MensagoModel {
     pub id: RandomID,
+    pub contact_id: RandomID,
 
     pub label: String,
 
@@ -69,6 +120,7 @@ pub struct KeyModel {
 #[derive(Debug, Clone)]
 pub struct AddressModel {
     pub id: RandomID,
+    pub contact_id: RandomID,
 
     pub label: String,
 
@@ -85,6 +137,7 @@ pub struct AddressModel {
 #[derive(Debug, Clone)]
 pub struct PhotoModel {
     pub id: RandomID,
+    pub contact_id: RandomID,
 
     pub mime_type: String,
     pub data: Vec<u8>,
@@ -93,6 +146,7 @@ pub struct PhotoModel {
 #[derive(Debug, Clone)]
 pub struct FileModel {
     pub id: RandomID,
+    pub contact_id: RandomID,
 
     pub name: String,
     pub mime_type: String,
