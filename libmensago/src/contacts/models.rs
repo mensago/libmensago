@@ -3,11 +3,6 @@ use libkeycard::*;
 use rusqlite;
 
 pub trait DBModel {
-    fn load_from_db<T: DBModel>(
-        contact_id: &RandomID,
-        conn: &mut rusqlite::Connection,
-    ) -> Result<T, MensagoError>;
-
     fn add_to_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError>;
     fn refresh_from_db(&mut self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError>;
     fn update_in_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError>;
@@ -16,8 +11,8 @@ pub trait DBModel {
 
 #[derive(Debug, Clone)]
 pub struct StringModel {
-    pub id: RandomID,
     pub table: String,
+    pub id: RandomID,
     pub contact_id: RandomID,
 
     pub label: String,
@@ -28,42 +23,119 @@ impl StringModel {
     /// Creates a new empty StringModel
     pub fn new(contact_id: &RandomID, table: &str) -> StringModel {
         StringModel {
-            id: RandomID::generate(),
             table: String::from(table),
+            id: RandomID::generate(),
             contact_id: contact_id.clone(),
             label: String::new(),
             value: String::new(),
         }
     }
+
+    pub fn load_from_db(
+        tablename: &str,
+        id: &RandomID,
+        conn: &mut rusqlite::Connection,
+    ) -> Result<StringModel, MensagoError> {
+        let mut stmt = conn.prepare("SELECT conid,label,value, FROM ?1 WHERE id = ?2")?;
+        let (conid, label, value) = match stmt.query_row(&[tablename, &id.to_string()], |row| {
+            Ok((
+                row.get::<usize, String>(0).unwrap(),
+                row.get::<usize, String>(1).unwrap(),
+                row.get::<usize, String>(2).unwrap(),
+            ))
+        }) {
+            Ok(v) => v,
+            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+        };
+
+        Ok(StringModel {
+            id: id.clone(),
+            table: String::from(tablename),
+            contact_id: match RandomID::from(&conid) {
+                Some(v) => v,
+                None => {
+                    return Err(MensagoError::ErrDatabaseException(format!(
+                        "Bad contact ID received from database: '{}'",
+                        conid
+                    )))
+                }
+            },
+            label,
+            value,
+        })
+    }
 }
 
 impl DBModel for StringModel {
-    fn load_from_db<T: DBModel>(
-        contact_id: &RandomID,
-        conn: &mut rusqlite::Connection,
-    ) -> Result<T, MensagoError> {
-        // TODO: Implement StringModel::load_from_db
-        Err(MensagoError::ErrUnimplemented)
-    }
-
     fn add_to_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
-        // TODO: Implement StringModel::add_to_db
-        Err(MensagoError::ErrUnimplemented)
+        match conn.execute(
+            "INSERT INTO ?1(id, conid, label, value) VALUES(?2,?3,?4,?5)",
+            &[
+                &self.table,
+                &self.id.to_string(),
+                &self.contact_id.to_string(),
+                &self.label,
+                &self.value,
+            ],
+        ) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
+        }
     }
 
     fn refresh_from_db(&mut self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
-        // TODO: Implement StringModel::refresh_from_db
-        Err(MensagoError::ErrUnimplemented)
+        let mut stmt = conn.prepare("SELECT conid,label,value, FROM ?1 WHERE id = ?2")?;
+        let (conid, label, value) =
+            match stmt.query_row(&[&self.table, &self.id.to_string()], |row| {
+                Ok((
+                    row.get::<usize, String>(0).unwrap(),
+                    row.get::<usize, String>(1).unwrap(),
+                    row.get::<usize, String>(2).unwrap(),
+                ))
+            }) {
+                Ok(v) => v,
+                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+            };
+
+        self.contact_id = match RandomID::from(&conid) {
+            Some(v) => v,
+            None => {
+                return Err(MensagoError::ErrDatabaseException(format!(
+                    "Bad contact ID received from database: '{}'",
+                    conid
+                )))
+            }
+        };
+        self.label = label;
+        self.value = value;
+
+        Ok(())
     }
 
     fn update_in_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
-        // TODO: Implement StringModel::update_in_db
-        Err(MensagoError::ErrUnimplemented)
+        match conn.execute(
+            "UPDATE ?1 SET conid=?2,label=?3,value=?4 WHERE id=?5",
+            &[
+                &self.table,
+                &self.contact_id.to_string(),
+                &self.label,
+                &self.value,
+                &self.id.to_string(),
+            ],
+        ) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
+        }
     }
 
     fn delete_from_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
-        // TODO: Implement StringModel::delete_from_db
-        Err(MensagoError::ErrUnimplemented)
+        match conn.execute(
+            "DELETE FROM ?1 WHERE id=?2",
+            &[&self.table, &self.id.to_string()],
+        ) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
+        }
     }
 }
 
