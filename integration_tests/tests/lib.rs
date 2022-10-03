@@ -3,4 +3,5 @@
 mod client;
 mod common;
 mod iscmds;
+mod models;
 mod resolver;
