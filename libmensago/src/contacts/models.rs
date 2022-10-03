@@ -1,6 +1,9 @@
 use crate::base::*;
 use libkeycard::*;
 use rusqlite;
+use std::convert::TryFrom;
+use std::fmt;
+use std::str::FromStr;
 
 pub trait DBModel {
     fn add_to_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError>;
@@ -139,14 +142,116 @@ impl DBModel for StringModel {
     }
 }
 
+#[derive(Debug, PartialEq, PartialOrd, Clone, Copy)]
+pub enum NamePartType {
+    None,
+    Additional,
+    Nickname,
+    Suffix,
+}
+
+impl fmt::Display for NamePartType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            NamePartType::None => write!(f, "none"),
+            NamePartType::Additional => write!(f, "additional"),
+            NamePartType::Nickname => write!(f, "nickname"),
+            NamePartType::Suffix => write!(f, "suffix"),
+        }
+    }
+}
+
+impl FromStr for NamePartType {
+    type Err = ();
+
+    fn from_str(input: &str) -> Result<NamePartType, Self::Err> {
+        match input.to_lowercase().as_str() {
+            "none" => Ok(NamePartType::None),
+            "additional" => Ok(NamePartType::Additional),
+            "nickname" => Ok(NamePartType::Nickname),
+            "suffix" => Ok(NamePartType::Suffix),
+            _ => Err(()),
+        }
+    }
+}
+
+impl std::convert::TryFrom<&str> for NamePartType {
+    type Error = MensagoError;
+    fn try_from(input: &str) -> Result<Self, Self::Error> {
+        match input.to_lowercase().as_str() {
+            "none" => Ok(NamePartType::None),
+            "additional" => Ok(NamePartType::Additional),
+            "nickname" => Ok(NamePartType::Nickname),
+            "suffix" => Ok(NamePartType::Suffix),
+            _ => Err(MensagoError::ErrBadValue),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct NamePartModel {
     pub id: RandomID,
     pub contact_id: RandomID,
 
-    pub part_type: String,
+    pub part_type: NamePartType,
     pub value: String,
-    pub priority: String,
+    pub priority: usize,
+}
+
+impl NamePartModel {
+    /// Creates a new empty NamePartModel
+    pub fn new(contact_id: &RandomID) -> NamePartModel {
+        NamePartModel {
+            id: RandomID::generate(),
+            contact_id: contact_id.clone(),
+            part_type: NamePartType::None,
+            value: String::new(),
+            priority: 0,
+        }
+    }
+
+    pub fn load_from_db(
+        id: &RandomID,
+        conn: &mut rusqlite::Connection,
+    ) -> Result<NamePartModel, MensagoError> {
+        let mut stmt = conn
+            .prepare("SELECT conid,parttype,value,priority FROM contact_nameparts WHERE id = ?2")?;
+        let (conid, parttype, value, priority) = match stmt.query_row(&[&id.to_string()], |row| {
+            Ok((
+                row.get::<usize, String>(0).unwrap(),
+                row.get::<usize, String>(1).unwrap(),
+                row.get::<usize, String>(2).unwrap(),
+                row.get::<usize, String>(3).unwrap(),
+            ))
+        }) {
+            Ok(v) => v,
+            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+        };
+
+        Ok(NamePartModel {
+            id: id.clone(),
+            contact_id: match RandomID::from(&conid) {
+                Some(v) => v,
+                None => {
+                    return Err(MensagoError::ErrDatabaseException(format!(
+                        "Bad contact ID received from database: '{}'",
+                        conid
+                    )))
+                }
+            },
+            part_type: NamePartType::try_from(parttype.as_str())?,
+            value,
+            priority: match priority.parse::<usize>() {
+                Ok(v) => v,
+                Err(_) => {
+                    return Err(MensagoError::ErrDatabaseException(format!(
+                        "Bad priority received from database: '{}'",
+                        priority
+                    )))
+                }
+            },
+        })
+    }
 }
 
 #[derive(Debug, Clone)]
