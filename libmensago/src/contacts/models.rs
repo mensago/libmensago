@@ -254,6 +254,89 @@ impl NamePartModel {
     }
 }
 
+impl DBModel for NamePartModel {
+    fn add_to_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+        match conn.execute(
+            "INSERT INTO contact_nameparts(id, conid, parttype, value, priority) VALUES(?1,?2,?3,?4)",
+            &[
+                &self.id.to_string(),
+                &self.contact_id.to_string(),
+                &self.value.to_string(),
+                &self.priority.to_string(),
+            ],
+        ) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
+        }
+    }
+
+    fn refresh_from_db(&mut self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+        let mut stmt = conn
+            .prepare("SELECT conid,parttype,value,priority FROM contact_nameparts WHERE id = ?2")?;
+        let (conid, parttype, value, priority) =
+            match stmt.query_row(&[&self.id.to_string()], |row| {
+                Ok((
+                    row.get::<usize, String>(0).unwrap(),
+                    row.get::<usize, String>(1).unwrap(),
+                    row.get::<usize, String>(2).unwrap(),
+                    row.get::<usize, String>(3).unwrap(),
+                ))
+            }) {
+                Ok(v) => v,
+                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+            };
+
+        self.contact_id = match RandomID::from(&conid) {
+            Some(v) => v,
+            None => {
+                return Err(MensagoError::ErrDatabaseException(format!(
+                    "Bad contact ID received from database: '{}'",
+                    conid
+                )))
+            }
+        };
+        self.part_type = NamePartType::try_from(parttype.as_str())?;
+        self.value = value;
+        self.priority = match priority.parse::<usize>() {
+            Ok(v) => v,
+            Err(_) => {
+                return Err(MensagoError::ErrDatabaseException(format!(
+                    "Bad priority received from database: '{}'",
+                    priority
+                )))
+            }
+        };
+
+        Ok(())
+    }
+
+    fn update_in_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+        match conn.execute(
+            "UPDATE contact_nameparts SET conid=?1,parttype=?2,value=?3,priority=?4 WHERE id=?5",
+            &[
+                &self.contact_id.to_string(),
+                &self.part_type.to_string(),
+                &self.value,
+                &self.priority.to_string(),
+                &self.id.to_string(),
+            ],
+        ) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
+        }
+    }
+
+    fn delete_from_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+        match conn.execute(
+            "DELETE FROM contact_nameparts WHERE id=?1",
+            &[&self.id.to_string()],
+        ) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct NameModel {
     pub id: RandomID,
