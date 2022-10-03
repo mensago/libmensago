@@ -51,7 +51,7 @@ static STORAGE_DB_SETUP_COMMANDS: &str = "
 		'attachments' TEXT
 	);
 	CREATE TABLE 'contacts' (
-		'conid' TEXT NOT NULL,
+		'conid' TEXT NOT NULL UNIQUE,
 		'entitytype' TEXT NOT NULL,
         'group' TEXT NOT NULL,
         'gender' TEXT,
@@ -64,6 +64,7 @@ static STORAGE_DB_SETUP_COMMANDS: &str = "
         'annotation' BOOL
 	);
     CREATE TABLE 'contact_names' (
+        'id' TEXT NOT NULL UNIQUE,
         'conid' TEXT NOT NULL,
         'formatted_name' TEXT NOT NULL,
         'given_name' TEXT NOT NULL,
@@ -71,12 +72,14 @@ static STORAGE_DB_SETUP_COMMANDS: &str = "
         'prefix' TEXT
     );
     CREATE TABLE 'contact_nameparts' (
+        'id' TEXT NOT NULL UNIQUE,
         'conid' TEXT NOT NULL,
         'parttype' TEXT NOT NULL,
         'value' TEXT NOT NULL,
         'priority' TEXT NOT NULL
     );
     CREATE TABLE 'contact_mensago' (
+        'id' TEXT NOT NULL UNIQUE,
         'conid' TEXT NOT NULL,
         'label' TEXT NOT NULL,
         'uid' TEXT NOT NULL,
@@ -84,6 +87,7 @@ static STORAGE_DB_SETUP_COMMANDS: &str = "
         'domain' TEXT NOT NULL
     );
     CREATE TABLE 'contact_address' (
+        'id' TEXT NOT NULL UNIQUE,
         'conid' TEXT NOT NULL,
         'label' TEXT NOT NULL,
         'street' TEXT,
@@ -95,11 +99,13 @@ static STORAGE_DB_SETUP_COMMANDS: &str = "
         'preferred' BOOL
     );
     CREATE TABLE 'contact_photo' (
+        'id' TEXT NOT NULL UNIQUE,
         'conid' TEXT NOT NULL UNIQUE,
         'mime' TEXT NOT NULL,
         'data' BLOB
     );
     CREATE TABLE 'contact_files' (
+        'id' TEXT NOT NULL UNIQUE,
         'conid' TEXT NOT NULL,
         'name' TEXT NOT NULL UNIQUE,
         'mime' TEXT NOT NULL,
@@ -112,7 +118,7 @@ static STORAGE_DB_SETUP_COMMANDS: &str = "
 		'time' TEXT NOT NULL
 	);
 	CREATE TABLE 'photos' (
-		'id' TEXT NOT NULL,
+		'id' TEXT NOT NULL UNIQUE,
 		'type' TEXT NOT NULL,
 		'photodata' BLOB,
 		'isannotation' TEXT NOT NULL,
