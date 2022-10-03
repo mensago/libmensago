@@ -215,7 +215,7 @@ impl NamePartModel {
         conn: &mut rusqlite::Connection,
     ) -> Result<NamePartModel, MensagoError> {
         let mut stmt = conn
-            .prepare("SELECT conid,parttype,value,priority FROM contact_nameparts WHERE id = ?2")?;
+            .prepare("SELECT conid,parttype,value,priority FROM contact_nameparts WHERE id = ?1")?;
         let (conid, parttype, value, priority) = match stmt.query_row(&[&id.to_string()], |row| {
             Ok((
                 row.get::<usize, String>(0).unwrap(),
@@ -257,10 +257,11 @@ impl NamePartModel {
 impl DBModel for NamePartModel {
     fn add_to_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
         match conn.execute(
-            "INSERT INTO contact_nameparts(id, conid, parttype, value, priority) VALUES(?1,?2,?3,?4)",
+            "INSERT INTO contact_nameparts(id, conid, parttype, value, priority) VALUES(?1,?2,?3,?4,?5)",
             &[
                 &self.id.to_string(),
                 &self.contact_id.to_string(),
+                &self.part_type.to_string(),
                 &self.value.to_string(),
                 &self.priority.to_string(),
             ],
@@ -272,7 +273,7 @@ impl DBModel for NamePartModel {
 
     fn refresh_from_db(&mut self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
         let mut stmt = conn
-            .prepare("SELECT conid,parttype,value,priority FROM contact_nameparts WHERE id = ?2")?;
+            .prepare("SELECT conid,parttype,value,priority FROM contact_nameparts WHERE id = ?1")?;
         let (conid, parttype, value, priority) =
             match stmt.query_row(&[&self.id.to_string()], |row| {
                 Ok((

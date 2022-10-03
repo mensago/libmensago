@@ -46,10 +46,29 @@ mod tests {
     }
 
     #[test]
-    fn test_stringmodel() -> Result<(), MensagoError> {
-        let testname = "test_stringmodel";
+    fn test_namepartmodel() -> Result<(), MensagoError> {
+        let testname = "test_namepartmodel";
 
-        let (_, _, _) = setup_db_test(testname)?;
+        // The list of full data is as follows:
+        // let (config, pwhash, profman) = setup_db_test(testname)?;
+        let (_, _, profman) = setup_db_test(testname)?;
+
+        let profile = profman.get_active_profile().unwrap();
+        let mut db = profile.open_storage()?;
+
+        let model =
+            NamePartModel::new(&RandomID::from("00000000-1111-2222-3333-444444444444").unwrap());
+
+        match model.add_to_db(&mut db) {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: add_to_db() error: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        }
 
         Ok(())
     }
