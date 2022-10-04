@@ -126,7 +126,7 @@ mod tests {
             Ok(_) => (),
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
-                    "{}: set_in_db() error: {}",
+                    "{}: set_in_db() update error: {}",
                     testname,
                     e.to_string()
                 )))
@@ -157,6 +157,94 @@ mod tests {
         }
 
         match check_db_value(&mut db, "contact_nameparts", &model.id, "value", "Jr.") {
+            Ok(_) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: delete_from_db failed to delete row",
+                    testname,
+                )))
+            }
+            Err(_) => (),
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_namemodel() -> Result<(), MensagoError> {
+        let testname = "test_namemodel";
+
+        // The list of full data is as follows:
+        // let (config, pwhash, profman) = setup_db_test(testname)?;
+        let (_, _, profman) = setup_db_test(testname)?;
+
+        let profile = profman.get_active_profile().unwrap();
+        let mut db = profile.open_storage()?;
+
+        let conid = RandomID::from("00000000-1111-2222-3333-444444444444").unwrap();
+        let mut model = NameModel::new(&conid);
+        model.given_name = String::from("Corbin");
+        model.family_name = String::from("Simons");
+
+        // Add to db
+        match model.set_in_db(&mut db) {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: set_in_db() error: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        }
+
+        match check_db_value(&mut db, "contact_names", &model.id, "given_name", "Corbin") {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: set_in_db value check error for given name: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        }
+
+        // Update in db
+        model.prefix = String::from("Mr.");
+        match model.set_in_db(&mut db) {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: set_in_db() update error: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        }
+
+        match check_db_value(&mut db, "contact_names", &model.id, "prefix", "Mr.") {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: set_in_db value check error for prefix: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        }
+
+        // Delete from db
+        match model.delete_from_db(&mut db) {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: delete_from_db() error: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        }
+
+        match check_db_value(&mut db, "contact_names", &model.id, "prefix", "Mr.") {
             Ok(_) => {
                 return Err(MensagoError::ErrProgramException(format!(
                     "{}: delete_from_db failed to delete row",

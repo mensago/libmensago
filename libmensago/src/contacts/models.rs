@@ -301,7 +301,7 @@ impl NamePartModel {
         for model in models.iter() {
             model.set_in_db(conn)?;
         }
-        return Err(MensagoError::ErrUnimplemented);
+        Ok(())
     }
 }
 
@@ -422,7 +422,7 @@ impl NameModel {
 
         {
             let mut stmt = conn.prepare(
-            "SELECT conid,formattedname,givenname,familyname,prefix FROM contact_name WHERE id = ?1",
+            "SELECT conid,formatted_name,given_name,family_name,prefix FROM contact_names WHERE id = ?1",
         )?;
             let (conidstr, formattedname, givenname, familyname, prefix) =
                 match stmt.query_row(&[&id.to_string()], |row| {
@@ -466,7 +466,7 @@ impl NameModel {
 impl DBModel for NameModel {
     fn delete_from_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
         match conn.execute(
-            "DELETE FROM contact_name WHERE id=?1",
+            "DELETE FROM contact_names WHERE id=?1",
             &[&self.id.to_string()],
         ) {
             Ok(_) => Ok(()),
@@ -477,7 +477,7 @@ impl DBModel for NameModel {
     fn refresh_from_db(&mut self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
         {
             let mut stmt = conn.prepare(
-            "SELECT conid,formattedname,givenname,familyname,prefix FROM contact_name WHERE id = ?1",
+            "SELECT conid,formatted_name,given_name,family_name,prefix FROM contact_names WHERE id = ?1",
         )?;
             let (conidstr, formattedname, givenname, familyname, prefix) =
                 match stmt.query_row(&[&self.id.to_string()], |row| {
@@ -520,7 +520,7 @@ impl DBModel for NameModel {
 
     fn set_in_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
         match conn.execute(
-            "INSERT OR REPLACE INTO contact_name(id, conid, formattedname, givenname, familyname, 
+            "INSERT OR REPLACE INTO contact_names(id, conid, formatted_name, given_name, family_name, 
             prefix) VALUES(?1,?2,?3,?4,?5,?6)",
             &[
                 &self.id.to_string(),
