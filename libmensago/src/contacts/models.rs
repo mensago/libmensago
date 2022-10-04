@@ -196,7 +196,10 @@ impl NamePartModel {
         }
     }
 
-    /// Instantiates a NamePartModel from a model ID in the database.
+    /// Instantiates a NamePartModel from a model ID in the database. Note that this call is
+    /// different from `NameModel::load_from_db` in that the model's ID is required, not the contact
+    /// ID. This is because a contact has only one name structure, but the name structure itself
+    /// has components which can be in multiples, such as nicknames.
     pub fn load_from_db(
         id: &RandomID,
         conn: &mut rusqlite::Connection,
