@@ -453,6 +453,80 @@ impl NameModel {
     }
 }
 
+impl DBModel for NameModel {
+    fn delete_from_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+        match conn.execute(
+            "DELETE FROM contact_name WHERE id=?1",
+            &[&self.id.to_string()],
+        ) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
+        }
+    }
+
+    fn refresh_from_db(&mut self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+        {
+            let mut stmt = conn.prepare(
+            "SELECT conid,formattedname,givenname,familyname,prefix FROM contact_name WHERE id = ?1",
+        )?;
+            let (conidstr, formattedname, givenname, familyname, prefix) =
+                match stmt.query_row(&[&self.id.to_string()], |row| {
+                    Ok((
+                        row.get::<usize, String>(0).unwrap(),
+                        row.get::<usize, String>(1).unwrap(),
+                        row.get::<usize, String>(2).unwrap(),
+                        row.get::<usize, String>(3).unwrap(),
+                        row.get::<usize, String>(4).unwrap(),
+                    ))
+                }) {
+                    Ok(v) => v,
+                    Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+                };
+
+            let conid = match RandomID::from(&conidstr) {
+                Some(v) => v,
+                None => {
+                    return Err(MensagoError::ErrDatabaseException(format!(
+                        "Bad contact ID received from database: '{}'",
+                        conidstr
+                    )))
+                }
+            };
+
+            self.contact_id = conid;
+            self.formatted_name = formattedname;
+            self.given_name = givenname;
+            self.family_name = familyname;
+            self.prefix = prefix;
+        }
+
+        self.additional_names =
+            NamePartModel::load_all(&self.contact_id, NamePartType::Additional, conn)?;
+        self.nicknames = NamePartModel::load_all(&self.contact_id, NamePartType::Nickname, conn)?;
+        self.suffixes = NamePartModel::load_all(&self.contact_id, NamePartType::Suffix, conn)?;
+
+        Ok(())
+    }
+
+    fn set_in_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+        match conn.execute(
+            "INSERT OR REPLACE INTO contact_name(id, conid, formattedname, givenname, familyname, 
+            prefix) VALUES(?1,?2,?3,?4,?5,?6)",
+            &[
+                &self.id.to_string(),
+                &self.contact_id.to_string(),
+                &self.formatted_name.to_string(),
+                &self.given_name.to_string(),
+                &self.family_name.to_string(),
+                &self.prefix.to_string(),
+            ],
+        ) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
+        }
+    }
+}
+
 /// MensagoModel represents a Mensago address or a workspace address in the database.
 #[derive(Debug, Clone)]
 pub struct MensagoModel {
