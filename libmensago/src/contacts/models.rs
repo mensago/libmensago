@@ -6,10 +6,9 @@ use std::fmt;
 use std::str::FromStr;
 
 pub trait DBModel {
-    fn add_to_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError>;
-    fn refresh_from_db(&mut self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError>;
-    fn update_in_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError>;
     fn delete_from_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError>;
+    fn refresh_from_db(&mut self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError>;
+    fn set_in_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError>;
 }
 
 #[derive(Debug, Clone)]
@@ -70,16 +69,10 @@ impl StringModel {
 }
 
 impl DBModel for StringModel {
-    fn add_to_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+    fn delete_from_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
         match conn.execute(
-            "INSERT INTO ?1(id, conid, label, value) VALUES(?2,?3,?4,?5)",
-            &[
-                &self.table,
-                &self.id.to_string(),
-                &self.contact_id.to_string(),
-                &self.label,
-                &self.value,
-            ],
+            "DELETE FROM ?1 WHERE id=?2",
+            &[&self.table, &self.id.to_string()],
         ) {
             Ok(_) => Ok(()),
             Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
@@ -115,26 +108,16 @@ impl DBModel for StringModel {
         Ok(())
     }
 
-    fn update_in_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+    fn set_in_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
         match conn.execute(
-            "UPDATE ?1 SET conid=?2,label=?3,value=?4 WHERE id=?5",
+            "INSERT OR REPLACE INTO ?1(id, conid, label, value) VALUES(?2,?3,?4,?5)",
             &[
                 &self.table,
+                &self.id.to_string(),
                 &self.contact_id.to_string(),
                 &self.label,
                 &self.value,
-                &self.id.to_string(),
             ],
-        ) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
-        }
-    }
-
-    fn delete_from_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
-        match conn.execute(
-            "DELETE FROM ?1 WHERE id=?2",
-            &[&self.table, &self.id.to_string()],
         ) {
             Ok(_) => Ok(()),
             Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
@@ -255,16 +238,10 @@ impl NamePartModel {
 }
 
 impl DBModel for NamePartModel {
-    fn add_to_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+    fn delete_from_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
         match conn.execute(
-            "INSERT INTO contact_nameparts(id, conid, parttype, value, priority) VALUES(?1,?2,?3,?4,?5)",
-            &[
-                &self.id.to_string(),
-                &self.contact_id.to_string(),
-                &self.part_type.to_string(),
-                &self.value.to_string(),
-                &self.priority.to_string(),
-            ],
+            "DELETE FROM contact_nameparts WHERE id=?1",
+            &[&self.id.to_string()],
         ) {
             Ok(_) => Ok(()),
             Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
@@ -311,26 +288,16 @@ impl DBModel for NamePartModel {
         Ok(())
     }
 
-    fn update_in_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+    fn set_in_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
         match conn.execute(
-            "UPDATE contact_nameparts SET conid=?1,parttype=?2,value=?3,priority=?4 WHERE id=?5",
+            "INSERT OR REPLACE INTO contact_nameparts(id, conid, parttype, value, priority) VALUES(?1,?2,?3,?4,?5)",
             &[
+                &self.id.to_string(),
                 &self.contact_id.to_string(),
                 &self.part_type.to_string(),
-                &self.value,
+                &self.value.to_string(),
                 &self.priority.to_string(),
-                &self.id.to_string(),
             ],
-        ) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
-        }
-    }
-
-    fn delete_from_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
-        match conn.execute(
-            "DELETE FROM contact_nameparts WHERE id=?1",
-            &[&self.id.to_string()],
         ) {
             Ok(_) => Ok(()),
             Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),

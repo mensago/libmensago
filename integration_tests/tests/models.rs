@@ -94,13 +94,14 @@ mod tests {
         let mut db = profile.open_storage()?;
 
         let conid = RandomID::from("00000000-1111-2222-3333-444444444444").unwrap();
-        let model = NamePartModel::new(&conid);
+        let mut model = NamePartModel::new(&conid);
 
-        match model.add_to_db(&mut db) {
+        // Add to db
+        match model.set_in_db(&mut db) {
             Ok(_) => (),
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
-                    "{}: add_to_db() error: {}",
+                    "{}: set_in_db() error: {}",
                     testname,
                     e.to_string()
                 )))
@@ -111,11 +112,58 @@ mod tests {
             Ok(_) => (),
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
-                    "{}: add_to_db value check error for priority: {}",
+                    "{}: set_in_db value check error for priority: {}",
                     testname,
                     e.to_string()
                 )))
             }
+        }
+
+        // Update in db
+        model.part_type = NamePartType::Suffix;
+        model.value = String::from("Jr.");
+        match model.set_in_db(&mut db) {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: set_in_db() error: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        }
+
+        match check_db_value(&mut db, "contact_nameparts", &model.id, "value", "Jr.") {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: set_in_db value check error for priority: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        }
+
+        // Delete from db
+        match model.delete_from_db(&mut db) {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: delete_from_db() error: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        }
+
+        match check_db_value(&mut db, "contact_nameparts", &model.id, "value", "Jr.") {
+            Ok(_) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: delete_from_db failed to delete row",
+                    testname,
+                )))
+            }
+            Err(_) => (),
         }
 
         Ok(())
