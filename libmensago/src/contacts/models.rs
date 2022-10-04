@@ -293,6 +293,16 @@ impl NamePartModel {
 
         Ok(out)
     }
+
+    pub fn set_all(
+        models: &Vec<NamePartModel>,
+        conn: &mut rusqlite::Connection,
+    ) -> Result<(), MensagoError> {
+        for model in models.iter() {
+            model.set_in_db(conn)?;
+        }
+        return Err(MensagoError::ErrUnimplemented);
+    }
 }
 
 impl DBModel for NamePartModel {
@@ -521,9 +531,13 @@ impl DBModel for NameModel {
                 &self.prefix.to_string(),
             ],
         ) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
+            Ok(_) => (),
+            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
         }
+
+        NamePartModel::set_all(&self.additional_names, conn)?;
+        NamePartModel::set_all(&self.nicknames, conn)?;
+        NamePartModel::set_all(&self.suffixes, conn)
     }
 }
 
