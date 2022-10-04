@@ -11,6 +11,7 @@ pub trait DBModel {
     fn set_in_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError>;
 }
 
+/// StringModel is just a base class to represent key-value pairs in the database.
 #[derive(Debug, Clone)]
 pub struct StringModel {
     pub table: String,
@@ -171,6 +172,8 @@ impl std::convert::TryFrom<&str> for NamePartType {
     }
 }
 
+/// NamePartModel is a database representation of a part of a name which is not one of the base
+/// name components -- middle name(s), suffixes, or nicknames.
 #[derive(Debug, Clone)]
 pub struct NamePartModel {
     pub id: RandomID,
@@ -193,6 +196,7 @@ impl NamePartModel {
         }
     }
 
+    /// Instantiates a NamePartModel from a model ID in the database.
     pub fn load_from_db(
         id: &RandomID,
         conn: &mut rusqlite::Connection,
@@ -236,6 +240,8 @@ impl NamePartModel {
         })
     }
 
+    /// Returns a list of all NamePartModels in the database of a particular type that belong to a
+    /// specific contact.
     pub fn load_all(
         conid: &RandomID,
         parttype: NamePartType,
@@ -357,6 +363,8 @@ impl DBModel for NamePartModel {
     }
 }
 
+/// NameModel is the database representation of a contact's name and all the miscellaneous
+/// components that go with it.
 #[derive(Debug, Clone)]
 pub struct NameModel {
     pub id: RandomID,
@@ -394,6 +402,7 @@ impl NameModel {
         }
     }
 
+    /// `load_from_db()` instantiates a NameModel from the specified contact ID.
     pub fn load_from_db(
         id: &RandomID,
         conn: &mut rusqlite::Connection,
@@ -444,6 +453,7 @@ impl NameModel {
     }
 }
 
+/// MensagoModel represents a Mensago address or a workspace address in the database.
 #[derive(Debug, Clone)]
 pub struct MensagoModel {
     pub id: RandomID,
@@ -456,6 +466,8 @@ pub struct MensagoModel {
     pub domain: Domain,
 }
 
+/// KeyModel represents a cryptography key or keypair in the database. Note that keys are stored in
+/// a user's secrets database, not regular storage.
 #[derive(Debug, Clone)]
 pub struct KeyModel {
     pub id: RandomID,
@@ -467,6 +479,7 @@ pub struct KeyModel {
     pub value: String,
 }
 
+/// AddressModel represents a contact's street address
 #[derive(Debug, Clone)]
 pub struct AddressModel {
     pub id: RandomID,
@@ -484,6 +497,7 @@ pub struct AddressModel {
     pub preferred: bool,
 }
 
+/// PhotoModel represents a contact's photo
 #[derive(Debug, Clone)]
 pub struct PhotoModel {
     pub id: RandomID,
@@ -493,6 +507,7 @@ pub struct PhotoModel {
     pub data: Vec<u8>,
 }
 
+/// FileModel represents a file attached to a contact
 #[derive(Debug, Clone)]
 pub struct FileModel {
     pub id: RandomID,
