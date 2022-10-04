@@ -144,6 +144,26 @@ mod tests {
             }
         }
 
+        // Load from db
+        let loadmodel = match NamePartModel::load_from_db(&model.id, &mut db) {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: load_from_db() error: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        };
+
+        if loadmodel.part_type != NamePartType::Suffix || loadmodel.value != "Jr." {
+            return Err(MensagoError::ErrProgramException(format!(
+                "{}: load_from_db value mismatch: expected parttype = 'suffix' and value = 'Jr.'. 
+                Got '{}' and value '{}'",
+                testname, loadmodel.part_type, loadmodel.value
+            )));
+        }
+
         // Delete from db
         match model.delete_from_db(&mut db) {
             Ok(_) => (),
