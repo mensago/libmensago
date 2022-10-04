@@ -552,9 +552,142 @@ pub struct MensagoModel {
 
     pub label: String,
 
-    pub uid: UserID,
+    pub uid: Option<UserID>,
     pub wid: RandomID,
     pub domain: Domain,
+}
+
+impl MensagoModel {
+    /// Creates a new empty MensagoModel
+    pub fn new(
+        contact_id: &RandomID,
+        uid: Option<&UserID>,
+        wid: &RandomID,
+        domain: &Domain,
+    ) -> MensagoModel {
+        MensagoModel {
+            id: RandomID::generate(),
+            contact_id: contact_id.clone(),
+            label: String::new(),
+            uid: match uid {
+                Some(v) => Some(v.clone()),
+                None => None,
+            },
+            wid: wid.clone(),
+            domain: domain.clone(),
+        }
+    }
+
+    // /// Instantiates a MensagoModel from a model ID in the database. Note that this call is
+    // /// different from `NameModel::load_from_db` in that the model's ID is required, not the contact
+    // /// ID. This is because a contact has only one name structure, but the name structure itself
+    // /// has components which can be in multiples, such as nicknames.
+    // pub fn load_from_db(
+    //     id: &RandomID,
+    //     conn: &mut rusqlite::Connection,
+    // ) -> Result<MensagoModel, MensagoError> {
+    //     let mut stmt =
+    //         conn.prepare("SELECT conid,uid,wid,domain FROM contact_mensago WHERE id = ?1")?;
+    //     let (conidstr, uidstr, widstr, domstr) = match stmt.query_row(&[&id.to_string()], |row| {
+    //         Ok((
+    //             row.get::<usize, String>(0).unwrap(),
+    //             row.get::<usize, String>(1).unwrap(),
+    //             row.get::<usize, String>(2).unwrap(),
+    //             row.get::<usize, String>(3).unwrap(),
+    //         ))
+    //     }) {
+    //         Ok(v) => v,
+    //         Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+    //     };
+
+    //     Ok(MensagoModel {
+    //         id: id.clone(),
+    //         contact_id: match RandomID::from(&conid) {
+    //             Some(v) => v,
+    //             None => {
+    //                 return Err(MensagoError::ErrDatabaseException(format!(
+    //                     "Bad contact ID received from database: '{}'",
+    //                     conid
+    //                 )))
+    //             }
+    //         },
+    //         part_type: NamePartType::try_from(parttype.as_str())?,
+    //         value,
+    //         priority: match priority.parse::<usize>() {
+    //             Ok(v) => v,
+    //             Err(_) => {
+    //                 return Err(MensagoError::ErrDatabaseException(format!(
+    //                     "Bad priority received from database: '{}'",
+    //                     priority
+    //                 )))
+    //             }
+    //         },
+    //     })
+    // }
+
+    // /// Returns a list of all MensagoModels in the database of a particular type that belong to a
+    // /// specific contact.
+    // pub fn load_all(
+    //     conid: &RandomID,
+    //     parttype: NamePartType,
+    //     conn: &mut rusqlite::Connection,
+    // ) -> Result<Vec<MensagoModel>, MensagoError> {
+    //     let mut ids = Vec::<RandomID>::new();
+    //     {
+    //         let mut stmt = match conn
+    //             .prepare("SELECT id FROM contact_nameparts WHERE conid = ?1 and parttype = ?2")
+    //         {
+    //             Ok(v) => v,
+    //             Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+    //         };
+
+    //         let mut rows = match stmt.query([&conid.as_string(), parttype.to_string().as_str()]) {
+    //             Ok(v) => v,
+    //             Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+    //         };
+
+    //         let mut option_row = match rows.next() {
+    //             Ok(v) => v,
+    //             Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+    //         };
+
+    //         while option_row.is_some() {
+    //             let row = option_row.unwrap();
+    //             let partid = match RandomID::from(&row.get::<usize, String>(0).unwrap()) {
+    //                 Some(v) => v,
+    //                 None => {
+    //                     return Err(MensagoError::ErrDatabaseException(format!(
+    //                         "Bad name part ID {} in contact_nameparts",
+    //                         &row.get::<usize, String>(0).unwrap()
+    //                     )))
+    //                 }
+    //             };
+    //             ids.push(partid);
+
+    //             option_row = match rows.next() {
+    //                 Ok(v) => v,
+    //                 Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+    //             };
+    //         }
+    //     }
+
+    //     let mut out = Vec::new();
+    //     for id in ids.iter() {
+    //         out.push(MensagoModel::load_from_db(&id, conn)?);
+    //     }
+
+    //     Ok(out)
+    // }
+
+    // pub fn set_all(
+    //     models: &Vec<MensagoModel>,
+    //     conn: &mut rusqlite::Connection,
+    // ) -> Result<(), MensagoError> {
+    //     for model in models.iter() {
+    //         model.set_in_db(conn)?;
+    //     }
+    //     Ok(())
+    // }
 }
 
 /// KeyModel represents a cryptography key or keypair in the database. Note that keys are stored in
