@@ -56,8 +56,16 @@ mod tests {
             return Err(MensagoError::ErrEmptyData);
         }
 
-        let mut stmt = conn.prepare("SELECT ?1 FROM ?2 WHERE id = ?3")?;
-        let dbvalue = match stmt.query_row(&[column, tablename, &id.to_string()], |row| {
+        // Doing regular string substitution in a SQL query is usually a recipe for an injection
+        // attack. We're doing this here because (1) using the regular syntax for inserting values
+        // into queries creates syntax errors when used for table names and (2) we control that
+        // part of the query. We're also doing the same thing for the column because the escaping
+        // done for substitution causes the column name to be returned from the query instead of
+        // the value of the row in that column. Not great, but it *is* safe in this instance.
+        let mut stmt =
+            conn.prepare(format!("SELECT {} FROM {} WHERE id = ?1", column, tablename).as_str())?;
+
+        let dbvalue = match stmt.query_row(&[&id.to_string()], |row| {
             Ok(row.get::<usize, String>(0).unwrap())
         }) {
             Ok(v) => v,
@@ -85,8 +93,8 @@ mod tests {
         let profile = profman.get_active_profile().unwrap();
         let mut db = profile.open_storage()?;
 
-        let modelid = RandomID::from("00000000-1111-2222-3333-444444444444").unwrap();
-        let model = NamePartModel::new(&modelid);
+        let conid = RandomID::from("00000000-1111-2222-3333-444444444444").unwrap();
+        let model = NamePartModel::new(&conid);
 
         match model.add_to_db(&mut db) {
             Ok(_) => (),
@@ -99,7 +107,7 @@ mod tests {
             }
         }
 
-        match check_db_value(&mut db, "contact_nameparts", &modelid, "priority", "0") {
+        match check_db_value(&mut db, "contact_nameparts", &model.id, "priority", "0") {
             Ok(_) => (),
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
