@@ -232,6 +232,25 @@ mod tests {
             }
         }
 
+        // Load from db
+        let loadmodel = match NameModel::load_from_db(&conid, &mut db) {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: load_from_db() error: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        };
+
+        if loadmodel.given_name != "Corbin" || loadmodel.family_name != "Simons" {
+            return Err(MensagoError::ErrProgramException(format!(
+                "{}: load_from_db value mismatch: expected 'Corbin Simons', got '{} {}'",
+                testname, loadmodel.given_name, loadmodel.family_name
+            )));
+        }
+
         // Delete from db
         match model.delete_from_db(&mut db) {
             Ok(_) => (),

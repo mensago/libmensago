@@ -414,18 +414,17 @@ impl NameModel {
 
     /// `load_from_db()` instantiates a NameModel from the specified contact ID.
     pub fn load_from_db(
-        id: &RandomID,
+        conid: &RandomID,
         conn: &mut rusqlite::Connection,
     ) -> Result<NameModel, MensagoError> {
-        let conid: RandomID;
         let mut out: NameModel;
 
         {
             let mut stmt = conn.prepare(
-            "SELECT conid,formatted_name,given_name,family_name,prefix FROM contact_names WHERE id = ?1",
+            "SELECT id,formatted_name,given_name,family_name,prefix FROM contact_names WHERE conid = ?1",
         )?;
-            let (conidstr, formattedname, givenname, familyname, prefix) =
-                match stmt.query_row(&[&id.to_string()], |row| {
+            let (idstr, formattedname, givenname, familyname, prefix) =
+                match stmt.query_row(&[&conid.to_string()], |row| {
                     Ok((
                         row.get::<usize, String>(0).unwrap(),
                         row.get::<usize, String>(1).unwrap(),
@@ -438,17 +437,18 @@ impl NameModel {
                     Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
                 };
 
-            conid = match RandomID::from(&conidstr) {
+            let id = match RandomID::from(&idstr) {
                 Some(v) => v,
                 None => {
                     return Err(MensagoError::ErrDatabaseException(format!(
-                        "Bad contact ID received from database: '{}'",
-                        conidstr
+                        "Bad contact name ID received from database: '{}'",
+                        idstr
                     )))
                 }
             };
 
             out = NameModel::new(&conid);
+            out.id = id;
             out.formatted_name = formattedname;
             out.given_name = givenname;
             out.family_name = familyname;
