@@ -235,6 +235,58 @@ impl NamePartModel {
             },
         })
     }
+
+    pub fn load_all(
+        conid: &RandomID,
+        parttype: NamePartType,
+        conn: &mut rusqlite::Connection,
+    ) -> Result<Vec<NamePartModel>, MensagoError> {
+        let mut ids = Vec::<RandomID>::new();
+        {
+            let mut stmt = match conn
+                .prepare("SELECT id FROM contact_nameparts WHERE conid = ?1 and parttype = ?2")
+            {
+                Ok(v) => v,
+                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+            };
+
+            let mut rows = match stmt.query([&conid.as_string(), parttype.to_string().as_str()]) {
+                Ok(v) => v,
+                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+            };
+
+            let mut option_row = match rows.next() {
+                Ok(v) => v,
+                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+            };
+
+            while option_row.is_some() {
+                let row = option_row.unwrap();
+                let partid = match RandomID::from(&row.get::<usize, String>(0).unwrap()) {
+                    Some(v) => v,
+                    None => {
+                        return Err(MensagoError::ErrDatabaseException(format!(
+                            "Bad name part ID {} in contact_nameparts",
+                            &row.get::<usize, String>(0).unwrap()
+                        )))
+                    }
+                };
+                ids.push(partid);
+
+                option_row = match rows.next() {
+                    Ok(v) => v,
+                    Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+                };
+            }
+        }
+
+        let mut out = Vec::new();
+        for id in ids.iter() {
+            out.push(NamePartModel::load_from_db(&id, conn)?);
+        }
+
+        Ok(out)
+    }
 }
 
 impl DBModel for NamePartModel {
@@ -320,6 +372,76 @@ pub struct NameModel {
 
     pub prefix: String,
     pub suffixes: Vec<NamePartModel>,
+}
+
+impl NameModel {
+    /// Creates a new empty NameModel
+    pub fn new(contact_id: &RandomID) -> NameModel {
+        NameModel {
+            id: RandomID::generate(),
+            contact_id: contact_id.clone(),
+
+            formatted_name: String::new(),
+
+            given_name: String::new(),
+            family_name: String::new(),
+            additional_names: Vec::new(),
+
+            nicknames: Vec::new(),
+
+            prefix: String::new(),
+            suffixes: Vec::new(),
+        }
+    }
+
+    pub fn load_from_db(
+        id: &RandomID,
+        conn: &mut rusqlite::Connection,
+    ) -> Result<NameModel, MensagoError> {
+        let conid: RandomID;
+        let mut out: NameModel;
+
+        {
+            let mut stmt = conn.prepare(
+            "SELECT conid,formattedname,givenname,familyname,prefix FROM contact_name WHERE id = ?1",
+        )?;
+            let (conidstr, formattedname, givenname, familyname, prefix) =
+                match stmt.query_row(&[&id.to_string()], |row| {
+                    Ok((
+                        row.get::<usize, String>(0).unwrap(),
+                        row.get::<usize, String>(1).unwrap(),
+                        row.get::<usize, String>(2).unwrap(),
+                        row.get::<usize, String>(3).unwrap(),
+                        row.get::<usize, String>(4).unwrap(),
+                    ))
+                }) {
+                    Ok(v) => v,
+                    Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+                };
+
+            conid = match RandomID::from(&conidstr) {
+                Some(v) => v,
+                None => {
+                    return Err(MensagoError::ErrDatabaseException(format!(
+                        "Bad contact ID received from database: '{}'",
+                        conidstr
+                    )))
+                }
+            };
+
+            out = NameModel::new(&conid);
+            out.formatted_name = formattedname;
+            out.given_name = givenname;
+            out.family_name = familyname;
+            out.prefix = prefix;
+        }
+
+        out.additional_names = NamePartModel::load_all(&conid, NamePartType::Additional, conn)?;
+        out.nicknames = NamePartModel::load_all(&conid, NamePartType::Nickname, conn)?;
+        out.suffixes = NamePartModel::load_all(&conid, NamePartType::Suffix, conn)?;
+
+        Ok(out)
+    }
 }
 
 #[derive(Debug, Clone)]
