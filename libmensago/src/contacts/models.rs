@@ -561,6 +561,7 @@ impl MensagoModel {
     /// Creates a new empty MensagoModel
     pub fn new(
         contact_id: &RandomID,
+        label: &str,
         uid: Option<&UserID>,
         wid: &RandomID,
         domain: &Domain,
@@ -568,7 +569,7 @@ impl MensagoModel {
         MensagoModel {
             id: RandomID::generate(),
             contact_id: contact_id.clone(),
-            label: String::new(),
+            label: String::from(label),
             uid: match uid {
                 Some(v) => Some(v.clone()),
                 None => None,
