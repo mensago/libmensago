@@ -163,7 +163,9 @@ static SECRETS_DB_SETUP_COMMANDS: &str = "
 		'os' TEXT NOT NULL
 	);
     CREATE TABLE 'contact_keys' (
+		'id' TEXT NOT NULL UNIQUE,
         'conid' TEXT NOT NULL,
+        'label' TEXT NOT NULL UNIQUE,
         'category' TEXT NOT NULL,
         'value' TEXT NOT NULL,
 		'timestamp' TEXT NOT NULL

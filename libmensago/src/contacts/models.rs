@@ -1,4 +1,5 @@
-use crate::base::*;
+use crate::{base::*, types::*};
+use eznacl::*;
 use libkeycard::*;
 use rusqlite;
 use std::convert::TryFrom;
@@ -768,12 +769,101 @@ impl DBModel for MensagoModel {
 #[derive(Debug, Clone)]
 pub struct KeyModel {
     pub id: RandomID,
+    pub contact_id: RandomID,
 
     pub label: String,
+    pub category: KeyCategory,
+    pub value: CryptoString,
+    pub timestamp: Timestamp,
+}
 
-    pub keytype: String,
-    pub keyhash: String,
-    pub value: String,
+impl DBModel for KeyModel {
+    fn delete_from_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+        match conn.execute(
+            "DELETE FROM contact_keys WHERE id=?1",
+            &[&self.id.to_string()],
+        ) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
+        }
+    }
+
+    fn refresh_from_db(&mut self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+        let mut stmt = conn.prepare(
+            "SELECT conid,label,category,value,timestamp FROM contact_keys WHERE id = ?1",
+        )?;
+        let (conidstr, labelstr, catstr, keystr, timestr) =
+            match stmt.query_row(&[&self.id.to_string()], |row| {
+                Ok((
+                    row.get::<usize, String>(0).unwrap(),
+                    row.get::<usize, String>(1).unwrap(),
+                    row.get::<usize, String>(2).unwrap(),
+                    row.get::<usize, String>(3).unwrap(),
+                    row.get::<usize, String>(4).unwrap(),
+                ))
+            }) {
+                Ok(v) => v,
+                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+            };
+        self.label = labelstr;
+
+        self.contact_id = match RandomID::from(&conidstr) {
+            Some(v) => v,
+            None => {
+                return Err(MensagoError::ErrDatabaseException(format!(
+                    "Bad contact ID received from database: '{}'",
+                    conidstr
+                )))
+            }
+        };
+        self.category = match KeyCategory::try_from(catstr.as_str()) {
+            Ok(v) => v,
+            Err(_) => {
+                return Err(MensagoError::ErrDatabaseException(format!(
+                    "Bad key category received from database: '{}'",
+                    catstr
+                )))
+            }
+        };
+        self.value = match CryptoString::from(&keystr) {
+            Some(v) => v,
+            None => {
+                return Err(MensagoError::ErrDatabaseException(format!(
+                    "Bad contact key received from database: '{}'",
+                    keystr
+                )))
+            }
+        };
+        self.timestamp = match Timestamp::from_str(&timestr) {
+            Some(v) => v,
+            None => {
+                return Err(MensagoError::ErrDatabaseException(format!(
+                    "Bad timestamp received from database: '{}'",
+                    timestr
+                )))
+            }
+        };
+
+        Ok(())
+    }
+
+    fn set_in_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+        match conn.execute(
+            "INSERT OR REPLACE INTO contact_keys(id, conid, label, category, value, timestamp) 
+            VALUES(?1,?2,?3,?4,?5,?6)",
+            &[
+                &self.id.to_string(),
+                &self.contact_id.to_string(),
+                &self.label,
+                &self.category.to_string(),
+                &self.value.to_string(),
+                &self.timestamp.to_string(),
+            ],
+        ) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
+        }
+    }
 }
 
 /// AddressModel represents a contact's street address
