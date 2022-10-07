@@ -86,6 +86,12 @@ mod tests {
     }
 
     #[test]
+    fn test_stringmodel() -> Result<(), MensagoError> {
+        // TODO: Write unit test for StringModel()
+        Ok(())
+    }
+
+    #[test]
     fn test_namepartmodel() -> Result<(), MensagoError> {
         let testname = "test_namepartmodel";
 
@@ -204,8 +210,7 @@ mod tests {
         let mut db = profile.open_storage()?;
 
         let conid = RandomID::from("00000000-1111-2222-3333-444444444444").unwrap();
-        let mut model = NameModel::new(&conid);
-        model.given_name = String::from("Corbin");
+        let mut model = NameModel::new(&conid, "Corbin");
         model.family_name = String::from("Simons");
 
         // Add to db
