@@ -1826,4 +1826,6 @@ impl ContactModel {
         }
         Ok(out)
     }
+
+    // TODO: Implement DBModel trait for ContactModel
 }

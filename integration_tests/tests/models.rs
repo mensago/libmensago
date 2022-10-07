@@ -916,4 +916,10 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_contactmodel() -> Result<(), MensagoError> {
+        // TODO: Write unit test for ContactModel()
+        Ok(())
+    }
 }
