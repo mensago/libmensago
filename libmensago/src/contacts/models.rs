@@ -1130,7 +1130,7 @@ impl DBModel for AddressModel {
     fn refresh_from_db(&mut self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
         let mut stmt = conn.prepare(
             "SELECT conid,label,street,extended,locality,region,postalcode,country,preferred 
-            FROM contact_adress WHERE id = ?1",
+            FROM contact_address WHERE id = ?1",
         )?;
         let (conidstr, label, street, extended, locality, region, postalcode, country, preferred) =
             match stmt.query_row(&[&self.id.to_string()], |row| {
@@ -1173,8 +1173,8 @@ impl DBModel for AddressModel {
 
     fn set_in_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
         match conn.execute(
-            "INSERT OR REPLACE INTO contact_keys(id,conid,label,street,extended,locality,region,
-            postalcode,country,preferred) VALUES(?1,?2,?3,?4,?5,?6,?7,?8)",
+            "INSERT OR REPLACE INTO contact_address(id,conid,label,street,extended,locality,region,
+            postalcode,country,preferred) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)",
             rusqlite::params![
                 &self.id.to_string(),
                 &self.contact_id.to_string(),

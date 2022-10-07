@@ -543,4 +543,126 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_addressmodel() -> Result<(), MensagoError> {
+        let testname = "test_addressmodel";
+
+        // The list of full data is as follows:
+        // let (config, pwhash, profman) = setup_db_test(testname)?;
+        let (_, _, profman) = setup_db_test(testname)?;
+
+        let profile = profman.get_active_profile().unwrap();
+        let mut db = profile.open_storage()?;
+
+        let conid = RandomID::from("00000000-1111-2222-3333-444444444444").unwrap();
+        let mut model = AddressModel::new(&conid, "Home");
+        model.street = String::from("1313 Mockingbird Lane");
+        model.country = String::from("United States");
+
+        // Add to db
+        match model.set_in_db(&mut db) {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: set_in_db() error: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        }
+
+        let mut fields = vec![
+            ("id", model.id.to_string()),
+            ("conid", conid.to_string()),
+            ("label", String::from("Home")),
+            ("street", String::from("1313 Mockingbird Lane")),
+            ("country", String::from("United States")),
+        ];
+        for pair in fields.iter() {
+            match check_db_value(&mut db, "contact_address", &model.id, pair.0, &pair.1) {
+                Ok(_) => (),
+                Err(e) => {
+                    return Err(MensagoError::ErrProgramException(format!(
+                        "{}: set_in_db value check error for {}: {}",
+                        testname,
+                        pair.0,
+                        e.to_string()
+                    )))
+                }
+            }
+        }
+
+        // Update db
+        model.label = String::from("Other");
+        match model.set_in_db(&mut db) {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: set_in_db() update error: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        }
+
+        fields[2] = ("label", String::from("Other"));
+        for pair in fields.iter() {
+            match check_db_value(&mut db, "contact_address", &model.id, pair.0, &pair.1) {
+                Ok(_) => (),
+                Err(e) => {
+                    return Err(MensagoError::ErrProgramException(format!(
+                        "{}: set_in_db update value check error for {}: {}",
+                        testname,
+                        pair.0,
+                        e.to_string()
+                    )))
+                }
+            }
+        }
+
+        // Load from db
+        let loadmodel = match AddressModel::load_from_db(&model.id, &mut db) {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: load_from_db() error: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        };
+
+        if loadmodel.label != "Other" || loadmodel.country != "United States" {
+            return Err(MensagoError::ErrProgramException(format!(
+                "{}: load_from_db value mismatch: expected 'Other' and
+                'United States', got '{} {}'",
+                testname, loadmodel.label, loadmodel.country
+            )));
+        }
+
+        // Delete from db
+        match model.delete_from_db(&mut db) {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: delete_from_db() error: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        }
+
+        match check_db_value(&mut db, "contact_address", &model.id, "label", "") {
+            Ok(_) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: delete_from_db failed to delete row",
+                    testname,
+                )))
+            }
+            Err(_) => (),
+        }
+
+        Ok(())
+    }
 }
