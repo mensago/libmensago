@@ -770,7 +770,7 @@ pub struct KeyModel {
 
     pub label: String,
     pub category: KeyCategory,
-    pub value: CryptoString,
+    pub key: CryptoString,
     pub timestamp: Timestamp,
 }
 
@@ -787,7 +787,7 @@ impl KeyModel {
             contact_id: contact_id.clone(),
             label: String::from(label),
             category,
-            value: key.clone(),
+            key: key.clone(),
             timestamp: Timestamp::new(),
         }
     }
@@ -819,7 +819,7 @@ impl KeyModel {
             contact_id: RandomID::try_from(conidstr.as_str())?,
             label,
             category: KeyCategory::try_from(catstr.as_str())?,
-            value: CryptoString::try_from(valstr.as_str())?,
+            key: CryptoString::try_from(valstr.as_str())?,
             timestamp: Timestamp::try_from(timestr.as_str())?,
         })
     }
@@ -934,7 +934,7 @@ impl DBModel for KeyModel {
                 )))
             }
         };
-        self.value = match CryptoString::from(&keystr) {
+        self.key = match CryptoString::from(&keystr) {
             Some(v) => v,
             None => {
                 return Err(MensagoError::ErrDatabaseException(format!(
@@ -965,7 +965,7 @@ impl DBModel for KeyModel {
                 &self.contact_id.to_string(),
                 &self.label,
                 &self.category.to_string(),
-                &self.value.to_string(),
+                &self.key.to_string(),
                 &self.timestamp.to_string(),
             ],
         ) {
