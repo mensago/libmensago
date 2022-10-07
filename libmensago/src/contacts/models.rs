@@ -1397,7 +1397,9 @@ impl DBModel for PhotoModel {
     }
 }
 
-/// FileModel represents a file attached to a contact
+/// FileModel represents a file attached to a contact. This holds the raw data of the file in
+/// memory while it exists. It would be wise to restrict the size of the files stored into a
+/// contact. Just sayin'. 🙃
 #[derive(Debug, Clone)]
 pub struct FileModel {
     pub id: RandomID,
@@ -1465,6 +1467,57 @@ impl FileModel {
             out = FileModel::new(&id, &name, &imgtype, &imgdata);
             out.id = id;
         }
+        Ok(out)
+    }
+
+    /// Returns a list of all FileModels that belong to a specific contact.
+    pub fn load_all(
+        conid: &RandomID,
+        conn: &mut rusqlite::Connection,
+    ) -> Result<Vec<FileModel>, MensagoError> {
+        let mut ids = Vec::<RandomID>::new();
+
+        let mut stmt = match conn.prepare("SELECT id FROM contact_files WHERE conid = ?1") {
+            Ok(v) => v,
+            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+        };
+
+        let mut rows = match stmt.query([&conid.as_string()]) {
+            Ok(v) => v,
+            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+        };
+
+        let mut option_row = match rows.next() {
+            Ok(v) => v,
+            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+        };
+
+        while option_row.is_some() {
+            let row = option_row.unwrap();
+            let partid = match RandomID::from(&row.get::<usize, String>(0).unwrap()) {
+                Some(v) => v,
+                None => {
+                    return Err(MensagoError::ErrDatabaseException(format!(
+                        "Bad file model ID {} in contact_files",
+                        &row.get::<usize, String>(0).unwrap()
+                    )))
+                }
+            };
+            ids.push(partid);
+
+            option_row = match rows.next() {
+                Ok(v) => v,
+                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+            };
+        }
+        drop(rows);
+        drop(stmt);
+
+        let mut out = Vec::new();
+        for id in ids.iter() {
+            out.push(FileModel::load_from_db(&id, conn)?);
+        }
+
         Ok(out)
     }
 }
@@ -1622,8 +1675,6 @@ impl ContactModel {
         conid: &RandomID,
         conn: &mut rusqlite::Connection,
     ) -> Result<ContactModel, MensagoError> {
-        let mut out: ContactModel;
-
         let mut stmt = conn.prepare(
             "SELECT entitytype,group,gender,bio,anniversary,birthday,organization,orgunits,
             title,categories,languages,notes FROM contacts WHERE conid = ?1 AND annotation=false",
@@ -1685,28 +1736,33 @@ impl ContactModel {
         // All the values simple types have been loaded, so now we just load the ones which
         // have a dedicated type model
 
-        // Ok(ContactModel {
-        //     id: conid.clone(),
-        //     entity_type,
-        //     group,
-        //     name: NameModel::load_from_db(conid, conn)?,
-        //     gender,
-        //     bio,
-        //     anniversary,
-        //     birthday,
-        //     //email,
-        //     organization,
-        //     orgunits: unitlist.items,
-        //     title,
-        //     categories: catlist.items,
-        //     //websites,
-        //     photo,
-        //     languages: langlist.items,
-        //     notes,
-        //     //attachments,
-        //     //custom,
-        //     annotations: None,
-        // })
-        Err(MensagoError::ErrUnimplemented)
+        Ok(ContactModel {
+            id: conid.clone(),
+            entity_type,
+            group,
+            name: NameModel::load_from_db(conid, conn)?,
+            gender,
+            bio,
+            social: StringModel::load_all(conid, "social", conn)?,
+            mensago: MensagoModel::load_all(conid, conn)?,
+            keys: KeyModel::load_all(conid, conn)?,
+            messaging: StringModel::load_all(conid, "messaging", conn)?,
+            addresses: AddressModel::load_all(conid, conn)?,
+            phone: StringModel::load_all(conid, "phone", conn)?,
+            anniversary,
+            birthday,
+            email: StringModel::load_all(conid, "email", conn)?,
+            organization,
+            orgunits: unitlist.items,
+            title,
+            categories: catlist.items,
+            websites: StringModel::load_all(conid, "website", conn)?,
+            photo,
+            languages: langlist.items,
+            notes,
+            attachments: FileModel::load_all(conid, conn)?,
+            custom: StringModel::load_all(conid, "custom", conn)?,
+            annotations: None,
+        })
     }
 }
