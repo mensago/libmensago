@@ -580,10 +580,8 @@ impl MensagoModel {
         }
     }
 
-    /// Instantiates a MensagoModel from a model ID in the database. Note that this call is
-    /// different from `NameModel::load_from_db` in that the model's ID is required, not the contact
-    /// ID. This is because a contact has only one name structure, but the name structure itself
-    /// has components which can be in multiples, such as nicknames.
+    /// Instantiates a MensagoModel from a model ID in the database. If you would like to load all
+    /// of a contact's Mensago addresses, look at `load_all()` in combination with this call.
     pub fn load_from_db(
         id: &RandomID,
         conn: &mut rusqlite::Connection,
@@ -618,7 +616,6 @@ impl MensagoModel {
     /// specific contact.
     pub fn load_all(
         conid: &RandomID,
-        parttype: NamePartType,
         conn: &mut rusqlite::Connection,
     ) -> Result<Vec<MensagoModel>, MensagoError> {
         let mut ids = Vec::<RandomID>::new();
@@ -628,7 +625,7 @@ impl MensagoModel {
                 Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
             };
 
-            let mut rows = match stmt.query([&conid.as_string(), parttype.to_string().as_str()]) {
+            let mut rows = match stmt.query([&conid.as_string()]) {
                 Ok(v) => v,
                 Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
             };
@@ -644,7 +641,7 @@ impl MensagoModel {
                     Some(v) => v,
                     None => {
                         return Err(MensagoError::ErrDatabaseException(format!(
-                            "Bad name part ID {} in contact_mensago",
+                            "Bad Mensago address ID {} in contact_mensago",
                             &row.get::<usize, String>(0).unwrap()
                         )))
                     }
@@ -775,6 +772,118 @@ pub struct KeyModel {
     pub category: KeyCategory,
     pub value: CryptoString,
     pub timestamp: Timestamp,
+}
+
+impl KeyModel {
+    /// Creates a new empty KeyModel.
+    pub fn new(
+        contact_id: &RandomID,
+        label: &str,
+        category: KeyCategory,
+        key: &CryptoString,
+    ) -> KeyModel {
+        KeyModel {
+            id: RandomID::generate(),
+            contact_id: contact_id.clone(),
+            label: String::from(label),
+            category,
+            value: key.clone(),
+            timestamp: Timestamp::new(),
+        }
+    }
+
+    /// Instantiates a KeyModel from a model ID in the database. If you would like to load all
+    /// of a contact's keys, look at `load_all()`.
+    pub fn load_from_db(
+        id: &RandomID,
+        conn: &mut rusqlite::Connection,
+    ) -> Result<KeyModel, MensagoError> {
+        let mut stmt =
+            conn.prepare("SELECT conid,label,uid,wid,domain FROM contact_keys WHERE id = ?1")?;
+        let (conidstr, label, catstr, valstr, timestr) =
+            match stmt.query_row(&[&id.to_string()], |row| {
+                Ok((
+                    row.get::<usize, String>(0).unwrap(),
+                    row.get::<usize, String>(1).unwrap(),
+                    row.get::<usize, String>(2).unwrap(),
+                    row.get::<usize, String>(3).unwrap(),
+                    row.get::<usize, String>(4).unwrap(),
+                ))
+            }) {
+                Ok(v) => v,
+                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+            };
+
+        Ok(KeyModel {
+            id: id.clone(),
+            contact_id: RandomID::try_from(conidstr.as_str())?,
+            label,
+            category: KeyCategory::try_from(catstr.as_str())?,
+            value: CryptoString::try_from(valstr.as_str())?,
+            timestamp: Timestamp::try_from(timestr.as_str())?,
+        })
+    }
+
+    /// Returns a list of all KeyModels in the database of a particular type that belong to a
+    /// specific contact.
+    pub fn load_all(
+        conid: &RandomID,
+        conn: &mut rusqlite::Connection,
+    ) -> Result<Vec<KeyModel>, MensagoError> {
+        let mut ids = Vec::<RandomID>::new();
+        {
+            let mut stmt = match conn.prepare("SELECT id FROM contact_keys WHERE conid = ?1") {
+                Ok(v) => v,
+                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+            };
+
+            let mut rows = match stmt.query([&conid.as_string()]) {
+                Ok(v) => v,
+                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+            };
+
+            let mut option_row = match rows.next() {
+                Ok(v) => v,
+                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+            };
+
+            while option_row.is_some() {
+                let row = option_row.unwrap();
+                let partid = match RandomID::from(&row.get::<usize, String>(0).unwrap()) {
+                    Some(v) => v,
+                    None => {
+                        return Err(MensagoError::ErrDatabaseException(format!(
+                            "Bad key model ID {} in contact_keys",
+                            &row.get::<usize, String>(0).unwrap()
+                        )))
+                    }
+                };
+                ids.push(partid);
+
+                option_row = match rows.next() {
+                    Ok(v) => v,
+                    Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+                };
+            }
+        }
+
+        let mut out = Vec::new();
+        for id in ids.iter() {
+            out.push(KeyModel::load_from_db(&id, conn)?);
+        }
+
+        Ok(out)
+    }
+
+    pub fn set_all(
+        models: &Vec<MensagoModel>,
+        conn: &mut rusqlite::Connection,
+    ) -> Result<(), MensagoError> {
+        for model in models.iter() {
+            model.set_in_db(conn)?;
+        }
+        Ok(())
+    }
 }
 
 impl DBModel for KeyModel {
