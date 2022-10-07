@@ -1,4 +1,4 @@
-use crate::{base::*, types::*, EntityType};
+use crate::{base::*, types::*, EntityType, SeparatedStrList};
 use eznacl::*;
 use libkeycard::*;
 use mime::Mime;
@@ -16,8 +16,8 @@ pub trait DBModel {
 /// StringModel is just a base class to represent key-value pairs in the database.
 #[derive(Debug, Clone)]
 pub struct StringModel {
-    pub table: String,
     pub id: RandomID,
+    pub itemtype: String,
     pub contact_id: RandomID,
 
     pub label: String,
@@ -26,10 +26,10 @@ pub struct StringModel {
 
 impl StringModel {
     /// Creates a new empty StringModel
-    pub fn new(contact_id: &RandomID, table: &str) -> StringModel {
+    pub fn new(contact_id: &RandomID, itemtype: &str) -> StringModel {
         StringModel {
-            table: String::from(table),
             id: RandomID::generate(),
+            itemtype: String::from(itemtype),
             contact_id: contact_id.clone(),
             label: String::new(),
             value: String::new(),
@@ -37,16 +37,17 @@ impl StringModel {
     }
 
     pub fn load_from_db(
-        tablename: &str,
         id: &RandomID,
         conn: &mut rusqlite::Connection,
     ) -> Result<StringModel, MensagoError> {
-        let mut stmt = conn.prepare("SELECT conid,label,value, FROM ?1 WHERE id = ?2")?;
-        let (conid, label, value) = match stmt.query_row(&[tablename, &id.to_string()], |row| {
+        let mut stmt =
+            conn.prepare("SELECT conid,itemtype,label,value FROM contact_keyvalue WHERE id = ?1")?;
+        let (conidstr, itemtype, label, value) = match stmt.query_row(&[&id.to_string()], |row| {
             Ok((
                 row.get::<usize, String>(0).unwrap(),
                 row.get::<usize, String>(1).unwrap(),
                 row.get::<usize, String>(2).unwrap(),
+                row.get::<usize, String>(3).unwrap(),
             ))
         }) {
             Ok(v) => v,
@@ -55,13 +56,13 @@ impl StringModel {
 
         Ok(StringModel {
             id: id.clone(),
-            table: String::from(tablename),
-            contact_id: match RandomID::from(&conid) {
+            itemtype,
+            contact_id: match RandomID::from(&conidstr) {
                 Some(v) => v,
                 None => {
                     return Err(MensagoError::ErrDatabaseException(format!(
                         "Bad contact ID received from database: '{}'",
-                        conid
+                        conidstr
                     )))
                 }
             },
@@ -69,13 +70,67 @@ impl StringModel {
             value,
         })
     }
+
+    /// Returns a list of all StringModels of a particular type that belong to a specific contact.
+    pub fn load_all(
+        conid: &RandomID,
+        itemtype: &str,
+        conn: &mut rusqlite::Connection,
+    ) -> Result<Vec<StringModel>, MensagoError> {
+        let mut ids = Vec::<RandomID>::new();
+
+        let mut stmt = match conn
+            .prepare("SELECT id FROM contact_keyvalue WHERE conid = ?1 AND itemtype = ?2")
+        {
+            Ok(v) => v,
+            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+        };
+
+        let mut rows = match stmt.query([&conid.as_string(), itemtype]) {
+            Ok(v) => v,
+            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+        };
+
+        let mut option_row = match rows.next() {
+            Ok(v) => v,
+            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+        };
+
+        while option_row.is_some() {
+            let row = option_row.unwrap();
+            let partid = match RandomID::from(&row.get::<usize, String>(0).unwrap()) {
+                Some(v) => v,
+                None => {
+                    return Err(MensagoError::ErrDatabaseException(format!(
+                        "Bad string model ID {} in contact_keyvalue",
+                        &row.get::<usize, String>(0).unwrap()
+                    )))
+                }
+            };
+            ids.push(partid);
+
+            option_row = match rows.next() {
+                Ok(v) => v,
+                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+            };
+        }
+        drop(rows);
+        drop(stmt);
+
+        let mut out = Vec::new();
+        for id in ids.iter() {
+            out.push(StringModel::load_from_db(&id, conn)?);
+        }
+
+        Ok(out)
+    }
 }
 
 impl DBModel for StringModel {
     fn delete_from_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
         match conn.execute(
-            "DELETE FROM ?1 WHERE id=?2",
-            &[&self.table, &self.id.to_string()],
+            "DELETE FROM contact_keyvalue WHERE id=?1",
+            &[&self.id.to_string()],
         ) {
             Ok(_) => Ok(()),
             Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
@@ -83,18 +138,19 @@ impl DBModel for StringModel {
     }
 
     fn refresh_from_db(&mut self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
-        let mut stmt = conn.prepare("SELECT conid,label,value, FROM ?1 WHERE id = ?2")?;
-        let (conid, label, value) =
-            match stmt.query_row(&[&self.table, &self.id.to_string()], |row| {
-                Ok((
-                    row.get::<usize, String>(0).unwrap(),
-                    row.get::<usize, String>(1).unwrap(),
-                    row.get::<usize, String>(2).unwrap(),
-                ))
-            }) {
-                Ok(v) => v,
-                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-            };
+        let mut stmt =
+            conn.prepare("SELECT conid,itemtype,label,value FROM contact_keyvalue WHERE id = ?1")?;
+        let (conid, itemtype, label, value) = match stmt.query_row(&[&self.id.to_string()], |row| {
+            Ok((
+                row.get::<usize, String>(0).unwrap(),
+                row.get::<usize, String>(1).unwrap(),
+                row.get::<usize, String>(2).unwrap(),
+                row.get::<usize, String>(3).unwrap(),
+            ))
+        }) {
+            Ok(v) => v,
+            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+        };
 
         self.contact_id = match RandomID::from(&conid) {
             Some(v) => v,
@@ -105,6 +161,7 @@ impl DBModel for StringModel {
                 )))
             }
         };
+        self.itemtype = itemtype;
         self.label = label;
         self.value = value;
 
@@ -113,10 +170,11 @@ impl DBModel for StringModel {
 
     fn set_in_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
         match conn.execute(
-            "INSERT OR REPLACE INTO ?1(id, conid, label, value) VALUES(?2,?3,?4,?5)",
+            "INSERT OR REPLACE INTO contact_keyvalue(id,type,conid,label,value) 
+            VALUES(?1,?2,?3,?4,?5)",
             &[
-                &self.table,
                 &self.id.to_string(),
+                &self.itemtype.to_string(),
                 &self.contact_id.to_string(),
                 &self.label,
                 &self.value,
@@ -398,15 +456,22 @@ pub struct NameModel {
 }
 
 impl NameModel {
-    /// Creates a new empty NameModel
-    pub fn new(contact_id: &RandomID) -> NameModel {
+    /// Creates a new NameModel. The spec requires each contact to at least have something in the
+    /// GivenName field. This call will panic if given an empty string or one containing only
+    /// whitespace.
+    pub fn new(contact_id: &RandomID, givenname: &str) -> NameModel {
+        let gn = String::from(givenname.trim());
+        if gn.len() < 1 {
+            panic!();
+        }
+
         NameModel {
             id: RandomID::generate(),
             contact_id: contact_id.clone(),
 
             formatted_name: String::new(),
 
-            given_name: String::new(),
+            given_name: gn,
             family_name: String::new(),
             additional_names: Vec::new(),
 
@@ -452,7 +517,7 @@ impl NameModel {
                 }
             };
 
-            out = NameModel::new(&conid);
+            out = NameModel::new(&conid, &givenname);
             out.id = id;
             out.formatted_name = formattedname;
             out.given_name = givenname;
@@ -1478,7 +1543,7 @@ impl DBModel for FileModel {
 
 /// DBContact, unlike `JSONContact`, is a model for interacting with the database
 pub struct ContactModel {
-    pub contact_id: RandomID,
+    pub id: RandomID,
     pub entity_type: EntityType,
 
     pub group: String,
@@ -1520,13 +1585,13 @@ pub struct ContactModel {
 
 impl ContactModel {
     /// Creates a new empty ContactModel, which defaults to representing an individual
-    pub fn new() -> ContactModel {
+    pub fn new(givenname: &str) -> ContactModel {
         let conid = RandomID::generate();
         ContactModel {
-            contact_id: conid.clone(),
+            id: conid.clone(),
             entity_type: EntityType::Individual,
             group: String::new(),
-            name: NameModel::new(&conid),
+            name: NameModel::new(&conid, givenname),
             gender: String::new(),
             bio: String::new(),
             social: Vec::new(),
@@ -1550,5 +1615,98 @@ impl ContactModel {
             custom: Vec::new(),
             annotations: None,
         }
+    }
+
+    /// `load_from_db()` instantiates a ContactModel from the specified contact ID.
+    pub fn load_from_db(
+        conid: &RandomID,
+        conn: &mut rusqlite::Connection,
+    ) -> Result<ContactModel, MensagoError> {
+        let mut out: ContactModel;
+
+        let mut stmt = conn.prepare(
+            "SELECT entitytype,group,gender,bio,anniversary,birthday,organization,orgunits,
+            title,categories,languages,notes FROM contacts WHERE conid = ?1 AND annotation=false",
+        )?;
+        let (
+            entitytypestr,
+            group,
+            gender,
+            bio,
+            anniversary,
+            birthday,
+            organization,
+            orgunitstr,
+            title,
+            categorystr,
+            languagestr,
+            notes,
+        ) = match stmt.query_row(&[&conid.to_string()], |row| {
+            Ok((
+                row.get::<usize, String>(0).unwrap(),
+                row.get::<usize, String>(1).unwrap(),
+                row.get::<usize, String>(2).unwrap(),
+                row.get::<usize, String>(3).unwrap(),
+                row.get::<usize, String>(4).unwrap(),
+                row.get::<usize, String>(5).unwrap(),
+                row.get::<usize, String>(6).unwrap(),
+                row.get::<usize, String>(7).unwrap(),
+                row.get::<usize, String>(8).unwrap(),
+                row.get::<usize, String>(9).unwrap(),
+                row.get::<usize, String>(10).unwrap(),
+                row.get::<usize, String>(11).unwrap(),
+            ))
+        }) {
+            Ok(v) => v,
+            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+        };
+
+        // Drop so we can use conn again later on
+        drop(stmt);
+
+        let entity_type = match EntityType::try_from(entitytypestr.as_str()) {
+            Ok(v) => v,
+            Err(v) => {
+                return Err(MensagoError::ErrDatabaseException(format!(
+                    "Bad entity type received from database: '{}'",
+                    v
+                )))
+            }
+        };
+        let unitlist = SeparatedStrList::from(&orgunitstr, ",");
+        let catlist = SeparatedStrList::from(&categorystr, ",");
+        let langlist = SeparatedStrList::from(&languagestr, ",");
+
+        let photo = match PhotoModel::load_from_db(conid, conn) {
+            Ok(v) => Some(v),
+            Err(_) => None,
+        };
+
+        // All the values simple types have been loaded, so now we just load the ones which
+        // have a dedicated type model
+
+        // Ok(ContactModel {
+        //     id: conid.clone(),
+        //     entity_type,
+        //     group,
+        //     name: NameModel::load_from_db(conid, conn)?,
+        //     gender,
+        //     bio,
+        //     anniversary,
+        //     birthday,
+        //     //email,
+        //     organization,
+        //     orgunits: unitlist.items,
+        //     title,
+        //     categories: catlist.items,
+        //     //websites,
+        //     photo,
+        //     languages: langlist.items,
+        //     notes,
+        //     //attachments,
+        //     //custom,
+        //     annotations: None,
+        // })
+        Err(MensagoError::ErrUnimplemented)
     }
 }
