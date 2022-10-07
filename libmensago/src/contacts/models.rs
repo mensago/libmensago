@@ -1339,8 +1339,141 @@ pub struct FileModel {
     pub contact_id: RandomID,
 
     pub name: String,
-    pub mime_type: String,
+    pub mime_type: Mime,
     pub data: Vec<u8>,
+}
+
+impl FileModel {
+    /// Creates a new empty FileModel
+    pub fn new(contact_id: &RandomID, name: &str, mimetype: &Mime, imgdata: &Vec<u8>) -> FileModel {
+        FileModel {
+            id: RandomID::generate(),
+            contact_id: contact_id.clone(),
+
+            name: String::from(name),
+            mime_type: mimetype.clone(),
+            data: imgdata.clone(),
+        }
+    }
+
+    /// `load_from_db()` instantiates a FileModel from the specified file ID.
+    pub fn load_from_db(
+        id: &RandomID,
+        conn: &mut rusqlite::Connection,
+    ) -> Result<FileModel, MensagoError> {
+        let mut out: FileModel;
+
+        {
+            let mut stmt =
+                conn.prepare("SELECT conid,name,mime,data FROM contact_files WHERE id = ?1")?;
+            let (idstr, name, mimestr, imgdata) = match stmt.query_row(&[&id.to_string()], |row| {
+                Ok((
+                    row.get::<usize, String>(0).unwrap(),
+                    row.get::<usize, String>(1).unwrap(),
+                    row.get::<usize, String>(2).unwrap(),
+                    row.get::<usize, Vec<u8>>(3).unwrap(),
+                ))
+            }) {
+                Ok(v) => v,
+                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+            };
+
+            let id = match RandomID::from(&idstr) {
+                Some(v) => v,
+                None => {
+                    return Err(MensagoError::ErrDatabaseException(format!(
+                        "Bad file ID received from database: '{}'",
+                        idstr
+                    )))
+                }
+            };
+            let imgtype = match Mime::from_str(&mimestr) {
+                Ok(v) => v,
+                Err(_) => {
+                    return Err(MensagoError::ErrDatabaseException(format!(
+                        "Bad file MIME type received from database: '{}'",
+                        mimestr
+                    )))
+                }
+            };
+
+            out = FileModel::new(&id, &name, &imgtype, &imgdata);
+            out.id = id;
+        }
+        Ok(out)
+    }
+}
+
+impl DBModel for FileModel {
+    fn delete_from_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+        match conn.execute(
+            "DELETE FROM contact_files WHERE id=?1",
+            &[&self.id.to_string()],
+        ) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
+        }
+    }
+
+    fn refresh_from_db(&mut self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+        {
+            let mut stmt =
+                conn.prepare("SELECT conid,name,mime,data FROM contact_files WHERE id = ?1")?;
+            let (conidstr, name, mimestr, imgdata) =
+                match stmt.query_row(&[&self.id.to_string()], |row| {
+                    Ok((
+                        row.get::<usize, String>(0).unwrap(),
+                        row.get::<usize, String>(1).unwrap(),
+                        row.get::<usize, String>(2).unwrap(),
+                        row.get::<usize, Vec<u8>>(3).unwrap(),
+                    ))
+                }) {
+                    Ok(v) => v,
+                    Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+                };
+
+            let conid = match RandomID::from(&conidstr) {
+                Some(v) => v,
+                None => {
+                    return Err(MensagoError::ErrDatabaseException(format!(
+                        "Bad contact ID received from database: '{}'",
+                        conidstr
+                    )))
+                }
+            };
+            let imgtype = match Mime::from_str(&mimestr) {
+                Ok(v) => v,
+                Err(_) => {
+                    return Err(MensagoError::ErrDatabaseException(format!(
+                        "Bad file MIME type received from database: '{}'",
+                        mimestr
+                    )))
+                }
+            };
+
+            self.contact_id = conid;
+            self.name = name;
+            self.mime_type = imgtype;
+            self.data = imgdata;
+        }
+        Ok(())
+    }
+
+    fn set_in_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+        match conn.execute(
+            "INSERT OR REPLACE INTO contact_files(id,conid,name,mime,data) VALUES(?1,?2,?3,?4,?5)",
+            rusqlite::params![
+                &self.id.to_string(),
+                &self.contact_id.to_string(),
+                &self.name,
+                &self.mime_type.to_string(),
+                &self.data,
+            ],
+        ) {
+            Ok(_) => Ok(()),
+            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+        }
+    }
 }
 
 /// DBContact, unlike `JSONContact`, is a model for interacting with the database
