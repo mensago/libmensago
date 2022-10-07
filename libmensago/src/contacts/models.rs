@@ -994,6 +994,206 @@ pub struct AddressModel {
     pub preferred: bool,
 }
 
+impl AddressModel {
+    /// Creates a new empty KeyModel.
+    pub fn new(contact_id: &RandomID, label: &str) -> AddressModel {
+        AddressModel {
+            id: RandomID::generate(),
+            contact_id: contact_id.clone(),
+            label: String::from(label),
+            street: String::new(),
+            extended: String::new(),
+            locality: String::new(),
+            region: String::new(),
+            postalcode: String::new(),
+            country: String::new(),
+
+            preferred: false,
+        }
+    }
+
+    /// Instantiates a AddressModel from a model ID in the database. If you would like to load all
+    /// of a contact's keys, look at `load_all()`.
+    pub fn load_from_db(
+        id: &RandomID,
+        conn: &mut rusqlite::Connection,
+    ) -> Result<AddressModel, MensagoError> {
+        let mut stmt = conn.prepare(
+            "SELECT conid,label,street,extended,locality,region,postalcode,country,preferred 
+            FROM contact_address WHERE id = ?1",
+        )?;
+        let (conidstr, label, street, extended, locality, region, postalcode, country, preferred) =
+            match stmt.query_row(&[&id.to_string()], |row| {
+                Ok((
+                    row.get::<usize, String>(0).unwrap(),
+                    row.get::<usize, String>(1).unwrap(),
+                    row.get::<usize, String>(2).unwrap(),
+                    row.get::<usize, String>(3).unwrap(),
+                    row.get::<usize, String>(4).unwrap(),
+                    row.get::<usize, String>(5).unwrap(),
+                    row.get::<usize, String>(6).unwrap(),
+                    row.get::<usize, String>(7).unwrap(),
+                    row.get::<usize, bool>(8).unwrap(),
+                ))
+            }) {
+                Ok(v) => v,
+                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+            };
+
+        Ok(AddressModel {
+            id: id.clone(),
+            contact_id: RandomID::try_from(conidstr.as_str())?,
+            label,
+            street,
+            extended,
+            locality,
+            region,
+            postalcode,
+            country,
+            preferred,
+        })
+    }
+
+    /// Returns a list of all AddressModels in the database of a particular type that belong to a
+    /// specific contact.
+    pub fn load_all(
+        conid: &RandomID,
+        conn: &mut rusqlite::Connection,
+    ) -> Result<Vec<AddressModel>, MensagoError> {
+        let mut ids = Vec::<RandomID>::new();
+        {
+            let mut stmt = match conn.prepare("SELECT id FROM contact_address WHERE conid = ?1") {
+                Ok(v) => v,
+                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+            };
+
+            let mut rows = match stmt.query([&conid.as_string()]) {
+                Ok(v) => v,
+                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+            };
+
+            let mut option_row = match rows.next() {
+                Ok(v) => v,
+                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+            };
+
+            while option_row.is_some() {
+                let row = option_row.unwrap();
+                let partid = match RandomID::from(&row.get::<usize, String>(0).unwrap()) {
+                    Some(v) => v,
+                    None => {
+                        return Err(MensagoError::ErrDatabaseException(format!(
+                            "Bad address model ID {} in contact_address",
+                            &row.get::<usize, String>(0).unwrap()
+                        )))
+                    }
+                };
+                ids.push(partid);
+
+                option_row = match rows.next() {
+                    Ok(v) => v,
+                    Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+                };
+            }
+        }
+
+        let mut out = Vec::new();
+        for id in ids.iter() {
+            out.push(AddressModel::load_from_db(&id, conn)?);
+        }
+
+        Ok(out)
+    }
+
+    pub fn set_all(
+        models: &Vec<MensagoModel>,
+        conn: &mut rusqlite::Connection,
+    ) -> Result<(), MensagoError> {
+        for model in models.iter() {
+            model.set_in_db(conn)?;
+        }
+        Ok(())
+    }
+}
+
+impl DBModel for AddressModel {
+    fn delete_from_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+        match conn.execute(
+            "DELETE FROM contact_address WHERE id=?1",
+            &[&self.id.to_string()],
+        ) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
+        }
+    }
+
+    fn refresh_from_db(&mut self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+        let mut stmt = conn.prepare(
+            "SELECT conid,label,street,extended,locality,region,postalcode,country,preferred 
+            FROM contact_adress WHERE id = ?1",
+        )?;
+        let (conidstr, label, street, extended, locality, region, postalcode, country, preferred) =
+            match stmt.query_row(&[&self.id.to_string()], |row| {
+                Ok((
+                    row.get::<usize, String>(0).unwrap(),
+                    row.get::<usize, String>(1).unwrap(),
+                    row.get::<usize, String>(2).unwrap(),
+                    row.get::<usize, String>(3).unwrap(),
+                    row.get::<usize, String>(4).unwrap(),
+                    row.get::<usize, String>(5).unwrap(),
+                    row.get::<usize, String>(6).unwrap(),
+                    row.get::<usize, String>(7).unwrap(),
+                    row.get::<usize, bool>(8).unwrap(),
+                ))
+            }) {
+                Ok(v) => v,
+                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+            };
+        self.label = label;
+        self.street = street;
+        self.extended = extended;
+        self.locality = locality;
+        self.region = region;
+        self.postalcode = postalcode;
+        self.country = country;
+        self.preferred = preferred;
+
+        self.contact_id = match RandomID::from(&conidstr) {
+            Some(v) => v,
+            None => {
+                return Err(MensagoError::ErrDatabaseException(format!(
+                    "Bad contact ID received from database: '{}'",
+                    conidstr
+                )))
+            }
+        };
+
+        Ok(())
+    }
+
+    fn set_in_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+        match conn.execute(
+            "INSERT OR REPLACE INTO contact_keys(id,conid,label,street,extended,locality,region,
+            postalcode,country,preferred) VALUES(?1,?2,?3,?4,?5,?6,?7,?8)",
+            rusqlite::params![
+                &self.id.to_string(),
+                &self.contact_id.to_string(),
+                &self.label,
+                &self.street,
+                &self.extended,
+                &self.locality,
+                &self.region,
+                &self.postalcode,
+                &self.country,
+                &self.preferred,
+            ],
+        ) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
+        }
+    }
+}
+
 /// PhotoModel represents a contact's photo
 #[derive(Debug, Clone)]
 pub struct PhotoModel {
