@@ -1,4 +1,4 @@
-use crate::{base::*, types::*};
+use crate::{base::*, types::*, EntityType};
 use eznacl::*;
 use libkeycard::*;
 use mime::Mime;
@@ -1479,7 +1479,7 @@ impl DBModel for FileModel {
 /// DBContact, unlike `JSONContact`, is a model for interacting with the database
 pub struct ContactModel {
     pub contact_id: RandomID,
-    pub entity_type: String,
+    pub entity_type: EntityType,
 
     pub group: String,
 
@@ -1508,12 +1508,47 @@ pub struct ContactModel {
     pub categories: Vec<String>,
 
     pub websites: Vec<StringModel>,
-    pub photo: PhotoModel,
+    pub photo: Option<PhotoModel>,
 
-    pub languages: Vec<StringModel>,
+    pub languages: Vec<String>,
 
     pub notes: String,
     pub attachments: Vec<FileModel>,
     pub custom: Vec<StringModel>,
-    pub annotations: Box<Self>,
+    pub annotations: Option<Box<Self>>,
+}
+
+impl ContactModel {
+    /// Creates a new empty ContactModel, which defaults to representing an individual
+    pub fn new() -> ContactModel {
+        let conid = RandomID::generate();
+        ContactModel {
+            contact_id: conid.clone(),
+            entity_type: EntityType::Individual,
+            group: String::new(),
+            name: NameModel::new(&conid),
+            gender: String::new(),
+            bio: String::new(),
+            social: Vec::new(),
+            mensago: Vec::new(),
+            keys: Vec::new(),
+            messaging: Vec::new(),
+            addresses: Vec::new(),
+            phone: Vec::new(),
+            anniversary: String::new(),
+            birthday: String::new(),
+            email: Vec::new(),
+            organization: String::new(),
+            orgunits: Vec::new(),
+            title: String::new(),
+            categories: Vec::new(),
+            websites: Vec::new(),
+            photo: None,
+            languages: Vec::new(),
+            notes: String::new(),
+            attachments: Vec::new(),
+            custom: Vec::new(),
+            annotations: None,
+        }
+    }
 }
