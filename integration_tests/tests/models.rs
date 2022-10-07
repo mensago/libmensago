@@ -1,5 +1,6 @@
 mod tests {
     use crate::common::*;
+    use eznacl::CryptoString;
     use libkeycard::*;
     use libmensago::*;
     use std::path::PathBuf;
@@ -298,7 +299,7 @@ mod tests {
 
     #[test]
     fn test_mensagomodel() -> Result<(), MensagoError> {
-        let testname = "test_namemodel";
+        let testname = "test_mensagomodel";
 
         // The list of full data is as follows:
         // let (config, pwhash, profman) = setup_db_test(testname)?;
@@ -407,6 +408,130 @@ mod tests {
         }
 
         match check_db_value(&mut db, "contact_mensago", &model.id, "uid", "csimons") {
+            Ok(_) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: delete_from_db failed to delete row",
+                    testname,
+                )))
+            }
+            Err(_) => (),
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_keymodel() -> Result<(), MensagoError> {
+        let testname = "test_keymodel";
+
+        // The list of full data is as follows:
+        // let (config, pwhash, profman) = setup_db_test(testname)?;
+        let (_, _, profman) = setup_db_test(testname)?;
+
+        let profile = profman.get_active_profile().unwrap();
+        let mut db = profile.open_secrets()?;
+
+        let conid = RandomID::from("00000000-1111-2222-3333-444444444444").unwrap();
+        let testkey =
+            CryptoString::from("CURVE25519:SNhj2K`hgBd8>G>lW$!pXiM7S-B!Fbd9jT2&{{Az").unwrap();
+        let mut model = KeyModel::new(&conid, "Work", KeyCategory::Encryption, &testkey);
+
+        // Add to db
+        match model.set_in_db(&mut db) {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: set_in_db() error: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        }
+
+        let mut fields = vec![
+            ("id", model.id.to_string()),
+            ("conid", conid.to_string()),
+            ("label", String::from("Work")),
+            ("category", String::from("encryption")),
+            ("value", testkey.to_string()),
+        ];
+        for pair in fields.iter() {
+            match check_db_value(&mut db, "contact_keys", &model.id, pair.0, &pair.1) {
+                Ok(_) => (),
+                Err(e) => {
+                    return Err(MensagoError::ErrProgramException(format!(
+                        "{}: set_in_db value check error for {}: {}",
+                        testname,
+                        pair.0,
+                        e.to_string()
+                    )))
+                }
+            }
+        }
+
+        // Update db
+        model.label = String::from("Home");
+        match model.set_in_db(&mut db) {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: set_in_db() update error: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        }
+
+        fields[2] = ("label", String::from("Home"));
+        for pair in fields.iter() {
+            match check_db_value(&mut db, "contact_keys", &model.id, pair.0, &pair.1) {
+                Ok(_) => (),
+                Err(e) => {
+                    return Err(MensagoError::ErrProgramException(format!(
+                        "{}: set_in_db updatevalue check error for {}: {}",
+                        testname,
+                        pair.0,
+                        e.to_string()
+                    )))
+                }
+            }
+        }
+
+        // Load from db
+        let loadmodel = match KeyModel::load_from_db(&model.id, &mut db) {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: load_from_db() error: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        };
+
+        if loadmodel.label != "Home"
+            || loadmodel.key.to_string() != "CURVE25519:SNhj2K`hgBd8>G>lW$!pXiM7S-B!Fbd9jT2&{{Az"
+        {
+            return Err(MensagoError::ErrProgramException(format!(
+                "{}: load_from_db value mismatch: expected 'Home' and 
+                'CURVE25519:SNhj2K`hgBd8>G>lW$!pXiM7S-B!Fbd9jT2&{{Az', got '{} {}'",
+                testname, loadmodel.label, loadmodel.key
+            )));
+        }
+
+        // Delete from db
+        match model.delete_from_db(&mut db) {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: delete_from_db() error: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        }
+
+        match check_db_value(&mut db, "contact_keys", &model.id, "category", "encryption") {
             Ok(_) => {
                 return Err(MensagoError::ErrProgramException(format!(
                     "{}: delete_from_db failed to delete row",

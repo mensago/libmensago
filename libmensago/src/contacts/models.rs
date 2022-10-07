@@ -798,8 +798,9 @@ impl KeyModel {
         id: &RandomID,
         conn: &mut rusqlite::Connection,
     ) -> Result<KeyModel, MensagoError> {
-        let mut stmt =
-            conn.prepare("SELECT conid,label,uid,wid,domain FROM contact_keys WHERE id = ?1")?;
+        let mut stmt = conn.prepare(
+            "SELECT conid,label,category,value,timestamp FROM contact_keys WHERE id = ?1",
+        )?;
         let (conidstr, label, catstr, valstr, timestr) =
             match stmt.query_row(&[&id.to_string()], |row| {
                 Ok((
