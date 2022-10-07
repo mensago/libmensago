@@ -112,6 +112,7 @@ impl SeparatedStrList {
     fn parse(s: &str, sep: &str) -> Vec<String> {
         s.split(&sep)
             .map(|x| x.trim())
+            .filter(|x| x.len() > 0)
             .map(|x| String::from(x))
             .collect()
     }
@@ -124,5 +125,45 @@ impl fmt::Display for SeparatedStrList {
         } else {
             write!(f, "")
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{MensagoError, SeparatedStrList};
+
+    #[test]
+    fn test_seplist() -> Result<(), MensagoError> {
+        // Empty item filtering
+        assert_eq!(
+            SeparatedStrList::from("a::b::c::d::", "::").join(),
+            "a::b::c::d"
+        );
+
+        // Duplicate separator filtering
+        assert_eq!(
+            SeparatedStrList::from("a::b::c::::::d::", "::").join(),
+            "a::b::c::d"
+        );
+
+        // set()/set_separator()
+        assert_eq!(
+            SeparatedStrList::from("a:b:c:d:", ":")
+                .set_separator("-")
+                .set("a::b")
+                .join(),
+            "a::b"
+        );
+
+        // push()
+        assert_eq!(
+            SeparatedStrList::from("a:b:c:d:", ":")
+                .set_separator("-")
+                .push("e::f")
+                .join(),
+            "a-b-c-d-e::f"
+        );
+
+        Ok(())
     }
 }
