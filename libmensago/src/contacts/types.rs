@@ -164,6 +164,9 @@ mod tests {
             "a-b-c-d-e::f"
         );
 
+        // Empty string handling
+        assert_eq!(SeparatedStrList::from("", ":").join().len(), 0);
+
         Ok(())
     }
 }
