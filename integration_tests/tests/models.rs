@@ -3,7 +3,9 @@ mod tests {
     use eznacl::CryptoString;
     use libkeycard::*;
     use libmensago::*;
+    use mime::Mime;
     use std::path::PathBuf;
+    use std::str::FromStr;
     use toml_edit::Document;
 
     fn setup_db_test(
@@ -654,6 +656,126 @@ mod tests {
         }
 
         match check_db_value(&mut db, "contact_address", &model.id, "label", "") {
+            Ok(_) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: delete_from_db failed to delete row",
+                    testname,
+                )))
+            }
+            Err(_) => (),
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_photomodel() -> Result<(), MensagoError> {
+        let testname = "test_photomodel";
+
+        // The list of full data is as follows:
+        // let (config, pwhash, profman) = setup_db_test(testname)?;
+        let (_, _, profman) = setup_db_test(testname)?;
+
+        let profile = profman.get_active_profile().unwrap();
+        let mut db = profile.open_storage()?;
+
+        let conid = RandomID::from("00000000-1111-2222-3333-444444444444").unwrap();
+        let imgtype = Mime::from_str("image/webp").unwrap();
+        let imgdata = vec![65, 66, 67, 68, 69];
+        let mut model = PhotoModel::new(&conid, &imgtype, &imgdata);
+
+        // Add to db
+        match model.set_in_db(&mut db) {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: set_in_db() error: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        }
+
+        let mut fields = vec![
+            ("id", model.id.to_string()),
+            ("conid", conid.to_string()),
+            ("mime", String::from("image/webp")),
+            // Can't check binary data with check_db_value(). Oh well. *shrug*
+        ];
+        for pair in fields.iter() {
+            match check_db_value(&mut db, "contact_photo", &model.id, pair.0, &pair.1) {
+                Ok(_) => (),
+                Err(e) => {
+                    return Err(MensagoError::ErrProgramException(format!(
+                        "{}: set_in_db value check error for field {}: {}",
+                        testname,
+                        pair.0,
+                        e.to_string()
+                    )))
+                }
+            }
+        }
+
+        // Update in db
+        model.mime_type = Mime::from_str("image/png").unwrap();
+        match model.set_in_db(&mut db) {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: set_in_db() update error: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        }
+
+        fields[2] = ("mime", String::from("image/png"));
+        for pair in fields.iter() {
+            match check_db_value(&mut db, "contact_photo", &model.id, pair.0, &pair.1) {
+                Ok(_) => (),
+                Err(e) => {
+                    return Err(MensagoError::ErrProgramException(format!(
+                        "{}: set_in_db value check error for {}: {}",
+                        testname,
+                        pair.0,
+                        e.to_string()
+                    )))
+                }
+            }
+        }
+
+        // Load from db
+        let loadmodel = match PhotoModel::load_from_db(&conid, &mut db) {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: load_from_db() error: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        };
+
+        if loadmodel.contact_id != conid || loadmodel.mime_type.to_string() != "image/png" {
+            return Err(MensagoError::ErrProgramException(format!(
+                "{}: load_from_db value mismatch: expected {}/'image/png', got '{}/{}'",
+                testname, conid, loadmodel.contact_id, loadmodel.mime_type
+            )));
+        }
+
+        // Delete from db
+        match model.delete_from_db(&mut db) {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: delete_from_db() error: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        }
+
+        match check_db_value(&mut db, "contact_photo", &model.id, "mime", "") {
             Ok(_) => {
                 return Err(MensagoError::ErrProgramException(format!(
                     "{}: delete_from_db failed to delete row",

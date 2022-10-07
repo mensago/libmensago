@@ -1225,7 +1225,7 @@ impl PhotoModel {
 
         {
             let mut stmt =
-                conn.prepare("SELECT id,mime,data FROM contact_names WHERE conid = ?1")?;
+                conn.prepare("SELECT id,mime,data FROM contact_photo WHERE conid = ?1")?;
             let (idstr, mimestr, imgdata) = match stmt.query_row(&[&conid.to_string()], |row| {
                 Ok((
                     row.get::<usize, String>(0).unwrap(),
@@ -1241,7 +1241,7 @@ impl PhotoModel {
                 Some(v) => v,
                 None => {
                     return Err(MensagoError::ErrDatabaseException(format!(
-                        "Bad contact name ID received from database: '{}'",
+                        "Bad photo ID received from database: '{}'",
                         idstr
                     )))
                 }
