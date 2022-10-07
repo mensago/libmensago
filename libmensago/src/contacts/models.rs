@@ -1,6 +1,7 @@
 use crate::{base::*, types::*};
 use eznacl::*;
 use libkeycard::*;
+use mime::Mime;
 use rusqlite;
 use std::convert::TryFrom;
 use std::fmt;
@@ -1200,8 +1201,135 @@ pub struct PhotoModel {
     pub id: RandomID,
     pub contact_id: RandomID,
 
-    pub mime_type: String,
+    pub mime_type: Mime,
     pub data: Vec<u8>,
+}
+
+impl PhotoModel {
+    /// Creates a new empty PhotoModel
+    pub fn new(contact_id: &RandomID, mimetype: &Mime, imgdata: &Vec<u8>) -> PhotoModel {
+        PhotoModel {
+            id: RandomID::generate(),
+            contact_id: contact_id.clone(),
+            mime_type: mimetype.clone(),
+            data: imgdata.clone(),
+        }
+    }
+
+    /// `load_from_db()` instantiates a PhotoModel from the specified contact ID.
+    pub fn load_from_db(
+        conid: &RandomID,
+        conn: &mut rusqlite::Connection,
+    ) -> Result<PhotoModel, MensagoError> {
+        let mut out: PhotoModel;
+
+        {
+            let mut stmt =
+                conn.prepare("SELECT id,mime,data FROM contact_names WHERE conid = ?1")?;
+            let (idstr, mimestr, imgdata) = match stmt.query_row(&[&conid.to_string()], |row| {
+                Ok((
+                    row.get::<usize, String>(0).unwrap(),
+                    row.get::<usize, String>(1).unwrap(),
+                    row.get::<usize, Vec<u8>>(2).unwrap(),
+                ))
+            }) {
+                Ok(v) => v,
+                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+            };
+
+            let id = match RandomID::from(&idstr) {
+                Some(v) => v,
+                None => {
+                    return Err(MensagoError::ErrDatabaseException(format!(
+                        "Bad contact name ID received from database: '{}'",
+                        idstr
+                    )))
+                }
+            };
+            let imgtype = match Mime::from_str(&mimestr) {
+                Ok(v) => v,
+                Err(_) => {
+                    return Err(MensagoError::ErrDatabaseException(format!(
+                        "Bad photo MIME type received from database: '{}'",
+                        mimestr
+                    )))
+                }
+            };
+
+            out = PhotoModel::new(&conid, &imgtype, &imgdata);
+            out.id = id;
+        }
+        Ok(out)
+    }
+}
+
+impl DBModel for PhotoModel {
+    fn delete_from_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+        match conn.execute(
+            "DELETE FROM contact_photo WHERE id=?1",
+            &[&self.id.to_string()],
+        ) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
+        }
+    }
+
+    fn refresh_from_db(&mut self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+        {
+            let mut stmt =
+                conn.prepare("SELECT conid,mime,data FROM contact_photo WHERE id = ?1")?;
+            let (conidstr, mimestr, imgdata) =
+                match stmt.query_row(&[&self.id.to_string()], |row| {
+                    Ok((
+                        row.get::<usize, String>(0).unwrap(),
+                        row.get::<usize, String>(1).unwrap(),
+                        row.get::<usize, Vec<u8>>(2).unwrap(),
+                    ))
+                }) {
+                    Ok(v) => v,
+                    Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+                };
+
+            let conid = match RandomID::from(&conidstr) {
+                Some(v) => v,
+                None => {
+                    return Err(MensagoError::ErrDatabaseException(format!(
+                        "Bad contact ID received from database: '{}'",
+                        conidstr
+                    )))
+                }
+            };
+            let imgtype = match Mime::from_str(&mimestr) {
+                Ok(v) => v,
+                Err(_) => {
+                    return Err(MensagoError::ErrDatabaseException(format!(
+                        "Bad photo MIME type received from database: '{}'",
+                        mimestr
+                    )))
+                }
+            };
+
+            self.contact_id = conid;
+            self.mime_type = imgtype;
+            self.data = imgdata;
+        }
+        Ok(())
+    }
+
+    fn set_in_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+        match conn.execute(
+            "INSERT OR REPLACE INTO contact_photo(id,conid,mime,data) VALUES(?1,?2,?3,?4)",
+            rusqlite::params![
+                &self.id.to_string(),
+                &self.contact_id.to_string(),
+                &self.mime_type.to_string(),
+                &self.data,
+            ],
+        ) {
+            Ok(_) => Ok(()),
+            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+        }
+    }
 }
 
 /// FileModel represents a file attached to a contact
