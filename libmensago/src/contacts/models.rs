@@ -124,6 +124,20 @@ impl StringModel {
 
         Ok(out)
     }
+
+    /// Removes all of a contact's StringModels from the database
+    pub fn delete_all(
+        conid: &RandomID,
+        conn: &mut rusqlite::Connection,
+    ) -> Result<(), MensagoError> {
+        match conn.execute(
+            "DELETE FROM contact_keyvalue WHERE conid=?1",
+            &[&conid.to_string()],
+        ) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
+        }
+    }
 }
 
 impl DBModel for StringModel {
@@ -366,6 +380,20 @@ impl NamePartModel {
         }
         Ok(())
     }
+
+    /// Removes all of a contact's NamePartModels from the database
+    pub fn delete_all(
+        conid: &RandomID,
+        conn: &mut rusqlite::Connection,
+    ) -> Result<(), MensagoError> {
+        match conn.execute(
+            "DELETE FROM contact_nameparts WHERE conid=?1",
+            &[&conid.to_string()],
+        ) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
+        }
+    }
 }
 
 impl DBModel for NamePartModel {
@@ -542,6 +570,8 @@ impl DBModel for NameModel {
             Ok(_) => Ok(()),
             Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
         }
+
+        // TODO: clean up submodels (addtional_names, etc.)
     }
 
     fn refresh_from_db(&mut self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
@@ -737,6 +767,20 @@ impl MensagoModel {
             model.set_in_db(conn)?;
         }
         Ok(())
+    }
+
+    /// Removes all of a contact's MensagoModels from the database
+    pub fn delete_all(
+        conid: &RandomID,
+        conn: &mut rusqlite::Connection,
+    ) -> Result<(), MensagoError> {
+        match conn.execute(
+            "DELETE FROM contact_mensago WHERE conid=?1",
+            &[&conid.to_string()],
+        ) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
+        }
     }
 }
 
@@ -950,6 +994,20 @@ impl KeyModel {
             model.set_in_db(conn)?;
         }
         Ok(())
+    }
+
+    /// Removes all of a contact's KeyModels from the database
+    pub fn delete_all(
+        conid: &RandomID,
+        conn: &mut rusqlite::Connection,
+    ) -> Result<(), MensagoError> {
+        match conn.execute(
+            "DELETE FROM contact_keys WHERE conid=?1",
+            &[&conid.to_string()],
+        ) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
+        }
     }
 }
 
@@ -1179,6 +1237,20 @@ impl AddressModel {
             model.set_in_db(conn)?;
         }
         Ok(())
+    }
+
+    /// Removes all of a contact's AddressModels from the database
+    pub fn delete_all(
+        conid: &RandomID,
+        conn: &mut rusqlite::Connection,
+    ) -> Result<(), MensagoError> {
+        match conn.execute(
+            "DELETE FROM contact_address WHERE conid=?1",
+            &[&conid.to_string()],
+        ) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
+        }
     }
 }
 
@@ -1520,6 +1592,20 @@ impl FileModel {
 
         Ok(out)
     }
+
+    /// Removes all of a contact's FileModels from the database
+    pub fn delete_all(
+        conid: &RandomID,
+        conn: &mut rusqlite::Connection,
+    ) -> Result<(), MensagoError> {
+        match conn.execute(
+            "DELETE FROM contact_files WHERE conid=?1",
+            &[&conid.to_string()],
+        ) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
+        }
+    }
 }
 
 impl DBModel for FileModel {
@@ -1733,8 +1819,7 @@ impl ContactModel {
             Err(_) => None,
         };
 
-        // All the values simple types have been loaded, so now we just load the ones which
-        // have a dedicated type model
+        // TODO: load annotations
 
         Ok(ContactModel {
             id: conid.clone(),
@@ -1826,6 +1911,6 @@ impl ContactModel {
         }
         Ok(out)
     }
-
-    // TODO: Implement DBModel trait for ContactModel
 }
+
+// TODO: Implement DBModel trait for ContactModel
