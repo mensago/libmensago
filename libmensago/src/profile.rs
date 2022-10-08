@@ -101,9 +101,9 @@ static STORAGE_DB_SETUP_COMMANDS: &str = "
     CREATE TABLE 'contact_keyvalue' (
         'id' TEXT NOT NULL UNIQUE,
         'conid' TEXT NOT NULL,
-        'type' TEXT NOT NULL,
+        'itemtype' TEXT NOT NULL,
         'label' TEXT NOT NULL,
-        'value' TEXT,
+        'value' TEXT
     );
     CREATE TABLE 'contact_photo' (
         'id' TEXT NOT NULL UNIQUE,

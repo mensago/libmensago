@@ -170,7 +170,7 @@ impl DBModel for StringModel {
 
     fn set_in_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
         match conn.execute(
-            "INSERT OR REPLACE INTO contact_keyvalue(id,type,conid,label,value) 
+            "INSERT OR REPLACE INTO contact_keyvalue(id,itemtype,conid,label,value) 
             VALUES(?1,?2,?3,?4,?5)",
             &[
                 &self.id.to_string(),
