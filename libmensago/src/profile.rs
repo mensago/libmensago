@@ -62,7 +62,7 @@ static STORAGE_DB_SETUP_COMMANDS: &str = "
         'title' TEXT,
         'notes' TEXT,
         'annotation' BOOL,
-        'annotation_id' TEXT
+        'annotation_link' TEXT
 	);
     CREATE TABLE 'contact_names' (
         'id' TEXT NOT NULL UNIQUE,
