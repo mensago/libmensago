@@ -485,14 +485,10 @@ pub struct NameModel {
 }
 
 impl NameModel {
-    /// Creates a new NameModel. The spec requires each contact to at least have something in the
-    /// GivenName field. This call will panic if given an empty string or one containing only
-    /// whitespace.
+    /// Creates a new NameModel. Although the spec requires each contact to at least have something
+    /// in the GivenName field, this call will permit an empty `givenname` for usage in annotations.
     pub fn new(contact_id: &RandomID, givenname: &str) -> NameModel {
         let gn = String::from(givenname.trim());
-        if gn.len() < 1 {
-            panic!();
-        }
 
         NameModel {
             id: RandomID::generate(),
@@ -1725,14 +1721,16 @@ pub struct ContactDataModel {
 }
 
 impl ContactDataModel {
-    /// Creates a new empty ContactDataModel, which defaults to representing an individual
-    pub fn new(givenname: &str, is_annotation: bool) -> ContactDataModel {
+    /// Creates a new empty ContactDataModel, which defaults to representing an individual. The
+    /// `name` parameter is used for an individual's GivenName field or the base name of a group
+    /// or organization.
+    pub fn new(name: &str, entity_type: EntityType, is_annotation: bool) -> ContactDataModel {
         let conid = RandomID::generate();
         ContactDataModel {
             id: conid.clone(),
-            entity_type: EntityType::Individual,
+            entity_type,
             group: String::new(),
-            name: NameModel::new(&conid, givenname),
+            name: NameModel::new(&conid, name),
             gender: String::new(),
             bio: String::new(),
             social: Vec::new(),
@@ -1858,64 +1856,130 @@ impl ContactDataModel {
 
 impl DBModel for ContactDataModel {
     fn delete_from_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
-        // match conn.execute("DELETE FROM contacts WHERE id=?1", &[&self.id.to_string()]) {
-        //     Ok(_) => (),
-        //     Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-        // }
+        // No annotation check is needed for this call because annotations have different ids
+        // from their owners
+        match conn.execute("DELETE FROM contacts WHERE id=?1", &[&self.id.to_string()]) {
+            Ok(_) => (),
+            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+        }
 
-        // self.name.delete_from_db(conn)?;
-        // StringModel::delete_all(&self.id, conn)?;
-        // MensagoModel::delete_all(&self.id, conn)?;
-        // KeyModel::delete_all(&self.id, conn)?;
-        // AddressModel::delete_all(&self.id, conn)?;
-        // if self.photo.is_some() {
-        //     self.photo.as_ref().unwrap().delete_from_db(conn)?;
-        // }
-        // FileModel::delete_all(&self.id, conn)?;
+        self.name.delete_from_db(conn)?;
+        StringModel::delete_all(&self.id, conn)?;
+        MensagoModel::delete_all(&self.id, conn)?;
+        KeyModel::delete_all(&self.id, conn)?;
+        AddressModel::delete_all(&self.id, conn)?;
+        if self.photo.is_some() {
+            self.photo.as_ref().unwrap().delete_from_db(conn)?;
+        }
+        FileModel::delete_all(&self.id, conn)?;
 
         Ok(())
     }
 
     fn refresh_from_db(&mut self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
-        // let mut stmt = conn.prepare(
-        //     "SELECT conid,formatted_name,given_name,family_name,prefix FROM
-        // contact_names WHERE id = ?1",
-        // )?;
-        // let (conidstr, formattedname, givenname, familyname, prefix) =
-        //     match stmt.query_row(&[&self.id.to_string()], |row| {
-        //         Ok((
-        //             row.get::<usize, String>(0).unwrap(),
-        //             row.get::<usize, String>(1).unwrap(),
-        //             row.get::<usize, String>(2).unwrap(),
-        //             row.get::<usize, String>(3).unwrap(),
-        //             row.get::<usize, String>(4).unwrap(),
-        //         ))
-        //     }) {
-        //         Ok(v) => v,
-        //         Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-        //     };
+        let mut stmt = conn.prepare(
+            "SELECT entitytype,group,gender,bio,anniversary,birthday,organization,orgunits,
+            title,categories,languages,notes FROM contacts WHERE conid = ?1 AND annotation=?2",
+        )?;
+        let (
+            entitytypestr,
+            group,
+            gender,
+            bio,
+            anniversary,
+            birthday,
+            organization,
+            orgunitstr,
+            title,
+            categorystr,
+            languagestr,
+            notes,
+        ) = match stmt.query_row(
+            rusqlite::params![&self.id.to_string(), &self.is_annotation],
+            |row| {
+                Ok((
+                    row.get::<usize, String>(0).unwrap(),
+                    row.get::<usize, String>(1).unwrap(),
+                    row.get::<usize, String>(2).unwrap(),
+                    row.get::<usize, String>(3).unwrap(),
+                    row.get::<usize, String>(4).unwrap(),
+                    row.get::<usize, String>(5).unwrap(),
+                    row.get::<usize, String>(6).unwrap(),
+                    row.get::<usize, String>(7).unwrap(),
+                    row.get::<usize, String>(8).unwrap(),
+                    row.get::<usize, String>(9).unwrap(),
+                    row.get::<usize, String>(10).unwrap(),
+                    row.get::<usize, String>(11).unwrap(),
+                ))
+            },
+        ) {
+            Ok(v) => v,
+            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+        };
 
-        // let conid = match RandomID::from(&conidstr) {
-        //     Some(v) => v,
-        //     None => {
-        //         return Err(MensagoError::ErrDatabaseException(format!(
-        //             "Bad contact ID received from database: '{}'",
-        //             conidstr
-        //         )))
-        //     }
-        // };
+        // Drop so we can use conn again later on
+        drop(stmt);
 
-        // self.contact_id = conid;
-        // self.formatted_name = formattedname;
-        // self.given_name = givenname;
-        // self.family_name = familyname;
-        // self.prefix = prefix;
-        // drop(stmt);
+        self.entity_type = match EntityType::try_from(entitytypestr.as_str()) {
+            Ok(v) => v,
+            Err(v) => {
+                return Err(MensagoError::ErrDatabaseException(format!(
+                    "Bad entity type received from database: '{}'",
+                    v
+                )))
+            }
+        };
+        self.group = group;
+        self.name.refresh_from_db(conn)?;
+        self.gender = gender;
+        self.bio = bio;
+        for item in self.social.iter_mut() {
+            item.refresh_from_db(conn)?;
+        }
+        for item in self.mensago.iter_mut() {
+            item.refresh_from_db(conn)?;
+        }
+        for item in self.keys.iter_mut() {
+            item.refresh_from_db(conn)?;
+        }
+        for item in self.messaging.iter_mut() {
+            item.refresh_from_db(conn)?;
+        }
+        for item in self.addresses.iter_mut() {
+            item.refresh_from_db(conn)?;
+        }
+        for item in self.phone.iter_mut() {
+            item.refresh_from_db(conn)?;
+        }
+        self.anniversary = anniversary;
+        self.birthday = birthday;
 
-        // self.additional_names =
-        //     NamePartModel::load_all(&self.contact_id, NamePartType::Additional, conn)?;
-        // self.nicknames = NamePartModel::load_all(&self.contact_id, NamePartType::Nickname, conn)?;
-        // self.suffixes = NamePartModel::load_all(&self.contact_id, NamePartType::Suffix, conn)?;
+        for item in self.email.iter_mut() {
+            item.refresh_from_db(conn)?;
+        }
+
+        self.organization = organization;
+        self.orgunits = SeparatedStrList::from(&orgunitstr, ",").items;
+        self.title = title;
+        self.categories = SeparatedStrList::from(&categorystr, ",").items;
+
+        for item in self.websites.iter_mut() {
+            item.refresh_from_db(conn)?;
+        }
+
+        self.photo = match PhotoModel::load_from_db(&self.id, conn) {
+            Ok(v) => Some(v),
+            Err(_) => None,
+        };
+        self.languages = SeparatedStrList::from(&languagestr, ",").items;
+
+        self.notes = notes;
+        for item in self.attachments.iter_mut() {
+            item.refresh_from_db(conn)?;
+        }
+        for item in self.custom.iter_mut() {
+            item.refresh_from_db(conn)?;
+        }
 
         Ok(())
     }
@@ -1942,92 +2006,5 @@ impl DBModel for ContactDataModel {
         // NamePartModel::set_all(&self.suffixes, conn)
 
         Ok(())
-    }
-}
-
-/// ContactModel represents a complete contact, including annotations
-pub struct ContactModel {
-    pub data: ContactDataModel,
-    pub annotations: Option<ContactDataModel>,
-}
-
-impl ContactModel {
-    /// Returns a new ContactModel without annotations
-    pub fn new(givenname: &str) -> ContactModel {
-        ContactModel {
-            data: ContactDataModel::new(givenname, false),
-            annotations: None,
-        }
-    }
-
-    /// Returns true if the model has client-side annotations
-    pub fn has_annotations(&self) -> bool {
-        self.annotations.is_some()
-    }
-
-    /// Ensures that the contact has a data container for annotations
-    pub fn enable_annotations(&mut self) {
-        // TODO: implement enable_annotations()
-    }
-
-    /// Returns the IDs of all contacts in the database.
-    ///
-    /// Because file attachments can make ContactDataModels very large and a user may have thousands of
-    /// contacts, this method and `get_names()` are the two ways of getting information
-    /// about all of the user's contacts at once and dealing with them iteratively. Generally
-    /// speaking, you probably want `get_names()`.
-    pub fn get_ids(conn: &mut rusqlite::Connection) -> Result<Vec<RandomID>, MensagoError> {
-        let mut ids = Vec::<RandomID>::new();
-
-        let mut stmt = match conn.prepare("SELECT id FROM contacts") {
-            Ok(v) => v,
-            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-        };
-
-        let mut rows = match stmt.query([]) {
-            Ok(v) => v,
-            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-        };
-
-        let mut option_row = match rows.next() {
-            Ok(v) => v,
-            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-        };
-
-        while option_row.is_some() {
-            let row = option_row.unwrap();
-            let partid = match RandomID::from(&row.get::<usize, String>(0).unwrap()) {
-                Some(v) => v,
-                None => {
-                    return Err(MensagoError::ErrDatabaseException(format!(
-                        "Bad contact model ID {} in contacts",
-                        &row.get::<usize, String>(0).unwrap()
-                    )))
-                }
-            };
-            ids.push(partid);
-
-            option_row = match rows.next() {
-                Ok(v) => v,
-                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-            };
-        }
-
-        Ok(ids)
-    }
-
-    /// This convenience method returns a list of NameModels representing all the user's contacts.
-    ///
-    /// Because file attachments can make ContactDataModels very large and a user may have thousands of
-    /// contacts, this method and `get_ids()` are the two ways of getting information about all of
-    /// the user's contacts at once and dealing with them iteratively.
-    #[inline]
-    pub fn get_names(conn: &mut rusqlite::Connection) -> Result<Vec<NameModel>, MensagoError> {
-        let mut out = Vec::<NameModel>::new();
-
-        for id in ContactModel::get_ids(conn)? {
-            out.push(NameModel::load_from_db(&id, conn)?)
-        }
-        Ok(out)
     }
 }
