@@ -51,7 +51,7 @@ static STORAGE_DB_SETUP_COMMANDS: &str = "
 		'attachments' TEXT
 	);
 	CREATE TABLE 'contacts' (
-		'conid' TEXT NOT NULL UNIQUE,
+		'id' TEXT NOT NULL UNIQUE,
 		'entitytype' TEXT NOT NULL,
         'group' TEXT NOT NULL,
         'gender' TEXT,
