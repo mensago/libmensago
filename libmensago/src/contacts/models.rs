@@ -5,7 +5,6 @@ use mime::Mime;
 use rusqlite;
 use std::convert::TryFrom;
 use std::fmt;
-use std::ops::Add;
 use std::str::FromStr;
 
 pub trait DBModel {
@@ -1395,6 +1394,16 @@ impl PhotoModel {
         }
         Ok(out)
     }
+
+    pub fn delete(conid: &RandomID, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+        match conn.execute(
+            "DELETE FROM contact_photo WHERE conid=?1",
+            &[&conid.to_string()],
+        ) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
+        }
+    }
 }
 
 impl DBModel for PhotoModel {
@@ -1718,6 +1727,7 @@ pub struct ContactDataModel {
     pub attachments: Vec<FileModel>,
     pub custom: Vec<StringModel>,
     pub is_annotation: bool,
+    pub annotation_link: Option<RandomID>,
 }
 
 impl ContactDataModel {
@@ -1753,6 +1763,7 @@ impl ContactDataModel {
             attachments: Vec::new(),
             custom: Vec::new(),
             is_annotation,
+            annotation_link: None,
         }
     }
 
@@ -1764,7 +1775,8 @@ impl ContactDataModel {
     ) -> Result<ContactDataModel, MensagoError> {
         let mut stmt = conn.prepare(
             "SELECT entitytype,group,gender,bio,anniversary,birthday,organization,orgunits,
-            title,categories,languages,notes FROM contacts WHERE conid = ?1 AND annotation=?2",
+            title,categories,languages,notes,annotation_link FROM contacts WHERE id = ?1 AND 
+            annotation=?2",
         )?;
         let (
             entitytypestr,
@@ -1779,6 +1791,7 @@ impl ContactDataModel {
             categorystr,
             languagestr,
             notes,
+            annlinkstr,
         ) = match stmt.query_row(
             rusqlite::params![&conid.to_string(), &is_annotation],
             |row| {
@@ -1795,6 +1808,7 @@ impl ContactDataModel {
                     row.get::<usize, String>(9).unwrap(),
                     row.get::<usize, String>(10).unwrap(),
                     row.get::<usize, String>(11).unwrap(),
+                    row.get::<usize, String>(12).unwrap(),
                 ))
             },
         ) {
@@ -1821,6 +1835,11 @@ impl ContactDataModel {
         let photo = match PhotoModel::load_from_db(conid, conn) {
             Ok(v) => Some(v),
             Err(_) => None,
+        };
+
+        let annotation_link = match RandomID::from(&annlinkstr) {
+            Some(v) => Some(v),
+            None => None,
         };
 
         Ok(ContactDataModel {
@@ -1850,6 +1869,7 @@ impl ContactDataModel {
             attachments: FileModel::load_all(conid, conn)?,
             custom: StringModel::load_all(conid, "custom", conn)?,
             is_annotation,
+            annotation_link,
         })
     }
 }
@@ -1985,25 +2005,80 @@ impl DBModel for ContactDataModel {
     }
 
     fn set_in_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
-        // match conn.execute(
-        //     "INSERT OR REPLACE INTO contact_names(id, conid, formatted_name, given_name, family_name,
-        //     prefix) VALUES(?1,?2,?3,?4,?5,?6)",
-        //     &[
-        //         &self.id.to_string(),
-        //         &self.contact_id.to_string(),
-        //         &self.formatted_name.to_string(),
-        //         &self.given_name.to_string(),
-        //         &self.family_name.to_string(),
-        //         &self.prefix.to_string(),
-        //     ],
-        // ) {
-        //     Ok(_) => (),
-        //     Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-        // }
+        let annlinkstr = match &self.annotation_link {
+            Some(v) => v.to_string(),
+            None => String::new(),
+        };
 
-        // NamePartModel::set_all(&self.additional_names, conn)?;
-        // NamePartModel::set_all(&self.nicknames, conn)?;
-        // NamePartModel::set_all(&self.suffixes, conn)
+        match conn.execute(
+            "INSERT OR REPLACE INTO contacts(id,entitytype,group,gender,bio,anniversary,birthday,
+            organization,orgunits,title,categories,languages,notes,annotation,annotation_link) 
+            VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14)",
+            rusqlite::params![
+                &self.id.to_string(),
+                &self.entity_type.to_string(),
+                &self.group.to_string(),
+                &self.gender.to_string(),
+                &self.bio.to_string(),
+                &self.anniversary.to_string(),
+                &self.birthday.to_string(),
+                &self.organization.to_string(),
+                &self.orgunits.join(","),
+                &self.title.to_string(),
+                &self.categories.join(","),
+                &self.languages.join(","),
+                &self.notes.to_string(),
+                &self.is_annotation,
+                &annlinkstr,
+            ],
+        ) {
+            Ok(_) => (),
+            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+        }
+
+        self.name.set_in_db(conn)?;
+        for item in self.social.iter() {
+            item.set_in_db(conn)?;
+        }
+        for item in self.mensago.iter() {
+            item.set_in_db(conn)?;
+        }
+        for item in self.keys.iter() {
+            item.set_in_db(conn)?;
+        }
+        for item in self.messaging.iter() {
+            item.set_in_db(conn)?;
+        }
+        for item in self.addresses.iter() {
+            item.set_in_db(conn)?;
+        }
+        for item in self.phone.iter() {
+            item.set_in_db(conn)?;
+        }
+
+        for item in self.email.iter() {
+            item.set_in_db(conn)?;
+        }
+
+        for item in self.websites.iter() {
+            item.set_in_db(conn)?;
+        }
+
+        match &self.photo {
+            Some(v) => {
+                v.set_in_db(conn)?;
+            }
+            None => {
+                PhotoModel::delete(&self.id, conn)?;
+            }
+        }
+
+        for item in self.attachments.iter() {
+            item.set_in_db(conn)?;
+        }
+        for item in self.custom.iter() {
+            item.set_in_db(conn)?;
+        }
 
         Ok(())
     }
