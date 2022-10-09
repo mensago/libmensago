@@ -67,8 +67,8 @@ static STORAGE_DB_SETUP_COMMANDS: &str = "
     CREATE TABLE 'contact_names' (
         'id' TEXT NOT NULL UNIQUE,
         'conid' TEXT NOT NULL,
-        'formatted_name' TEXT NOT NULL,
-        'given_name' TEXT NOT NULL,
+        'formatted_name' TEXT,
+        'given_name' TEXT,
         'family_name' TEXT,
         'prefix' TEXT
     );
