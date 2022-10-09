@@ -5,6 +5,7 @@ use mime::Mime;
 use rusqlite;
 use std::convert::TryFrom;
 use std::fmt;
+use std::ops::Add;
 use std::str::FromStr;
 
 pub trait DBModel {
@@ -567,11 +568,11 @@ impl DBModel for NameModel {
             "DELETE FROM contact_names WHERE id=?1",
             &[&self.id.to_string()],
         ) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
+            Ok(_) => (),
+            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
         }
 
-        // TODO: clean up submodels (addtional_names, etc.)
+        NamePartModel::delete_all(&self.contact_id, conn)
     }
 
     fn refresh_from_db(&mut self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
@@ -1680,8 +1681,9 @@ impl DBModel for FileModel {
     }
 }
 
-/// DBContact, unlike `JSONContact`, is a model for interacting with the database
-pub struct ContactModel {
+/// ContactDataModel is a structure to contain the data used for a contact. It is not the top-level
+/// model, however, in order to implement contact annotations.
+pub struct ContactDataModel {
     pub id: RandomID,
     pub entity_type: EntityType,
 
@@ -1719,14 +1721,14 @@ pub struct ContactModel {
     pub notes: String,
     pub attachments: Vec<FileModel>,
     pub custom: Vec<StringModel>,
-    pub annotations: Option<Box<Self>>,
+    pub is_annotation: bool,
 }
 
-impl ContactModel {
-    /// Creates a new empty ContactModel, which defaults to representing an individual
-    pub fn new(givenname: &str) -> ContactModel {
+impl ContactDataModel {
+    /// Creates a new empty ContactDataModel, which defaults to representing an individual
+    pub fn new(givenname: &str, is_annotation: bool) -> ContactDataModel {
         let conid = RandomID::generate();
-        ContactModel {
+        ContactDataModel {
             id: conid.clone(),
             entity_type: EntityType::Individual,
             group: String::new(),
@@ -1752,18 +1754,19 @@ impl ContactModel {
             notes: String::new(),
             attachments: Vec::new(),
             custom: Vec::new(),
-            annotations: None,
+            is_annotation,
         }
     }
 
-    /// `load_from_db()` instantiates a ContactModel from the specified contact ID.
+    /// `load_from_db()` instantiates a ContactDataModel from the specified contact ID.
     pub fn load_from_db(
         conid: &RandomID,
         conn: &mut rusqlite::Connection,
-    ) -> Result<ContactModel, MensagoError> {
+        is_annotation: bool,
+    ) -> Result<ContactDataModel, MensagoError> {
         let mut stmt = conn.prepare(
             "SELECT entitytype,group,gender,bio,anniversary,birthday,organization,orgunits,
-            title,categories,languages,notes FROM contacts WHERE conid = ?1 AND annotation=false",
+            title,categories,languages,notes FROM contacts WHERE conid = ?1 AND annotation=?2",
         )?;
         let (
             entitytypestr,
@@ -1778,22 +1781,25 @@ impl ContactModel {
             categorystr,
             languagestr,
             notes,
-        ) = match stmt.query_row(&[&conid.to_string()], |row| {
-            Ok((
-                row.get::<usize, String>(0).unwrap(),
-                row.get::<usize, String>(1).unwrap(),
-                row.get::<usize, String>(2).unwrap(),
-                row.get::<usize, String>(3).unwrap(),
-                row.get::<usize, String>(4).unwrap(),
-                row.get::<usize, String>(5).unwrap(),
-                row.get::<usize, String>(6).unwrap(),
-                row.get::<usize, String>(7).unwrap(),
-                row.get::<usize, String>(8).unwrap(),
-                row.get::<usize, String>(9).unwrap(),
-                row.get::<usize, String>(10).unwrap(),
-                row.get::<usize, String>(11).unwrap(),
-            ))
-        }) {
+        ) = match stmt.query_row(
+            rusqlite::params![&conid.to_string(), &is_annotation],
+            |row| {
+                Ok((
+                    row.get::<usize, String>(0).unwrap(),
+                    row.get::<usize, String>(1).unwrap(),
+                    row.get::<usize, String>(2).unwrap(),
+                    row.get::<usize, String>(3).unwrap(),
+                    row.get::<usize, String>(4).unwrap(),
+                    row.get::<usize, String>(5).unwrap(),
+                    row.get::<usize, String>(6).unwrap(),
+                    row.get::<usize, String>(7).unwrap(),
+                    row.get::<usize, String>(8).unwrap(),
+                    row.get::<usize, String>(9).unwrap(),
+                    row.get::<usize, String>(10).unwrap(),
+                    row.get::<usize, String>(11).unwrap(),
+                ))
+            },
+        ) {
             Ok(v) => v,
             Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
         };
@@ -1819,9 +1825,7 @@ impl ContactModel {
             Err(_) => None,
         };
 
-        // TODO: load annotations
-
-        Ok(ContactModel {
+        Ok(ContactDataModel {
             id: conid.clone(),
             entity_type,
             group,
@@ -1847,13 +1851,128 @@ impl ContactModel {
             notes,
             attachments: FileModel::load_all(conid, conn)?,
             custom: StringModel::load_all(conid, "custom", conn)?,
-            annotations: None,
+            is_annotation,
         })
+    }
+}
+
+impl DBModel for ContactDataModel {
+    fn delete_from_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+        // match conn.execute("DELETE FROM contacts WHERE id=?1", &[&self.id.to_string()]) {
+        //     Ok(_) => (),
+        //     Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+        // }
+
+        // self.name.delete_from_db(conn)?;
+        // StringModel::delete_all(&self.id, conn)?;
+        // MensagoModel::delete_all(&self.id, conn)?;
+        // KeyModel::delete_all(&self.id, conn)?;
+        // AddressModel::delete_all(&self.id, conn)?;
+        // if self.photo.is_some() {
+        //     self.photo.as_ref().unwrap().delete_from_db(conn)?;
+        // }
+        // FileModel::delete_all(&self.id, conn)?;
+
+        Ok(())
+    }
+
+    fn refresh_from_db(&mut self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+        // let mut stmt = conn.prepare(
+        //     "SELECT conid,formatted_name,given_name,family_name,prefix FROM
+        // contact_names WHERE id = ?1",
+        // )?;
+        // let (conidstr, formattedname, givenname, familyname, prefix) =
+        //     match stmt.query_row(&[&self.id.to_string()], |row| {
+        //         Ok((
+        //             row.get::<usize, String>(0).unwrap(),
+        //             row.get::<usize, String>(1).unwrap(),
+        //             row.get::<usize, String>(2).unwrap(),
+        //             row.get::<usize, String>(3).unwrap(),
+        //             row.get::<usize, String>(4).unwrap(),
+        //         ))
+        //     }) {
+        //         Ok(v) => v,
+        //         Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+        //     };
+
+        // let conid = match RandomID::from(&conidstr) {
+        //     Some(v) => v,
+        //     None => {
+        //         return Err(MensagoError::ErrDatabaseException(format!(
+        //             "Bad contact ID received from database: '{}'",
+        //             conidstr
+        //         )))
+        //     }
+        // };
+
+        // self.contact_id = conid;
+        // self.formatted_name = formattedname;
+        // self.given_name = givenname;
+        // self.family_name = familyname;
+        // self.prefix = prefix;
+        // drop(stmt);
+
+        // self.additional_names =
+        //     NamePartModel::load_all(&self.contact_id, NamePartType::Additional, conn)?;
+        // self.nicknames = NamePartModel::load_all(&self.contact_id, NamePartType::Nickname, conn)?;
+        // self.suffixes = NamePartModel::load_all(&self.contact_id, NamePartType::Suffix, conn)?;
+
+        Ok(())
+    }
+
+    fn set_in_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+        // match conn.execute(
+        //     "INSERT OR REPLACE INTO contact_names(id, conid, formatted_name, given_name, family_name,
+        //     prefix) VALUES(?1,?2,?3,?4,?5,?6)",
+        //     &[
+        //         &self.id.to_string(),
+        //         &self.contact_id.to_string(),
+        //         &self.formatted_name.to_string(),
+        //         &self.given_name.to_string(),
+        //         &self.family_name.to_string(),
+        //         &self.prefix.to_string(),
+        //     ],
+        // ) {
+        //     Ok(_) => (),
+        //     Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+        // }
+
+        // NamePartModel::set_all(&self.additional_names, conn)?;
+        // NamePartModel::set_all(&self.nicknames, conn)?;
+        // NamePartModel::set_all(&self.suffixes, conn)
+
+        Ok(())
+    }
+}
+
+/// ContactModel represents a complete contact, including annotations
+pub struct ContactModel {
+    pub data: ContactDataModel,
+    pub annotations: Option<ContactDataModel>,
+}
+
+impl ContactModel {
+    /// Returns a new ContactModel without annotations
+    pub fn new(givenname: &str) -> ContactModel {
+        ContactModel {
+            data: ContactDataModel::new(givenname, false),
+            annotations: None,
+        }
+    }
+
+    /// Returns true if the model has client-side annotations
+    pub fn has_annotations(&self) -> bool {
+        self.annotations.is_some()
+    }
+
+    /// Ensures that the contact has a data container for annotations
+    pub fn enable_annotations(&mut self) {
+        // TODO: implement enable_annotations()
     }
 
     /// Returns the IDs of all contacts in the database.
     ///
-    /// Because file attachments can make ContactModels very large and a user may have thousands of
+    /// Because file attachments can make ContactDataModels very large and a user may have thousands of
     /// contacts, this method and `get_names()` are the two ways of getting information
     /// about all of the user's contacts at once and dealing with them iteratively. Generally
     /// speaking, you probably want `get_names()`.
@@ -1899,7 +2018,7 @@ impl ContactModel {
 
     /// This convenience method returns a list of NameModels representing all the user's contacts.
     ///
-    /// Because file attachments can make ContactModels very large and a user may have thousands of
+    /// Because file attachments can make ContactDataModels very large and a user may have thousands of
     /// contacts, this method and `get_ids()` are the two ways of getting information about all of
     /// the user's contacts at once and dealing with them iteratively.
     #[inline]
@@ -1912,5 +2031,3 @@ impl ContactModel {
         Ok(out)
     }
 }
-
-// TODO: Implement DBModel trait for ContactModel
