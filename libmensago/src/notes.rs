@@ -379,3 +379,105 @@ impl NoteModel {
         })
     }
 }
+
+impl DBModel for NoteModel {
+    fn delete_from_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+        match conn.execute("DELETE FROM notes WHERE id=?1", &[&self.id.to_string()]) {
+            Ok(_) => (),
+            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+        }
+
+        AttachmentModel::delete_all(&self.id, conn)?;
+
+        Ok(())
+    }
+
+    fn refresh_from_db(&mut self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+        let mut stmt = conn.prepare(
+            "SELECT title,format,body,created,updated,notebook,tags FROM notes WHERE id = ?1",
+        )?;
+        let (title, formatstr, body, createdstr, updatedstr, notebook, tagstr) = match stmt
+            .query_row(&[&self.id.to_string()], |row| {
+                Ok((
+                    row.get::<usize, String>(0).unwrap(),
+                    row.get::<usize, String>(1).unwrap(),
+                    row.get::<usize, String>(2).unwrap(),
+                    row.get::<usize, String>(3).unwrap(),
+                    row.get::<usize, String>(4).unwrap(),
+                    row.get::<usize, String>(5).unwrap(),
+                    row.get::<usize, String>(6).unwrap(),
+                ))
+            }) {
+            Ok(v) => v,
+            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+        };
+        drop(stmt);
+
+        let noteformat = match NoteFormat::from_str(&formatstr) {
+            Ok(v) => v,
+            Err(_) => {
+                return Err(MensagoError::ErrDatabaseException(format!(
+                    "Bad note format type received from database: '{}'",
+                    formatstr
+                )))
+            }
+        };
+        let created = match Timestamp::try_from(createdstr.as_str()) {
+            Ok(v) => v,
+            Err(_) => {
+                return Err(MensagoError::ErrDatabaseException(format!(
+                    "Bad note creation date received from database: '{}'",
+                    createdstr
+                )))
+            }
+        };
+        let updated = match Timestamp::try_from(updatedstr.as_str()) {
+            Ok(v) => v,
+            Err(_) => {
+                return Err(MensagoError::ErrDatabaseException(format!(
+                    "Bad note updated date received from database: '{}'",
+                    updatedstr
+                )))
+            }
+        };
+
+        let taglist = SeparatedStrList::from(&tagstr, ",");
+
+        self.title = title;
+        self.format = noteformat;
+        self.body = body;
+        self.created = created;
+        self.updated = updated;
+        self.notebook = notebook;
+        self.tags = taglist.items;
+        self.attachments = AttachmentModel::load_all(&self.id, conn)?;
+
+        Ok(())
+    }
+
+    fn set_in_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+        match conn.execute(
+            "INSERT OR REPLACE INTO notes(id,title,format,body,created,updated,notebook,tags) 
+            VALUES(?1,?2,?3,?4,?5,?6,?7,?8)",
+            rusqlite::params![
+                &self.id.to_string(),
+                &self.title.to_string(),
+                &self.format.to_string(),
+                &self.body,
+                &self.created.to_string(),
+                &self.updated.to_string(),
+                &self.notebook,
+                &self.tags.join(","),
+            ],
+        ) {
+            Ok(_) => (),
+            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+        }
+
+        AttachmentModel::delete_all(&self.id, conn)?;
+        for item in self.attachments.iter() {
+            item.set_in_db(conn)?;
+        }
+        Ok(())
+    }
+}
