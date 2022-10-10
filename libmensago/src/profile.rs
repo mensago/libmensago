@@ -148,28 +148,32 @@ static STORAGE_DB_SETUP_COMMANDS: &str = "
 		'timestamp' TEXT NOT NULL
     );
 	CREATE TABLE 'updates' (
-		'id' TEXT NOT NULL UNIQUE,
-		'type' TEXT NOT NULL,
-		'data' TEXT NOT NULL,
-		'time' TEXT NOT NULL
+		'id'    TEXT NOT NULL UNIQUE,
+		'type'  TEXT NOT NULL,
+		'data'  TEXT NOT NULL,
+		'time'  TEXT NOT NULL
 	);
 	CREATE TABLE 'photos' (
-		'id' TEXT NOT NULL UNIQUE,
-		'type' TEXT NOT NULL,
-		'photodata' BLOB,
-		'isannotation' TEXT NOT NULL,
-		'contactgroup' TEXT
+		'id'            TEXT NOT NULL UNIQUE,
+		'type'          TEXT NOT NULL,
+		'photodata'     BLOB,
+		'isannotation'  TEXT NOT NULL,
+		'contactgroup'  TEXT
 	);
 	CREATE TABLE 'notes' (
-		'id'	TEXT NOT NULL UNIQUE,
-		'address' TEXT,
-		'title'	TEXT,
-		'body'	TEXT,
+		'id'	    TEXT NOT NULL UNIQUE,
+		'title'     TEXT NOT NULL,
+		'body'	    TEXT,
 		'notebook'	TEXT,
-		'tags'	TEXT,
+		'tags'	    TEXT,
 		'created'	TEXT NOT NULL,
-		'updated'	TEXT,
-		'attachments'	TEXT
+		'updated'	TEXT NOT NULL,
+	);
+	CREATE TABLE 'attachments' (
+		'id'	    TEXT NOT NULL UNIQUE,
+		'name'  	TEXT NOT NULL,
+		'mimetype'	TEXT NOT NULL,
+        'data'      BLOB,
 	);
 	CREATE TABLE 'files' (
 		'id'	TEXT NOT NULL UNIQUE,
