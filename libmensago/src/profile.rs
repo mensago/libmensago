@@ -53,13 +53,16 @@ static STORAGE_DB_SETUP_COMMANDS: &str = "
 	CREATE TABLE 'contacts' (
 		'id' TEXT NOT NULL UNIQUE,
 		'entitytype' TEXT NOT NULL,
-        'group' TEXT NOT NULL,
+        'contactgroup' TEXT NOT NULL,
         'gender' TEXT,
         'bio' TEXT,
         'anniversary' TEXT,
         'birthday' TEXT,
         'organization' TEXT,
+        'orgunits' TEXT,
         'title' TEXT,
+        'categories' TEXT,
+        'languages' TEXT,
         'notes' TEXT,
         'annotation' BOOL,
         'annotation_link' TEXT

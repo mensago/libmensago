@@ -1734,8 +1734,16 @@ impl ContactDataModel {
     /// Creates a new empty ContactDataModel, which defaults to representing an individual. The
     /// `name` parameter is used for an individual's GivenName field or the base name of a group
     /// or organization.
-    pub fn new(name: &str, entity_type: EntityType, is_annotation: bool) -> ContactDataModel {
-        let conid = RandomID::generate();
+    pub fn new(
+        name: &str,
+        entity_type: EntityType,
+        is_annotation: bool,
+        id: Option<&RandomID>,
+    ) -> ContactDataModel {
+        let conid = match id {
+            Some(v) => v.clone(),
+            None => RandomID::generate(),
+        };
         ContactDataModel {
             id: conid.clone(),
             entity_type,
@@ -1770,14 +1778,16 @@ impl ContactDataModel {
     /// `load_from_db()` instantiates a ContactDataModel from the specified contact ID.
     pub fn load_from_db(
         conid: &RandomID,
-        conn: &mut rusqlite::Connection,
+        storage: &mut rusqlite::Connection,
+        secrets: &mut rusqlite::Connection,
         is_annotation: bool,
     ) -> Result<ContactDataModel, MensagoError> {
-        let mut stmt = conn.prepare(
-            "SELECT entitytype,group,gender,bio,anniversary,birthday,organization,orgunits,
-            title,categories,languages,notes,annotation_link FROM contacts WHERE id = ?1 AND 
+        let mut stmt = storage.prepare(
+            "SELECT entitytype,contactgroup,gender,bio,anniversary,birthday,organization,orgunits,
+            title,categories,languages,notes,annotation_link FROM contacts WHERE id = ?1 AND
             annotation=?2",
         )?;
+
         let (
             entitytypestr,
             group,
@@ -1832,7 +1842,7 @@ impl ContactDataModel {
         let catlist = SeparatedStrList::from(&categorystr, ",");
         let langlist = SeparatedStrList::from(&languagestr, ",");
 
-        let photo = match PhotoModel::load_from_db(conid, conn) {
+        let photo = match PhotoModel::load_from_db(conid, storage) {
             Ok(v) => Some(v),
             Err(_) => None,
         };
@@ -1846,28 +1856,28 @@ impl ContactDataModel {
             id: conid.clone(),
             entity_type,
             group,
-            name: NameModel::load_from_db(conid, conn)?,
+            name: NameModel::load_from_db(conid, storage)?,
             gender,
             bio,
-            social: StringModel::load_all(conid, "social", conn)?,
-            mensago: MensagoModel::load_all(conid, conn)?,
-            keys: KeyModel::load_all(conid, conn)?,
-            messaging: StringModel::load_all(conid, "messaging", conn)?,
-            addresses: AddressModel::load_all(conid, conn)?,
-            phone: StringModel::load_all(conid, "phone", conn)?,
+            social: StringModel::load_all(conid, "social", storage)?,
+            mensago: MensagoModel::load_all(conid, storage)?,
+            keys: KeyModel::load_all(conid, secrets)?,
+            messaging: StringModel::load_all(conid, "messaging", storage)?,
+            addresses: AddressModel::load_all(conid, storage)?,
+            phone: StringModel::load_all(conid, "phone", storage)?,
             anniversary,
             birthday,
-            email: StringModel::load_all(conid, "email", conn)?,
+            email: StringModel::load_all(conid, "email", storage)?,
             organization,
             orgunits: unitlist.items,
             title,
             categories: catlist.items,
-            websites: StringModel::load_all(conid, "website", conn)?,
+            websites: StringModel::load_all(conid, "website", storage)?,
             photo,
             languages: langlist.items,
             notes,
-            attachments: FileModel::load_all(conid, conn)?,
-            custom: StringModel::load_all(conid, "custom", conn)?,
+            attachments: FileModel::load_all(conid, storage)?,
+            custom: StringModel::load_all(conid, "custom", storage)?,
             is_annotation,
             annotation_link,
         })
@@ -1898,7 +1908,7 @@ impl DBModel for ContactDataModel {
 
     fn refresh_from_db(&mut self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
         let mut stmt = conn.prepare(
-            "SELECT entitytype,group,gender,bio,anniversary,birthday,organization,orgunits,
+            "SELECT entitytype,contactgroup,gender,bio,anniversary,birthday,organization,orgunits,
             title,categories,languages,notes FROM contacts WHERE conid = ?1 AND annotation=?2",
         )?;
         let (
@@ -2011,9 +2021,9 @@ impl DBModel for ContactDataModel {
         };
 
         match conn.execute(
-            "INSERT OR REPLACE INTO contacts(id,entitytype,group,gender,bio,anniversary,birthday,
-            organization,orgunits,title,categories,languages,notes,annotation,annotation_link) 
-            VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14)",
+            "INSERT OR REPLACE INTO contacts(id,entitytype,contactgroup,gender,bio,anniversary,
+            birthday,organization,orgunits,title,categories,languages,notes,annotation,
+            annotation_link) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15)",
             rusqlite::params![
                 &self.id.to_string(),
                 &self.entity_type.to_string(),

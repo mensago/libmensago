@@ -1033,7 +1033,120 @@ mod tests {
 
     #[test]
     fn test_contactmodel() -> Result<(), MensagoError> {
-        // TODO: Write unit test for ContactModel()
+        let testname = "test_contactmodel";
+
+        // The list of full data is as follows:
+        // let (config, pwhash, profman) = setup_db_test(testname)?;
+        let (_, _, profman) = setup_db_test(testname)?;
+
+        let profile = profman.get_active_profile().unwrap();
+        let mut db = profile.open_storage()?;
+        let mut secrets = profile.open_secrets()?;
+
+        let modelid = RandomID::from("00000000-1111-2222-3333-444444444444").unwrap();
+        let mut model =
+            ContactDataModel::new("Corbin", EntityType::Individual, false, Some(&modelid));
+
+        model.name.family_name = String::from("Simons");
+        model.gender = String::from("male");
+        model.organization = String::from("Acme Widgets, Inc.");
+
+        let mut twitter = StringModel::new(&model.id, "social");
+        twitter.label = String::from("Twitter");
+        twitter.value = String::from("&test");
+        model.social.push(twitter);
+
+        // Add to db
+        match model.set_in_db(&mut db) {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: set_in_db() error: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        }
+
+        match check_db_value(&mut db, "contacts", &model.id, "gender", "male") {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: set_in_db value check error for gender: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        }
+
+        // Update in db
+        model.languages = vec![String::from("en"), String::from("es")];
+        match model.set_in_db(&mut db) {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: set_in_db() update error: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        }
+
+        match check_db_value(&mut db, "contacts", &model.id, "languages", "en,es") {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: set_in_db value check error for prefix: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        }
+
+        // Load from db
+        let loadmodel =
+            match ContactDataModel::load_from_db(&model.id, &mut db, &mut secrets, false) {
+                Ok(v) => v,
+                Err(e) => {
+                    return Err(MensagoError::ErrProgramException(format!(
+                        "{}: load_from_db() error: {}",
+                        testname,
+                        e.to_string()
+                    )))
+                }
+            };
+
+        if loadmodel.gender != "male" || loadmodel.organization != "Acme Widgets, Inc." {
+            return Err(MensagoError::ErrProgramException(format!(
+                "{}: load_from_db value mismatch: expected male/'Acme Widgets, Inc.', got '{}/{}'",
+                testname, loadmodel.gender, loadmodel.organization
+            )));
+        }
+
+        // Delete from db
+        match model.delete_from_db(&mut db) {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: delete_from_db() error: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        }
+
+        match check_db_value(&mut db, "contacts", &model.id, "gender", "") {
+            Ok(_) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: delete_from_db failed to delete row",
+                    testname,
+                )))
+            }
+            Err(_) => (),
+        }
+
+        // TODO: Finish testing ContactDataModel
+
         Ok(())
     }
 }

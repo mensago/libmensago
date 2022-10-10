@@ -12,7 +12,7 @@ impl Contact {
     /// Returns a new Contact without annotations
     pub fn new(name: &str, etype: EntityType) -> Contact {
         Contact {
-            data: ContactDataModel::new(name, etype, false),
+            data: ContactDataModel::new(name, etype, false, None),
             annotations: None,
         }
     }
