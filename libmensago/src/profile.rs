@@ -163,11 +163,12 @@ static STORAGE_DB_SETUP_COMMANDS: &str = "
 	CREATE TABLE 'notes' (
 		'id'	    TEXT NOT NULL UNIQUE,
 		'title'     TEXT NOT NULL,
+        'format'    TEXT NOT NULL,
 		'body'	    TEXT,
-		'notebook'	TEXT,
-		'tags'	    TEXT,
 		'created'	TEXT NOT NULL,
 		'updated'	TEXT NOT NULL,
+		'notebook'	TEXT,
+		'tags'	    TEXT,
 	);
 	CREATE TABLE 'attachments' (
 		'id'	    TEXT NOT NULL UNIQUE,
