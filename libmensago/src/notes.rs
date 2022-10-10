@@ -1,6 +1,7 @@
 use crate::base::MensagoError;
 use crate::contacts::DBModel;
-use libkeycard::{RandomID, Timestamp};
+use crate::SeparatedStrList;
+use libkeycard::*;
 use mime::Mime;
 use std::fmt;
 use std::str::FromStr;
@@ -48,6 +49,7 @@ impl std::convert::TryFrom<&str> for BinEncoding {
 #[derive(Debug, PartialEq, Clone)]
 pub struct AttachmentModel {
     pub id: RandomID,
+    pub docid: RandomID,
     pub name: String,
     pub mimetype: Mime,
     pub data: Vec<u8>,
@@ -55,9 +57,10 @@ pub struct AttachmentModel {
 
 impl AttachmentModel {
     /// Creates a new empty AttachmentModel
-    pub fn new() -> AttachmentModel {
+    pub fn new(docid: &RandomID) -> AttachmentModel {
         AttachmentModel {
             id: RandomID::generate(),
+            docid: docid.clone(),
             name: String::new(),
             mimetype: Mime::from_str("application/octet-stream").unwrap(),
             data: Vec::new(),
@@ -65,18 +68,21 @@ impl AttachmentModel {
     }
 
     /// Creates a new AttachmentModel from raw, unencoded data
-    pub fn from_raw(name: &str, mimetype: &Mime, data: &[u8]) -> AttachmentModel {
+    pub fn from_raw(docid: &RandomID, name: &str, mimetype: &Mime, data: &[u8]) -> AttachmentModel {
         AttachmentModel {
             id: RandomID::generate(),
+            docid: docid.clone(),
             name: String::from(name),
             mimetype: mimetype.clone(),
             data: data.to_vec(),
         }
     }
 
-    /// `load_from_db()` instantiates an AttachmentModel from the specified file ID.
+    /// `load_from_db()` instantiates an AttachmentModel from the specified file ID and owning
+    /// document ID.
     pub fn load_from_db(
         id: &RandomID,
+        docid: &RandomID,
         conn: &mut rusqlite::Connection,
     ) -> Result<AttachmentModel, MensagoError> {
         let mut out: AttachmentModel;
@@ -104,11 +110,13 @@ impl AttachmentModel {
             }
         };
 
-        out = AttachmentModel::from_raw(&name, &atttype, &attdata);
+        out = AttachmentModel::from_raw(&docid, &name, &atttype, &attdata);
         out.id = id.clone();
 
         Ok(out)
     }
+
+    // TODO: implement AttachmentModel::load_all()
 }
 
 impl DBModel for AttachmentModel {
@@ -212,12 +220,100 @@ impl std::convert::TryFrom<&str> for NoteFormat {
 /// The NoteModel type is the data type for managing notes in conjunction with the client database.
 #[derive(Debug, PartialEq, Clone)]
 pub struct NoteModel {
+    id: RandomID,
+    title: String,
+    format: NoteFormat,
+    body: String,
     created: Timestamp,
     updated: Timestamp,
-    format: NoteFormat,
-    title: String,
-    body: String,
+    notebook: String,
     tags: Vec<String>,
-    group: String,
     attachments: Vec<AttachmentModel>,
+}
+
+impl NoteModel {
+    /// Creates a new empty NoteModel
+    pub fn new(title: &str, format: NoteFormat, group: &str) -> NoteModel {
+        let ts = Timestamp::new();
+        NoteModel {
+            id: RandomID::generate(),
+            title: String::from(title),
+            format,
+            body: String::new(),
+            created: ts.clone(),
+            updated: ts,
+            notebook: String::from(group),
+            tags: Vec::new(),
+            attachments: Vec::new(),
+        }
+    }
+
+    /// `load_from_db()` instantiates an NoteModel from the specified note ID.
+    pub fn load_from_db(
+        id: &RandomID,
+        conn: &mut rusqlite::Connection,
+    ) -> Result<NoteModel, MensagoError> {
+        let mut stmt = conn.prepare(
+            "SELECT title,format,body,created,updated,notebook,tags FROM notes WHERE id = ?1",
+        )?;
+        let (title, formatstr, body, createdstr, updatedstr, notebook, tagstr) = match stmt
+            .query_row(&[&id.to_string()], |row| {
+                Ok((
+                    row.get::<usize, String>(0).unwrap(),
+                    row.get::<usize, String>(1).unwrap(),
+                    row.get::<usize, String>(2).unwrap(),
+                    row.get::<usize, String>(3).unwrap(),
+                    row.get::<usize, String>(4).unwrap(),
+                    row.get::<usize, String>(5).unwrap(),
+                    row.get::<usize, String>(6).unwrap(),
+                ))
+            }) {
+            Ok(v) => v,
+            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+        };
+        drop(stmt);
+
+        let noteformat = match NoteFormat::from_str(&formatstr) {
+            Ok(v) => v,
+            Err(_) => {
+                return Err(MensagoError::ErrDatabaseException(format!(
+                    "Bad note format type received from database: '{}'",
+                    formatstr
+                )))
+            }
+        };
+        let created = match Timestamp::try_from(createdstr.as_str()) {
+            Ok(v) => v,
+            Err(_) => {
+                return Err(MensagoError::ErrDatabaseException(format!(
+                    "Bad note creation date received from database: '{}'",
+                    createdstr
+                )))
+            }
+        };
+        let updated = match Timestamp::try_from(updatedstr.as_str()) {
+            Ok(v) => v,
+            Err(_) => {
+                return Err(MensagoError::ErrDatabaseException(format!(
+                    "Bad note updated date received from database: '{}'",
+                    updatedstr
+                )))
+            }
+        };
+
+        let taglist = SeparatedStrList::from(&tagstr, ",");
+
+        Ok(NoteModel {
+            id: id.clone(),
+            title,
+            format: noteformat,
+            body,
+            created,
+            updated,
+            notebook,
+            tags: taglist.items,
+            // TODO: fix attachment loading in load_from_db when AttachmentModel::load_all() is implemented
+            attachments: Vec::new(),
+        })
+    }
 }
