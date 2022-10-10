@@ -1143,8 +1143,6 @@ mod tests {
             Err(_) => (),
         }
 
-        // TODO: Finish testing ContactDataModel
-
         Ok(())
     }
 }
