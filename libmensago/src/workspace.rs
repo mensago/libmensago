@@ -10,7 +10,6 @@ use std::path::PathBuf;
 #[derive(Debug, PartialEq, PartialOrd, Clone)]
 pub struct Workspace {
     dbpath: PathBuf,
-    secretspath: PathBuf,
     path: PathBuf,
     uid: Option<UserID>,
     wid: Option<RandomID>,
@@ -25,12 +24,8 @@ impl Workspace {
         let mut storage = path.clone();
         storage.push("storage.db");
 
-        let mut secrets = path.clone();
-        secrets.push("secrets.db");
-
         return Workspace {
             dbpath: storage,
-            secretspath: secrets,
             path: path.clone(),
             uid: None,
             wid: None,
@@ -44,22 +39,6 @@ impl Workspace {
     pub fn open_storage(&self) -> Result<rusqlite::Connection, MensagoError> {
         match rusqlite::Connection::open_with_flags(
             &self.dbpath,
-            rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE,
-        ) {
-            Ok(v) => Ok(v),
-            Err(e) => {
-                return Err(MensagoError::ErrDatabaseException(String::from(
-                    e.to_string(),
-                )));
-            }
-        }
-    }
-
-    /// Returns a connection to the workspace's secrets database, which houses keys, password
-    /// hashes, and similar sensitive information
-    pub fn open_secrets(&self) -> Result<rusqlite::Connection, MensagoError> {
-        match rusqlite::Connection::open_with_flags(
-            &self.secretspath,
             rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE,
         ) {
             Ok(v) => Ok(v),
@@ -174,16 +153,7 @@ impl Workspace {
 
         let waddr = WAddress::from_parts(&wid, &server);
 
-        let secretstr = match self.secretspath.to_str() {
-            Some(v) => v,
-            None => {
-                return Err(MensagoError::ErrProgramException(String::from(
-                    "non-UTF8 path encountered in Workspace::generate",
-                )))
-            }
-        };
-
-        let conn = match rusqlite::Connection::open(&secretstr) {
+        let conn = match self.open_storage() {
             Ok(v) => v,
             Err(e) => {
                 return Err(MensagoError::ErrDatabaseException(String::from(
@@ -438,22 +408,7 @@ impl Workspace {
                 Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
             }
 
-            for table_name in ["folders", "messages", "notes"] {
-                match conn.execute(
-                    &format!("DELETE FROM {} WHERE address=?1", table_name),
-                    [address.as_string()],
-                ) {
-                    Ok(_) => (),
-                    Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-                }
-            }
-        }
-
-        // Clear out secrets database
-        {
-            let conn = self.open_secrets()?;
-
-            for table_name in ["keys", "sessions"] {
+            for table_name in ["folders", "messages", "notes", "keys", "sessions"] {
                 match conn.execute(
                     &format!("DELETE FROM {} WHERE address=?1", table_name),
                     [address.as_string()],

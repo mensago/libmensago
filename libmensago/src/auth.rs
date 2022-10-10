@@ -639,7 +639,7 @@ mod tests {
         profile_path.push("primary");
         let w = setup_workspace(&testname, &profile_path)?;
 
-        let conn = match w.open_secrets() {
+        let conn = match w.open_storage() {
             Ok(v) => v,
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
@@ -751,7 +751,7 @@ mod tests {
         profile_path.push("primary");
         let w = setup_workspace(&testname, &profile_path)?;
 
-        let conn = match w.open_secrets() {
+        let conn = match w.open_storage() {
             Ok(v) => v,
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
@@ -840,7 +840,7 @@ mod tests {
         profile_path.push("primary");
         let w = setup_workspace(&testname, &profile_path)?;
 
-        let conn = match w.open_secrets() {
+        let conn = match w.open_storage() {
             Ok(v) => v,
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(

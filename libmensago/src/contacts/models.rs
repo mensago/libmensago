@@ -1779,7 +1779,6 @@ impl ContactDataModel {
     pub fn load_from_db(
         conid: &RandomID,
         storage: &mut rusqlite::Connection,
-        secrets: &mut rusqlite::Connection,
         is_annotation: bool,
     ) -> Result<ContactDataModel, MensagoError> {
         let mut stmt = storage.prepare(
@@ -1861,7 +1860,7 @@ impl ContactDataModel {
             bio,
             social: StringModel::load_all(conid, "social", storage)?,
             mensago: MensagoModel::load_all(conid, storage)?,
-            keys: KeyModel::load_all(conid, secrets)?,
+            keys: KeyModel::load_all(conid, storage)?,
             messaging: StringModel::load_all(conid, "messaging", storage)?,
             addresses: AddressModel::load_all(conid, storage)?,
             phone: StringModel::load_all(conid, "phone", storage)?,

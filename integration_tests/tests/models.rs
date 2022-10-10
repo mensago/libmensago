@@ -550,7 +550,7 @@ mod tests {
         let (_, _, profman) = setup_db_test(testname)?;
 
         let profile = profman.get_active_profile().unwrap();
-        let mut db = profile.open_secrets()?;
+        let mut db = profile.open_storage()?;
 
         let conid = RandomID::from("00000000-1111-2222-3333-444444444444").unwrap();
         let testkey =
@@ -1041,7 +1041,6 @@ mod tests {
 
         let profile = profman.get_active_profile().unwrap();
         let mut db = profile.open_storage()?;
-        let mut secrets = profile.open_secrets()?;
 
         let modelid = RandomID::from("00000000-1111-2222-3333-444444444444").unwrap();
         let mut model =
@@ -1104,17 +1103,16 @@ mod tests {
         }
 
         // Load from db
-        let loadmodel =
-            match ContactDataModel::load_from_db(&model.id, &mut db, &mut secrets, false) {
-                Ok(v) => v,
-                Err(e) => {
-                    return Err(MensagoError::ErrProgramException(format!(
-                        "{}: load_from_db() error: {}",
-                        testname,
-                        e.to_string()
-                    )))
-                }
-            };
+        let loadmodel = match ContactDataModel::load_from_db(&model.id, &mut db, false) {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: load_from_db() error: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        };
 
         if loadmodel.gender != "male" || loadmodel.organization != "Acme Widgets, Inc." {
             return Err(MensagoError::ErrProgramException(format!(

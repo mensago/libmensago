@@ -963,7 +963,7 @@ pub fn regcode_user(
         &ADMIN_PROFILE_DATA["device.private"],
     )
     .unwrap();
-    let db = profile.open_secrets()?;
+    let db = profile.open_storage()?;
     match add_device_session(&db, &waddr, &devid, &devpair, None) {
         Ok(v) => v,
         Err(e) => {

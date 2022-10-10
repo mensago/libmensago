@@ -38,6 +38,23 @@ static STORAGE_DB_SETUP_COMMANDS: &str = "
 		'timestamp' TEXT NOT NULL,
 		'ttlexpires' TEXT
 	);
+	CREATE table 'keys' (
+		'keyid' TEXT NOT NULL UNIQUE,
+		'address' TEXT NOT NULL,
+		'type' TEXT NOT NULL,
+		'category' TEXT NOT NULL,
+		'private' TEXT NOT NULL,
+		'public' TEXT,
+		'timestamp' TEXT NOT NULL
+	);
+	CREATE table 'sessions'(
+		'address' TEXT NOT NULL,
+		'devid' TEXT NOT NULL,
+		'devname' TEXT NOT NULL,
+		'public_key' TEXT NOT NULL,
+		'private_key' TEXT NOT NULL,
+		'os' TEXT NOT NULL
+	);
 	CREATE table 'messages'(
 		'id' TEXT NOT NULL UNIQUE,
 		'from'  TEXT NOT NULL,
@@ -122,6 +139,14 @@ static STORAGE_DB_SETUP_COMMANDS: &str = "
         'mime' TEXT NOT NULL,
         'data' BLOB
     );
+    CREATE TABLE 'contact_keys' (
+		'id' TEXT NOT NULL UNIQUE,
+        'conid' TEXT NOT NULL,
+        'label' TEXT NOT NULL UNIQUE,
+        'category' TEXT NOT NULL,
+        'value' TEXT NOT NULL,
+		'timestamp' TEXT NOT NULL
+    );
 	CREATE TABLE 'updates' (
 		'id' TEXT NOT NULL UNIQUE,
 		'type' TEXT NOT NULL,
@@ -153,36 +178,6 @@ static STORAGE_DB_SETUP_COMMANDS: &str = "
 		'path'	TEXT NOT NULL
 	);
 	COMMIT;";
-
-static SECRETS_DB_SETUP_COMMANDS: &str = "
-	BEGIN;
-	CREATE table 'keys' (
-		'keyid' TEXT NOT NULL UNIQUE,
-		'address' TEXT NOT NULL,
-		'type' TEXT NOT NULL,
-		'category' TEXT NOT NULL,
-		'private' TEXT NOT NULL,
-		'public' TEXT,
-		'timestamp' TEXT NOT NULL
-	);
-	CREATE table 'sessions'(
-		'address' TEXT NOT NULL,
-		'devid' TEXT NOT NULL,
-		'devname' TEXT NOT NULL,
-		'public_key' TEXT NOT NULL,
-		'private_key' TEXT NOT NULL,
-		'os' TEXT NOT NULL
-	);
-    CREATE TABLE 'contact_keys' (
-		'id' TEXT NOT NULL UNIQUE,
-        'conid' TEXT NOT NULL,
-        'label' TEXT NOT NULL UNIQUE,
-        'category' TEXT NOT NULL,
-        'value' TEXT NOT NULL,
-		'timestamp' TEXT NOT NULL
-    );
-    COMMIT;
-";
 
 /// The Profile type is the client's entry point to interacting with local storage. A profile
 /// consists of a SQLCipher database for storing user data (messages, etc) and config info
@@ -429,10 +424,7 @@ impl Profile {
 
     /// Reinitializes the profile's database to empty
     pub fn reset_db(&self) -> Result<(), MensagoError> {
-        let strdata = [
-            ("storage.db", STORAGE_DB_SETUP_COMMANDS),
-            ("secrets.db", SECRETS_DB_SETUP_COMMANDS),
-        ];
+        let strdata = [("storage.db", STORAGE_DB_SETUP_COMMANDS)];
 
         for s in strdata {
             let mut dbpath = self.path.clone();
@@ -500,13 +492,6 @@ impl Profile {
                 "Bad identity workspace ID in database",
             ))),
         }
-    }
-
-    /// Creates a connection to the profile's database for storage of keys
-    pub fn open_secrets(&self) -> Result<rusqlite::Connection, rusqlite::Error> {
-        let mut dbpath = self.path.clone();
-        dbpath.push("secrets.db");
-        rusqlite::Connection::open_with_flags(dbpath, rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE)
     }
 
     /// Creates a connection to the profile's main storage database
