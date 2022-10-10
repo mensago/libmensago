@@ -481,3 +481,5 @@ impl DBModel for NoteModel {
         Ok(())
     }
 }
+
+// TODO: write tests for AttachmentModel and NoteModel
