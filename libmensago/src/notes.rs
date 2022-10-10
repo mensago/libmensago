@@ -125,7 +125,7 @@ impl DBModel for AttachmentModel {
     fn refresh_from_db(&mut self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
         {
             let mut stmt =
-                conn.prepare("SELECT name,mimetype,data FROM contact_files WHERE id = ?1")?;
+                conn.prepare("SELECT name,mimetype,data FROM attachments WHERE id = ?1")?;
             let (name, mimestr, attdata) = match stmt.query_row(&[&self.id.to_string()], |row| {
                 Ok((
                     row.get::<usize, String>(0).unwrap(),
@@ -156,7 +156,7 @@ impl DBModel for AttachmentModel {
 
     fn set_in_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
         match conn.execute(
-            "INSERT OR REPLACE INTO contact_files(id,name,mimetype,data) VALUES(?1,?2,?3,?4)",
+            "INSERT OR REPLACE INTO attachments(id,name,mimetype,data) VALUES(?1,?2,?3,?4)",
             rusqlite::params![
                 &self.id.to_string(),
                 &self.name,
