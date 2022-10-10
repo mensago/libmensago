@@ -116,7 +116,70 @@ impl AttachmentModel {
         Ok(out)
     }
 
-    // TODO: implement AttachmentModel::load_all()
+    /// Returns a list of all AttachmentModels that belong to a specific contact.
+    pub fn load_all(
+        docid: &RandomID,
+        conn: &mut rusqlite::Connection,
+    ) -> Result<Vec<AttachmentModel>, MensagoError> {
+        let mut ids = Vec::<RandomID>::new();
+
+        let mut stmt = match conn.prepare("SELECT id FROM attachments WHERE docid = ?1") {
+            Ok(v) => v,
+            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+        };
+
+        let mut rows = match stmt.query([&docid.as_string()]) {
+            Ok(v) => v,
+            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+        };
+
+        let mut option_row = match rows.next() {
+            Ok(v) => v,
+            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+        };
+
+        while option_row.is_some() {
+            let row = option_row.unwrap();
+            let partid = match RandomID::from(&row.get::<usize, String>(0).unwrap()) {
+                Some(v) => v,
+                None => {
+                    return Err(MensagoError::ErrDatabaseException(format!(
+                        "Bad attachment model ID {} in attachments",
+                        &row.get::<usize, String>(0).unwrap()
+                    )))
+                }
+            };
+            ids.push(partid);
+
+            option_row = match rows.next() {
+                Ok(v) => v,
+                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+            };
+        }
+        drop(rows);
+        drop(stmt);
+
+        let mut out = Vec::new();
+        for id in ids.iter() {
+            out.push(AttachmentModel::load_from_db(&id, &docid, conn)?);
+        }
+
+        Ok(out)
+    }
+
+    /// Removes all of a document's AttachmentModels from the database
+    pub fn delete_all(
+        docid: &RandomID,
+        conn: &mut rusqlite::Connection,
+    ) -> Result<(), MensagoError> {
+        match conn.execute(
+            "DELETE FROM attachments WHERE docid=?1",
+            &[&docid.to_string()],
+        ) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
+        }
+    }
 }
 
 impl DBModel for AttachmentModel {
@@ -312,8 +375,7 @@ impl NoteModel {
             updated,
             notebook,
             tags: taglist.items,
-            // TODO: fix attachment loading in load_from_db when AttachmentModel::load_all() is implemented
-            attachments: Vec::new(),
+            attachments: AttachmentModel::load_all(id, conn)?,
         })
     }
 }
