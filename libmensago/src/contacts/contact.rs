@@ -24,7 +24,9 @@ impl Contact {
 
     /// Ensures that the contact has a data container for annotations
     pub fn enable_annotations(&mut self) {
-        // TODO: implement enable_annotations()
+        if self.annotations.is_none() {
+            self.annotations = Some(ContactDataModel::new("", self.data.entity_type, true, None))
+        }
     }
 
     /// Returns the IDs of all contacts in the database.
