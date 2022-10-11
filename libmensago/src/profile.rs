@@ -168,14 +168,14 @@ static STORAGE_DB_SETUP_COMMANDS: &str = "
 		'created'	TEXT NOT NULL,
 		'updated'	TEXT NOT NULL,
 		'notebook'	TEXT,
-		'tags'	    TEXT,
+		'tags'	    TEXT
 	);
 	CREATE TABLE 'attachments' (
 		'id'	    TEXT NOT NULL UNIQUE,
 		'docid'	    TEXT NOT NULL,
 		'name'  	TEXT NOT NULL,
 		'mimetype'	TEXT NOT NULL,
-        'data'      BLOB,
+        'data'      BLOB
 	);
 	CREATE TABLE 'files' (
 		'id'	TEXT NOT NULL UNIQUE,
