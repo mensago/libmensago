@@ -4,4 +4,5 @@ mod client;
 mod common;
 mod iscmds;
 mod models;
+mod notes;
 mod resolver;

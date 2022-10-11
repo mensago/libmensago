@@ -1376,6 +1376,87 @@ impl DNSHandlerT for FakeDNSHandler {
     }
 }
 
+/// This call is for setting up database-oriented client-side code, such as data models. It does
+/// not call the server for anything should be used only in integration tests which are client-side
+/// only
+pub fn setup_db_test(
+    testname: &str,
+) -> Result<(Document, ArgonHash, ProfileManager), MensagoError> {
+    let mut config = load_server_config(true)?;
+    let profile_folder = match setup_profile_base(testname) {
+        Ok(v) => v,
+        Err(e) => {
+            return Err(MensagoError::ErrProgramException(format!(
+                "{}: setup_profile_base error: {}",
+                testname,
+                e.to_string()
+            )))
+        }
+    };
+    let pwhash = match setup_profile(&profile_folder, &mut config, &ADMIN_PROFILE_DATA) {
+        Ok(v) => v,
+        Err(e) => {
+            return Err(MensagoError::ErrProgramException(format!(
+                "{}: setup_profile error: {}",
+                testname,
+                e.to_string()
+            )))
+        }
+    };
+
+    let mut profman = ProfileManager::new(&PathBuf::from(&profile_folder));
+    match profman.load_profiles(Some(&PathBuf::from(&profile_folder))) {
+        Ok(_) => (),
+        Err(e) => {
+            return Err(MensagoError::ErrProgramException(format!(
+                "{}: load_profiles error: {}",
+                testname,
+                e.to_string()
+            )))
+        }
+    };
+
+    Ok((config, pwhash, profman))
+}
+
+/// Testing function for quickly checking a table value for a model in the client database.
+pub fn check_db_value(
+    conn: &mut rusqlite::Connection,
+    tablename: &str,
+    id: &RandomID,
+    column: &str,
+    value: &str,
+) -> Result<(), MensagoError> {
+    if tablename.len() == 0 || column.len() == 0 {
+        return Err(MensagoError::ErrEmptyData);
+    }
+
+    // Doing regular string substitution in a SQL query is usually a recipe for an injection
+    // attack. We're doing this here because (1) using the regular syntax for inserting values
+    // into queries creates syntax errors when used for table names and (2) we control that
+    // part of the query. We're also doing the same thing for the column because the escaping
+    // done for substitution causes the column name to be returned from the query instead of
+    // the value of the row in that column. Not great, but it *is* safe in this instance.
+    let mut stmt =
+        conn.prepare(format!("SELECT {} FROM {} WHERE id = ?1", column, tablename).as_str())?;
+
+    let dbvalue = match stmt.query_row(&[&id.to_string()], |row| {
+        Ok(row.get::<usize, String>(0).unwrap())
+    }) {
+        Ok(v) => v,
+        Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+    };
+
+    if dbvalue == value {
+        return Ok(());
+    }
+
+    Err(MensagoError::ErrDatabaseException(format!(
+        "wanted {}, got {}",
+        value, dbvalue,
+    )))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

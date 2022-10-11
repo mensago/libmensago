@@ -82,23 +82,34 @@ impl AttachmentModel {
     /// document ID.
     pub fn load_from_db(
         id: &RandomID,
-        docid: &RandomID,
         conn: &mut rusqlite::Connection,
     ) -> Result<AttachmentModel, MensagoError> {
         let mut out: AttachmentModel;
 
-        let mut stmt = conn.prepare("SELECT name,mimetype,data FROM attachments WHERE id = ?1")?;
-        let (name, mimestr, attdata) = match stmt.query_row(&[&id.to_string()], |row| {
+        let mut stmt =
+            conn.prepare("SELECT docid,name,mimetype,data FROM attachments WHERE id = ?1")?;
+        let (docidstr, name, mimestr, attdata) = match stmt.query_row(&[&id.to_string()], |row| {
             Ok((
                 row.get::<usize, String>(0).unwrap(),
                 row.get::<usize, String>(1).unwrap(),
-                row.get::<usize, Vec<u8>>(2).unwrap(),
+                row.get::<usize, String>(2).unwrap(),
+                row.get::<usize, Vec<u8>>(3).unwrap(),
             ))
         }) {
             Ok(v) => v,
             Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
         };
         drop(stmt);
+
+        let docid = match RandomID::from(&docidstr) {
+            Some(v) => v,
+            None => {
+                return Err(MensagoError::ErrDatabaseException(format!(
+                    "Bad document ID received from database: '{}'",
+                    docidstr
+                )))
+            }
+        };
 
         let atttype = match Mime::from_str(&mimestr) {
             Ok(v) => v,
@@ -161,7 +172,7 @@ impl AttachmentModel {
 
         let mut out = Vec::new();
         for id in ids.iter() {
-            out.push(AttachmentModel::load_from_db(&id, &docid, conn)?);
+            out.push(AttachmentModel::load_from_db(&id, conn)?);
         }
 
         Ok(out)
@@ -227,9 +238,10 @@ impl DBModel for AttachmentModel {
 
     fn set_in_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
         match conn.execute(
-            "INSERT OR REPLACE INTO attachments(id,name,mimetype,data) VALUES(?1,?2,?3,?4)",
+            "INSERT OR REPLACE INTO attachments(id,docid,name,mimetype,data) VALUES(?1,?2,?3,?4,?5)",
             rusqlite::params![
                 &self.id.to_string(),
+                &self.docid.to_string(),
                 &self.name,
                 &self.mimetype.to_string(),
                 &self.data,
