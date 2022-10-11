@@ -295,15 +295,15 @@ impl std::convert::TryFrom<&str> for NoteFormat {
 /// The NoteModel type is the data type for managing notes in conjunction with the client database.
 #[derive(Debug, PartialEq, Clone)]
 pub struct NoteModel {
-    id: RandomID,
-    title: String,
-    format: NoteFormat,
-    body: String,
-    created: Timestamp,
-    updated: Timestamp,
-    notebook: String,
-    tags: Vec<String>,
-    attachments: Vec<AttachmentModel>,
+    pub id: RandomID,
+    pub title: String,
+    pub format: NoteFormat,
+    pub body: String,
+    pub created: Timestamp,
+    pub updated: Timestamp,
+    pub notebook: String,
+    pub tags: Vec<String>,
+    pub attachments: Vec<AttachmentModel>,
 }
 
 impl NoteModel {
