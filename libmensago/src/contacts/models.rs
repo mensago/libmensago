@@ -1,4 +1,4 @@
-use crate::{base::*, types::*, EntityType, SeparatedStrList};
+use crate::{base::*, contacts::EntityType, dbsupport::SeparatedStrList, types::*};
 use eznacl::*;
 use libkeycard::*;
 use mime::Mime;

@@ -1,6 +1,6 @@
 use crate::base::MensagoError;
 use crate::contacts::DBModel;
-use crate::SeparatedStrList;
+use crate::dbsupport::SeparatedStrList;
 use libkeycard::*;
 use mime::Mime;
 use std::fmt;
