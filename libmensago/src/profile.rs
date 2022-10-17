@@ -62,9 +62,11 @@ static STORAGE_DB_SETUP_COMMANDS: &str = "
 		'cc'  TEXT,
 		'bcc' TEXT,
 		'date' TEXT NOT NULL,
+        'format' TEXT NOT NULL,
 		'thread_id' TEXT NOT NULL,
 		'subject' TEXT,
 		'body' TEXT,
+        'images' TEXT,
 		'attachments' TEXT
 	);
 	CREATE TABLE 'contacts' (
@@ -169,6 +171,13 @@ static STORAGE_DB_SETUP_COMMANDS: &str = "
 		'updated'	TEXT NOT NULL,
 		'notebook'	TEXT,
 		'tags'	    TEXT
+	);
+	CREATE TABLE 'images' (
+		'id'	    TEXT NOT NULL UNIQUE,
+		'ownerid'   TEXT NOT NULL,
+		'name'  	TEXT NOT NULL,
+		'mimetype'	TEXT NOT NULL,
+        'data'      BLOB
 	);
 	CREATE TABLE 'attachments' (
 		'id'	    TEXT NOT NULL UNIQUE,
