@@ -3,6 +3,7 @@ mod tests {
     use eznacl::CryptoString;
     use libkeycard::*;
     use libmensago::*;
+    use libmensago::{DBModel, MensagoError};
     use mime::Mime;
     use std::str::FromStr;
 

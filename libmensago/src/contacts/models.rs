@@ -1,4 +1,4 @@
-use crate::{base::*, contacts::EntityType, dbsupport::SeparatedStrList, types::*};
+use crate::{base::*, contacts::EntityType, dbsupport::*, types::*};
 use eznacl::*;
 use libkeycard::*;
 use mime::Mime;
@@ -6,12 +6,6 @@ use rusqlite;
 use std::convert::TryFrom;
 use std::fmt;
 use std::str::FromStr;
-
-pub trait DBModel {
-    fn delete_from_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError>;
-    fn refresh_from_db(&mut self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError>;
-    fn set_in_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError>;
-}
 
 /// StringModel is just a base class to represent key-value pairs in the database.
 #[derive(Debug, Clone)]

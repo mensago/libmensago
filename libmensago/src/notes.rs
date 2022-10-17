@@ -1,5 +1,5 @@
 use crate::base::MensagoError;
-use crate::contacts::DBModel;
+use crate::dbsupport::DBModel;
 use crate::dbsupport::SeparatedStrList;
 use libkeycard::*;
 use mime::Mime;
