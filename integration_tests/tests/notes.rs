@@ -141,7 +141,7 @@ mod tests {
         let mut db = profile.open_storage()?;
 
         let modelid = RandomID::from("00000000-1111-2222-3333-444444444444").unwrap();
-        let mut model = NoteModel::new("Untitled", NoteFormat::Text, "Default");
+        let mut model = NoteModel::new("Untitled", DocFormat::Text, "Default");
         model.id = modelid.clone();
         model.body = String::from("This is some text.\n");
 

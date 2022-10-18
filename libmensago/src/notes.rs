@@ -1,6 +1,4 @@
-use crate::base::MensagoError;
-use crate::dbsupport::DBModel;
-use crate::dbsupport::SeparatedStrList;
+use crate::{base::MensagoError, dbsupport::*, types::DocFormat};
 use libkeycard::*;
 use mime::Mime;
 use std::fmt;
@@ -44,6 +42,8 @@ impl std::convert::TryFrom<&str> for BinEncoding {
         }
     }
 }
+
+// TODO: move AttachmentModel to DBSupport
 
 /// AttachmentModel is a generic data class for housing file attachments.
 #[derive(Debug, PartialEq, Clone)]
@@ -253,62 +253,27 @@ impl DBModel for AttachmentModel {
     }
 }
 
-/// NoteFormat indicates the type of format used in a note -- plain text or SFTM.
-#[derive(Debug, PartialEq, PartialOrd, Clone, Copy)]
-pub enum NoteFormat {
-    Text,
-    SFTM,
-}
-
-impl fmt::Display for NoteFormat {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            NoteFormat::Text => write!(f, "text"),
-            NoteFormat::SFTM => write!(f, "sftm"),
-        }
-    }
-}
-
-impl FromStr for NoteFormat {
-    type Err = ();
-
-    fn from_str(input: &str) -> Result<NoteFormat, Self::Err> {
-        match input.to_lowercase().as_str() {
-            "text" => Ok(NoteFormat::Text),
-            "sftm" => Ok(NoteFormat::SFTM),
-            _ => Err(()),
-        }
-    }
-}
-
-impl std::convert::TryFrom<&str> for NoteFormat {
-    type Error = MensagoError;
-    fn try_from(input: &str) -> Result<Self, Self::Error> {
-        match input.to_lowercase().as_str() {
-            "text" => Ok(NoteFormat::Text),
-            "sftm" => Ok(NoteFormat::SFTM),
-            _ => Err(MensagoError::ErrBadValue),
-        }
-    }
-}
-
 /// The NoteModel type is the data type for managing notes in conjunction with the client database.
 #[derive(Debug, PartialEq, Clone)]
 pub struct NoteModel {
     pub id: RandomID,
     pub title: String,
-    pub format: NoteFormat,
+    pub format: DocFormat,
     pub body: String,
     pub created: Timestamp,
     pub updated: Timestamp,
     pub notebook: String,
     pub tags: Vec<String>,
+    // TODO: Add ImageModel to NoteModel
+    //pub images: Vec<ImageModel>,
+
+    // TODO: Update usage of AttachmentModel to store a SeparatedStringList of IDs in notes.attachments
     pub attachments: Vec<AttachmentModel>,
 }
 
 impl NoteModel {
     /// Creates a new empty NoteModel
-    pub fn new(title: &str, format: NoteFormat, group: &str) -> NoteModel {
+    pub fn new(title: &str, format: DocFormat, group: &str) -> NoteModel {
         let ts = Timestamp::new();
         NoteModel {
             id: RandomID::generate(),
@@ -348,7 +313,7 @@ impl NoteModel {
         };
         drop(stmt);
 
-        let noteformat = match NoteFormat::from_str(&formatstr) {
+        let docformat = match DocFormat::from_str(&formatstr) {
             Ok(v) => v,
             Err(_) => {
                 return Err(MensagoError::ErrDatabaseException(format!(
@@ -381,7 +346,7 @@ impl NoteModel {
         Ok(NoteModel {
             id: id.clone(),
             title,
-            format: noteformat,
+            format: docformat,
             body,
             created,
             updated,
@@ -425,7 +390,7 @@ impl DBModel for NoteModel {
         };
         drop(stmt);
 
-        let noteformat = match NoteFormat::from_str(&formatstr) {
+        let docformat = match DocFormat::from_str(&formatstr) {
             Ok(v) => v,
             Err(_) => {
                 return Err(MensagoError::ErrDatabaseException(format!(
@@ -456,7 +421,7 @@ impl DBModel for NoteModel {
         let taglist = SeparatedStrList::from(&tagstr, ",");
 
         self.title = title;
-        self.format = noteformat;
+        self.format = docformat;
         self.body = body;
         self.created = created;
         self.updated = updated;

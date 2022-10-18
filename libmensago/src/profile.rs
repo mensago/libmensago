@@ -58,7 +58,8 @@ static STORAGE_DB_SETUP_COMMANDS: &str = "
 	CREATE table 'messages'(
 		'id' TEXT NOT NULL UNIQUE,
 		'from'  TEXT NOT NULL,
-		'address' TEXT NOT NULL,
+        'conid' TEXT NOT NULL,
+		'to' TEXT NOT NULL,
 		'cc'  TEXT,
 		'bcc' TEXT,
 		'date' TEXT NOT NULL,
@@ -163,14 +164,16 @@ static STORAGE_DB_SETUP_COMMANDS: &str = "
 		'contactgroup'  TEXT
 	);
 	CREATE TABLE 'notes' (
-		'id'	    TEXT NOT NULL UNIQUE,
-		'title'     TEXT NOT NULL,
-        'format'    TEXT NOT NULL,
-		'body'	    TEXT,
-		'created'	TEXT NOT NULL,
-		'updated'	TEXT NOT NULL,
-		'notebook'	TEXT,
-		'tags'	    TEXT
+		'id'	        TEXT NOT NULL UNIQUE,
+		'title'         TEXT NOT NULL,
+        'format'        TEXT NOT NULL,
+		'body'  	    TEXT,
+		'created'   	TEXT NOT NULL,
+		'updated'   	TEXT NOT NULL,
+		'notebook'  	TEXT,
+		'tags'	        TEXT,
+        'images'        TEXT,
+        'attachments'   TEXT,
 	);
 	CREATE TABLE 'images' (
 		'id'	    TEXT NOT NULL UNIQUE,

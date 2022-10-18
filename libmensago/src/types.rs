@@ -2,6 +2,45 @@ use crate::base::*;
 use std::fmt;
 use std::str::FromStr;
 
+/// DocFormat indicates the type of format used in a note -- plain text or SFTM.
+#[derive(Debug, PartialEq, PartialOrd, Clone, Copy)]
+pub enum DocFormat {
+    Text,
+    SFTM,
+}
+
+impl fmt::Display for DocFormat {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            DocFormat::Text => write!(f, "text"),
+            DocFormat::SFTM => write!(f, "sftm"),
+        }
+    }
+}
+
+impl FromStr for DocFormat {
+    type Err = ();
+
+    fn from_str(input: &str) -> Result<DocFormat, Self::Err> {
+        match input.to_lowercase().as_str() {
+            "text" => Ok(DocFormat::Text),
+            "sftm" => Ok(DocFormat::SFTM),
+            _ => Err(()),
+        }
+    }
+}
+
+impl std::convert::TryFrom<&str> for DocFormat {
+    type Error = MensagoError;
+    fn try_from(input: &str) -> Result<Self, Self::Error> {
+        match input.to_lowercase().as_str() {
+            "text" => Ok(DocFormat::Text),
+            "sftm" => Ok(DocFormat::SFTM),
+            _ => Err(MensagoError::ErrBadValue),
+        }
+    }
+}
+
 /// KeyType defines the cryptographic purpose for a key, as in if it is used for symmetric
 /// encryption, asymmetric encryption, or digital signatures
 #[derive(Debug, PartialEq, PartialOrd, Clone, Copy)]
