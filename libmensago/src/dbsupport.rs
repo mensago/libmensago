@@ -1,6 +1,9 @@
 use crate::base::*;
+use libkeycard::*;
+use mime::Mime;
 use rusqlite;
 use std::fmt;
+use std::str::FromStr;
 
 pub trait DBModel {
     fn delete_from_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError>;
@@ -87,6 +90,214 @@ impl fmt::Display for SeparatedStrList {
             write!(f, "{}", self.items.join(&self.separator))
         } else {
             write!(f, "")
+        }
+    }
+}
+
+/// AttachmentModel is a generic data class for housing file attachments.
+#[derive(Debug, PartialEq, Clone)]
+pub struct AttachmentModel {
+    pub id: RandomID,
+    pub docid: RandomID,
+    pub name: String,
+    pub mimetype: Mime,
+    pub data: Vec<u8>,
+}
+
+impl AttachmentModel {
+    /// Creates a new empty AttachmentModel
+    pub fn new(docid: &RandomID) -> AttachmentModel {
+        AttachmentModel {
+            id: RandomID::generate(),
+            docid: docid.clone(),
+            name: String::new(),
+            mimetype: Mime::from_str("application/octet-stream").unwrap(),
+            data: Vec::new(),
+        }
+    }
+
+    /// Creates a new AttachmentModel from raw, unencoded data
+    pub fn from_raw(docid: &RandomID, name: &str, mimetype: &Mime, data: &[u8]) -> AttachmentModel {
+        AttachmentModel {
+            id: RandomID::generate(),
+            docid: docid.clone(),
+            name: String::from(name),
+            mimetype: mimetype.clone(),
+            data: data.to_vec(),
+        }
+    }
+
+    /// `load_from_db()` instantiates an AttachmentModel from the specified file ID and owning
+    /// document ID.
+    pub fn load_from_db(
+        id: &RandomID,
+        conn: &mut rusqlite::Connection,
+    ) -> Result<AttachmentModel, MensagoError> {
+        let mut out: AttachmentModel;
+
+        let mut stmt =
+            conn.prepare("SELECT docid,name,mimetype,data FROM attachments WHERE id = ?1")?;
+        let (docidstr, name, mimestr, attdata) = match stmt.query_row(&[&id.to_string()], |row| {
+            Ok((
+                row.get::<usize, String>(0).unwrap(),
+                row.get::<usize, String>(1).unwrap(),
+                row.get::<usize, String>(2).unwrap(),
+                row.get::<usize, Vec<u8>>(3).unwrap(),
+            ))
+        }) {
+            Ok(v) => v,
+            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+        };
+        drop(stmt);
+
+        let docid = match RandomID::from(&docidstr) {
+            Some(v) => v,
+            None => {
+                return Err(MensagoError::ErrDatabaseException(format!(
+                    "Bad document ID received from database: '{}'",
+                    docidstr
+                )))
+            }
+        };
+
+        let atttype = match Mime::from_str(&mimestr) {
+            Ok(v) => v,
+            Err(_) => {
+                return Err(MensagoError::ErrDatabaseException(format!(
+                    "Bad attachment MIME type received from database: '{}'",
+                    mimestr
+                )))
+            }
+        };
+
+        out = AttachmentModel::from_raw(&docid, &name, &atttype, &attdata);
+        out.id = id.clone();
+
+        Ok(out)
+    }
+
+    /// Returns a list of all AttachmentModels that belong to a specific contact.
+    pub fn load_all(
+        docid: &RandomID,
+        conn: &mut rusqlite::Connection,
+    ) -> Result<Vec<AttachmentModel>, MensagoError> {
+        let mut ids = Vec::<RandomID>::new();
+
+        let mut stmt = match conn.prepare("SELECT id FROM attachments WHERE docid = ?1") {
+            Ok(v) => v,
+            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+        };
+
+        let mut rows = match stmt.query([&docid.as_string()]) {
+            Ok(v) => v,
+            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+        };
+
+        let mut option_row = match rows.next() {
+            Ok(v) => v,
+            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+        };
+
+        while option_row.is_some() {
+            let row = option_row.unwrap();
+            let partid = match RandomID::from(&row.get::<usize, String>(0).unwrap()) {
+                Some(v) => v,
+                None => {
+                    return Err(MensagoError::ErrDatabaseException(format!(
+                        "Bad attachment model ID {} in attachments",
+                        &row.get::<usize, String>(0).unwrap()
+                    )))
+                }
+            };
+            ids.push(partid);
+
+            option_row = match rows.next() {
+                Ok(v) => v,
+                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+            };
+        }
+        drop(rows);
+        drop(stmt);
+
+        let mut out = Vec::new();
+        for id in ids.iter() {
+            out.push(AttachmentModel::load_from_db(&id, conn)?);
+        }
+
+        Ok(out)
+    }
+
+    /// Removes all of a document's AttachmentModels from the database
+    pub fn delete_all(
+        docid: &RandomID,
+        conn: &mut rusqlite::Connection,
+    ) -> Result<(), MensagoError> {
+        match conn.execute(
+            "DELETE FROM attachments WHERE docid=?1",
+            &[&docid.to_string()],
+        ) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
+        }
+    }
+}
+
+impl DBModel for AttachmentModel {
+    fn delete_from_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+        match conn.execute(
+            "DELETE FROM attachments WHERE id=?1",
+            &[&self.id.to_string()],
+        ) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
+        }
+    }
+
+    fn refresh_from_db(&mut self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+        {
+            let mut stmt =
+                conn.prepare("SELECT name,mimetype,data FROM attachments WHERE id = ?1")?;
+            let (name, mimestr, attdata) = match stmt.query_row(&[&self.id.to_string()], |row| {
+                Ok((
+                    row.get::<usize, String>(0).unwrap(),
+                    row.get::<usize, String>(1).unwrap(),
+                    row.get::<usize, Vec<u8>>(2).unwrap(),
+                ))
+            }) {
+                Ok(v) => v,
+                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+            };
+
+            let atttype = match Mime::from_str(&mimestr) {
+                Ok(v) => v,
+                Err(_) => {
+                    return Err(MensagoError::ErrDatabaseException(format!(
+                        "Bad attachment MIME type received from database: '{}'",
+                        mimestr
+                    )))
+                }
+            };
+
+            self.name = name;
+            self.mimetype = atttype;
+            self.data = attdata;
+        }
+        Ok(())
+    }
+
+    fn set_in_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+        match conn.execute(
+            "INSERT OR REPLACE INTO attachments(id,docid,name,mimetype,data) VALUES(?1,?2,?3,?4,?5)",
+            rusqlite::params![
+                &self.id.to_string(),
+                &self.docid.to_string(),
+                &self.name,
+                &self.mimetype.to_string(),
+                &self.data,
+            ],
+        ) {
+            Ok(_) => Ok(()),
+            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
         }
     }
 }

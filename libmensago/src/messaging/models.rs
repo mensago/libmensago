@@ -1,6 +1,7 @@
 use crate::{base::*, dbsupport::*, types::DocFormat, AttachmentModel};
 use libkeycard::*;
 use rusqlite;
+use std::str::FromStr;
 
 /// MessageModel represents a Mensago message
 #[derive(Debug, Clone)]
@@ -9,8 +10,8 @@ pub struct MessageModel {
     pub contact_id: RandomID,
     pub from: WAddress,
     pub to: WAddress,
-    pub cc: SeparatedStrList,
-    pub bcc: SeparatedStrList,
+    pub cc: Vec<WAddress>,
+    pub bcc: Vec<WAddress>,
     pub date: Timestamp,
     pub format: DocFormat,
     pub thread_id: RandomID,
@@ -36,7 +37,7 @@ impl DBModel for MessageModel {
 			images,attachments FROM messages WHERE id = ?1",
         )?;
         let (
-            fromst,
+            fromstr,
             conidstr,
             tostr,
             ccstr,
@@ -68,6 +69,15 @@ impl DBModel for MessageModel {
             Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
         };
 
+        self.from = match WAddress::from(&fromstr) {
+            Some(v) => v,
+            None => {
+                return Err(MensagoError::ErrDatabaseException(format!(
+                    "Bad From: address received from database: '{}'",
+                    fromstr
+                )))
+            }
+        };
         self.contact_id = match RandomID::from(&conidstr) {
             Some(v) => v,
             None => {
@@ -77,6 +87,75 @@ impl DBModel for MessageModel {
                 )))
             }
         };
+        self.to = match WAddress::from(&tostr) {
+            Some(v) => v,
+            None => {
+                return Err(MensagoError::ErrDatabaseException(format!(
+                    "Bad To: address received from database: '{}'",
+                    tostr
+                )))
+            }
+        };
+
+        let addrlist = SeparatedStrList::from(&ccstr, ",");
+        self.cc = Vec::new();
+        for item in addrlist.items {
+            match WAddress::from(&item) {
+                Some(v) => self.cc.push(v),
+                None => {
+                    return Err(MensagoError::ErrDatabaseException(format!(
+                        "Bad CC: address received from database: '{}'",
+                        item
+                    )))
+                }
+            };
+        }
+
+        let addrlist = SeparatedStrList::from(&bccstr, ",");
+        self.bcc = Vec::new();
+        for item in addrlist.items {
+            match WAddress::from(&item) {
+                Some(v) => self.bcc.push(v),
+                None => {
+                    return Err(MensagoError::ErrDatabaseException(format!(
+                        "Bad BCC: address received from database: '{}'",
+                        item
+                    )))
+                }
+            };
+        }
+
+        self.date = match Timestamp::from_str(&datestr) {
+            Some(v) => v,
+            None => {
+                return Err(MensagoError::ErrDatabaseException(format!(
+                    "Bad timestamp received from database: '{}'",
+                    datestr
+                )))
+            }
+        };
+        self.format = match DocFormat::from_str(&formatstr) {
+            Ok(v) => v,
+            Err(_) => {
+                return Err(MensagoError::ErrDatabaseException(format!(
+                    "Bad format value received from database: '{}'",
+                    formatstr
+                )))
+            }
+        };
+        self.thread_id = match RandomID::from(&thridstr) {
+            Some(v) => v,
+            None => {
+                return Err(MensagoError::ErrDatabaseException(format!(
+                    "Bad thread ID received from database: '{}'",
+                    conidstr
+                )))
+            }
+        };
+        self.subject = subject;
+        self.body = body;
+
+        // TODO: Add ImageModels from db in MessageModel::refresh_from_db()
 
         // TODO: Finish MessageModel::refresh_from_db()
 
