@@ -1,13 +1,12 @@
-use crate::{base::*, dbsupport::*, types::DocFormat, AttachmentModel};
+use crate::*;
 use libkeycard::*;
 use rusqlite;
 use std::str::FromStr;
 
 /// MessageModel represents a Mensago message
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct MessageModel {
     pub id: RandomID,
-    pub contact_id: RandomID,
     pub from: WAddress,
     pub to: WAddress,
     pub cc: Vec<WAddress>,
@@ -21,7 +20,178 @@ pub struct MessageModel {
     pub attachments: Vec<AttachmentModel>,
 }
 
-impl MessageModel {}
+impl MessageModel {
+    /// Returns a new message
+    pub fn new(from: &WAddress, to: &WAddress, format: DocFormat) -> MessageModel {
+        MessageModel {
+            id: RandomID::generate(),
+            from: from.clone(),
+            to: to.clone(),
+            cc: Vec::new(),
+            bcc: Vec::new(),
+            date: Timestamp::new(),
+            format,
+            thread_id: RandomID::generate(),
+            subject: String::new(),
+            body: String::new(),
+            images: Vec::new(),
+            attachments: Vec::new(),
+        }
+    }
+
+    /// Returns a copy of the current message. Note that the new message will not have the same
+    /// message ID as the original
+    pub fn clone(&self) -> MessageModel {
+        MessageModel {
+            id: RandomID::generate(),
+            from: self.from.clone(),
+            to: self.to.clone(),
+            cc: self.cc.clone(),
+            bcc: self.bcc.clone(),
+            date: self.date.clone(),
+            format: self.format.clone(),
+            thread_id: self.thread_id.clone(),
+            subject: self.subject.clone(),
+            body: self.body.clone(),
+            images: self.images.clone(),
+            attachments: self.attachments.clone(),
+        }
+    }
+
+    /// Creates a reply to a source message. If quoting is not Quoting::None, each line in the
+    /// source message's body is indented with the same formatting as e-mail (`> `). The body format
+    /// from the previous message is retained. Pictures are retained if the message is quoted, but
+    /// not other attachments.
+    pub fn reply(msg: &MessageModel, quoting: QuoteType, reply_all: bool) -> MessageModel {
+        let subject = if msg.subject.to_lowercase().starts_with("re:") {
+            msg.subject.clone()
+        } else {
+            format!("Re: {}", msg.subject)
+        };
+
+        let body = match quoting {
+            QuoteType::None => msg.body.clone(),
+            _ => {
+                if msg.body.len() == 0 {
+                    String::new()
+                } else {
+                    let lines: Vec<&str> = msg.subject.split("\r\n").collect();
+                    lines
+                        .iter()
+                        .map(|x| format!("> {}", x))
+                        .collect::<Vec<String>>()
+                        .join("\r\n")
+                }
+            }
+        };
+
+        MessageModel {
+            id: RandomID::generate(),
+            from: msg.to.clone(),
+            to: msg.from.clone(),
+            cc: if reply_all {
+                msg.cc.clone()
+            } else {
+                Vec::new()
+            },
+            bcc: if reply_all {
+                msg.bcc.clone()
+            } else {
+                Vec::new()
+            },
+            date: Timestamp::new(),
+            format: msg.format,
+            thread_id: msg.thread_id.clone(),
+            subject,
+            body,
+            images: msg.images.clone(),
+            attachments: Vec::new(),
+        }
+    }
+
+    /// Forwards a source message. As with `reply()`, if quoting is not Quoting::None, each line in
+    /// the source message's body is indented and both the body format from the previous message
+    /// and any pictures are retained.
+    pub fn forward(
+        from: &WAddress,
+        to: &WAddress,
+        msg: &MessageModel,
+        quoting: QuoteType,
+    ) -> MessageModel {
+        let subject = if msg.subject.to_lowercase().starts_with("fwd:") {
+            msg.subject.clone()
+        } else {
+            format!("Fwd: {}", msg.subject)
+        };
+
+        let body = match quoting {
+            QuoteType::None => msg.body.clone(),
+            _ => {
+                if msg.body.len() == 0 {
+                    String::new()
+                } else {
+                    let lines: Vec<&str> = msg.subject.split("\r\n").collect();
+                    lines
+                        .iter()
+                        .map(|x| format!("> {}", x))
+                        .collect::<Vec<String>>()
+                        .join("\r\n")
+                }
+            }
+        };
+
+        MessageModel {
+            id: RandomID::generate(),
+            from: from.clone(),
+            to: to.clone(),
+            cc: Vec::new(),
+            bcc: Vec::new(),
+            date: Timestamp::new(),
+            format: msg.format,
+            thread_id: msg.thread_id.clone(),
+            subject,
+            body,
+            images: msg.images.clone(),
+            attachments: Vec::new(),
+        }
+    }
+
+    // Sets the message subject
+    pub fn set_subject(mut self, subject: &str) -> Self {
+        self.subject = String::from(subject);
+        self
+    }
+
+    // Sets the message body
+    pub fn set_body(mut self, body: &str) -> Self {
+        self.subject = String::from(body);
+        self
+    }
+
+    // Adds a CC recipient
+    pub fn add_cc(mut self, recipient: WAddress) -> Self {
+        self.cc.push(recipient);
+        self
+    }
+
+    // Adds a BCC recipient
+    pub fn add_bcc(mut self, recipient: WAddress) -> Self {
+        self.bcc.push(recipient);
+        self
+    }
+
+    // Adds an image
+    pub fn add_image(mut self, img: ImageModel) -> Self {
+        self.images.push(img);
+        self
+    }
+
+    // Adds an attachment
+    pub fn attach(mut self, attachment: AttachmentModel) -> Self {
+        self.attachments.push(attachment);
+        self
+    }
+}
 
 impl DBModel for MessageModel {
     fn delete_from_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
@@ -33,7 +203,7 @@ impl DBModel for MessageModel {
 
     fn refresh_from_db(&mut self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
         let mut stmt = conn.prepare(
-            "SELECT from,conid,to,cc,bcc,date,format,thread_id,subject,body FROM messages 
+            "SELECT from,to,cc,bcc,date,format,thread_id,subject,body FROM messages 
             WHERE id = ?1",
         )?;
         let (fromstr, conidstr, tostr, ccstr, bccstr, datestr, formatstr, thridstr, subject, body) =
@@ -62,15 +232,6 @@ impl DBModel for MessageModel {
                 return Err(MensagoError::ErrDatabaseException(format!(
                     "Bad From: address received from database: '{}'",
                     fromstr
-                )))
-            }
-        };
-        self.contact_id = match RandomID::from(&conidstr) {
-            Some(v) => v,
-            None => {
-                return Err(MensagoError::ErrDatabaseException(format!(
-                    "Bad contact ID received from database: '{}'",
-                    conidstr
                 )))
             }
         };
@@ -153,11 +314,10 @@ impl DBModel for MessageModel {
 
         match conn.execute(
             "INSERT OR REPLACE INTO 
-            messages(id,from,conid,to,cc,bcc,date,format,thread_id,subject,body)
+            messages(id,from,to,cc,bcc,date,format,thread_id,subject,body)
             VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)",
             &[
                 &self.id.to_string(),
-                &self.contact_id.to_string(),
                 &self.from.to_string(),
                 &self.to.to_string(),
                 &ccstr,
