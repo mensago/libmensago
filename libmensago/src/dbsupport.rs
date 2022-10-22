@@ -43,6 +43,17 @@ impl SeparatedStrList {
         }
     }
 
+    pub fn from_vec<D: fmt::Display>(list: Vec<D>, sep: &str) -> SeparatedStrList {
+        SeparatedStrList {
+            separator: if sep.len() == 0 {
+                String::new()
+            } else {
+                String::from(sep)
+            },
+            items: list.iter().map(|x| x.to_string()).collect(),
+        }
+    }
+
     /// Returns all items in the list joined by the instance's separator character. No padding is
     /// placed between the items and the separator character. If there are no items in the list,
     /// this method returns an empty string.
