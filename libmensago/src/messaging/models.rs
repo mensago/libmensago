@@ -33,41 +33,27 @@ impl DBModel for MessageModel {
 
     fn refresh_from_db(&mut self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
         let mut stmt = conn.prepare(
-            "SELECT from,conid,to,cc,bcc,date,format,thread_id,subject,body,
-			images,attachments FROM messages WHERE id = ?1",
+            "SELECT from,conid,to,cc,bcc,date,format,thread_id,subject,body FROM messages 
+            WHERE id = ?1",
         )?;
-        let (
-            fromstr,
-            conidstr,
-            tostr,
-            ccstr,
-            bccstr,
-            datestr,
-            formatstr,
-            thridstr,
-            subject,
-            body,
-            imagestr,
-            attstr,
-        ) = match stmt.query_row(&[&self.id.to_string()], |row| {
-            Ok((
-                row.get::<usize, String>(0).unwrap(),
-                row.get::<usize, String>(1).unwrap(),
-                row.get::<usize, String>(2).unwrap(),
-                row.get::<usize, String>(3).unwrap(),
-                row.get::<usize, String>(4).unwrap(),
-                row.get::<usize, String>(5).unwrap(),
-                row.get::<usize, String>(6).unwrap(),
-                row.get::<usize, String>(7).unwrap(),
-                row.get::<usize, String>(8).unwrap(),
-                row.get::<usize, String>(9).unwrap(),
-                row.get::<usize, String>(10).unwrap(),
-                row.get::<usize, String>(11).unwrap(),
-            ))
-        }) {
-            Ok(v) => v,
-            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-        };
+        let (fromstr, conidstr, tostr, ccstr, bccstr, datestr, formatstr, thridstr, subject, body) =
+            match stmt.query_row(&[&self.id.to_string()], |row| {
+                Ok((
+                    row.get::<usize, String>(0).unwrap(),
+                    row.get::<usize, String>(1).unwrap(),
+                    row.get::<usize, String>(2).unwrap(),
+                    row.get::<usize, String>(3).unwrap(),
+                    row.get::<usize, String>(4).unwrap(),
+                    row.get::<usize, String>(5).unwrap(),
+                    row.get::<usize, String>(6).unwrap(),
+                    row.get::<usize, String>(7).unwrap(),
+                    row.get::<usize, String>(8).unwrap(),
+                    row.get::<usize, String>(9).unwrap(),
+                ))
+            }) {
+                Ok(v) => v,
+                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+            };
         drop(stmt);
 
         self.from = match WAddress::from(&fromstr) {
@@ -156,8 +142,7 @@ impl DBModel for MessageModel {
         self.subject = subject;
         self.body = body;
         self.images = ImageModel::load_all(&self.id, conn)?;
-
-        // TODO: Finish MessageModel::refresh_from_db()
+        self.attachments = AttachmentModel::load_all(&self.id, conn)?;
 
         Ok(())
     }
