@@ -148,21 +148,29 @@ impl DBModel for MessageModel {
     }
 
     fn set_in_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
-        // match conn.execute(
-        //     "INSERT OR REPLACE INTO messages(id,itemtype,conid,label,value)
-        //     VALUES(?1,?2,?3,?4,?5)",
-        //     &[
-        //         &self.id.to_string(),
-        //         &self.itemtype.to_string(),
-        //         &self.contact_id.to_string(),
-        //         &self.label,
-        //         &self.value,
-        //     ],
-        // ) {
-        //     Ok(_) => Ok(()),
-        //     Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
-        // }
-        // TODO: Implement MessageModel::set_in_db()
-        Err(MensagoError::ErrUnimplemented)
+        let ccstr = SeparatedStrList::from_vec(&self.cc, ",").join();
+        let bccstr = SeparatedStrList::from_vec(&self.bcc, ",").join();
+
+        match conn.execute(
+            "INSERT OR REPLACE INTO 
+            messages(id,from,conid,to,cc,bcc,date,format,thread_id,subject,body)
+            VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)",
+            &[
+                &self.id.to_string(),
+                &self.contact_id.to_string(),
+                &self.from.to_string(),
+                &self.to.to_string(),
+                &ccstr,
+                &bccstr,
+                &self.date.to_string(),
+                &self.format.to_string(),
+                &self.thread_id.to_string(),
+                &self.subject,
+                &self.body,
+            ],
+        ) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
+        }
     }
 }
