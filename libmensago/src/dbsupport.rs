@@ -43,7 +43,7 @@ impl SeparatedStrList {
         }
     }
 
-    pub fn from_vec<D: fmt::Display>(list: Vec<D>, sep: &str) -> SeparatedStrList {
+    pub fn from_vec<D: fmt::Display>(list: &Vec<D>, sep: &str) -> SeparatedStrList {
         SeparatedStrList {
             separator: if sep.len() == 0 {
                 String::new()
