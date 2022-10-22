@@ -150,7 +150,7 @@ mod tests {
             0xE8, 0x7F, 0, 0,
         ];
         let filename = String::from("test.webp");
-        let mut model = AttachmentModel::from_raw(&ownid, &filename, &filetype, &filedata);
+        let mut model = ImageModel::from_raw(&ownid, &filename, &filetype, &filedata);
 
         // Add to db
         match model.set_in_db(&mut db) {
@@ -214,7 +214,7 @@ mod tests {
         }
 
         // Load from db
-        let loadmodel = match AttachmentModel::load_from_db(&model.id, &mut db) {
+        let loadmodel = match ImageModel::load_from_db(&model.id, &mut db) {
             Ok(v) => v,
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
