@@ -174,9 +174,21 @@ impl MessageModel {
         self
     }
 
+    // Removes all CC recipients
+    pub fn clear_cc(mut self) -> Self {
+        self.cc.clear();
+        self
+    }
+
     // Adds a BCC recipient
     pub fn add_bcc(mut self, recipient: WAddress) -> Self {
         self.bcc.push(recipient);
+        self
+    }
+
+    // Removes all BCC recipients
+    pub fn clear_bcc(mut self) -> Self {
+        self.bcc.clear();
         self
     }
 
@@ -186,9 +198,21 @@ impl MessageModel {
         self
     }
 
+    // Removes all images
+    pub fn clear_images(mut self) -> Self {
+        self.images.clear();
+        self
+    }
+
     // Adds an attachment
     pub fn attach(mut self, attachment: AttachmentModel) -> Self {
         self.attachments.push(attachment);
+        self
+    }
+
+    // Removes all attachments
+    pub fn clear_attachments(mut self) -> Self {
+        self.attachments.clear();
         self
     }
 }
