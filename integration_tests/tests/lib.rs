@@ -2,7 +2,8 @@
 //! themselves
 mod client;
 mod common;
+mod contactmodels;
+mod dbsupport;
 mod iscmds;
-mod models;
 mod notes;
 mod resolver;
