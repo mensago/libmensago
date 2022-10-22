@@ -68,6 +68,7 @@ impl DBModel for MessageModel {
             Ok(v) => v,
             Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
         };
+        drop(stmt);
 
         self.from = match WAddress::from(&fromstr) {
             Some(v) => v,
@@ -154,7 +155,7 @@ impl DBModel for MessageModel {
         };
         self.subject = subject;
         self.body = body;
-        self.images = match ImageModel::load_all(&self.id, conn)?;
+        self.images = ImageModel::load_all(&self.id, conn)?;
 
         // TODO: Finish MessageModel::refresh_from_db()
 
