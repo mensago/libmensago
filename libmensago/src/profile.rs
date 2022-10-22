@@ -173,7 +173,7 @@ static STORAGE_DB_SETUP_COMMANDS: &str = "
 		'notebook'  	TEXT,
 		'tags'	        TEXT,
         'images'        TEXT,
-        'attachments'   TEXT,
+        'attachments'   TEXT
 	);
 	CREATE TABLE 'images' (
 		'id'	    TEXT NOT NULL UNIQUE,
