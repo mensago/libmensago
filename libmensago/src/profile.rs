@@ -177,14 +177,14 @@ static STORAGE_DB_SETUP_COMMANDS: &str = "
 	);
 	CREATE TABLE 'images' (
 		'id'	    TEXT NOT NULL UNIQUE,
-		'ownerid'   TEXT NOT NULL,
+		'ownid'   TEXT NOT NULL,
 		'name'  	TEXT NOT NULL,
 		'mimetype'	TEXT NOT NULL,
         'data'      BLOB
 	);
 	CREATE TABLE 'attachments' (
 		'id'	    TEXT NOT NULL UNIQUE,
-		'docid'	    TEXT NOT NULL,
+		'ownid'	    TEXT NOT NULL,
 		'name'  	TEXT NOT NULL,
 		'mimetype'	TEXT NOT NULL,
         'data'      BLOB

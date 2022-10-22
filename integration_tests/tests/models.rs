@@ -18,11 +18,11 @@ mod tests {
         let profile = profman.get_active_profile().unwrap();
         let mut db = profile.open_storage()?;
 
-        let docid = RandomID::from("00000000-1111-2222-3333-444444444444").unwrap();
+        let ownid = RandomID::from("00000000-1111-2222-3333-444444444444").unwrap();
         let filetype = Mime::from_str("text/plain").unwrap();
         let filedata = vec![65, 66, 67, 68, 69];
         let filename = String::from("test.txt");
-        let mut model = AttachmentModel::from_raw(&docid, &filename, &filetype, &filedata);
+        let mut model = AttachmentModel::from_raw(&ownid, &filename, &filetype, &filedata);
 
         // Add to db
         match model.set_in_db(&mut db) {
@@ -38,7 +38,7 @@ mod tests {
 
         let mut fields = vec![
             ("id", model.id.to_string()),
-            ("docid", docid.to_string()),
+            ("ownid", ownid.to_string()),
             ("name", filename.clone()),
             ("mimetype", filetype.to_string()),
             // Can't check binary data with check_db_value(). Oh well. *shrug*
@@ -99,10 +99,10 @@ mod tests {
             }
         };
 
-        if loadmodel.docid != docid || loadmodel.mimetype.to_string() != "text/markdown" {
+        if loadmodel.ownid != ownid || loadmodel.mimetype.to_string() != "text/markdown" {
             return Err(MensagoError::ErrProgramException(format!(
                 "{}: load_from_db value mismatch: expected {}/'text/markdown', got '{}/{}'",
-                testname, docid, loadmodel.docid, loadmodel.mimetype
+                testname, ownid, loadmodel.ownid, loadmodel.mimetype
             )));
         }
 
