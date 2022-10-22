@@ -53,10 +53,7 @@ pub struct NoteModel {
     pub updated: Timestamp,
     pub notebook: String,
     pub tags: Vec<String>,
-    // TODO: Add ImageModel to NoteModel
-    //pub images: Vec<ImageModel>,
-
-    // TODO: Update usage of AttachmentModel to store a SeparatedStringList of IDs in notes.attachments
+    pub images: Vec<ImageModel>,
     pub attachments: Vec<AttachmentModel>,
 }
 
@@ -73,6 +70,7 @@ impl NoteModel {
             updated: ts,
             notebook: String::from(group),
             tags: Vec::new(),
+            images: Vec::new(),
             attachments: Vec::new(),
         }
     }
@@ -141,6 +139,7 @@ impl NoteModel {
             updated,
             notebook,
             tags: taglist.items,
+            images: ImageModel::load_all(id, conn)?,
             attachments: AttachmentModel::load_all(id, conn)?,
         })
     }
@@ -216,6 +215,7 @@ impl DBModel for NoteModel {
         self.updated = updated;
         self.notebook = notebook;
         self.tags = taglist.items;
+        self.images = ImageModel::load_all(&self.id, conn)?;
         self.attachments = AttachmentModel::load_all(&self.id, conn)?;
 
         Ok(())
@@ -238,6 +238,11 @@ impl DBModel for NoteModel {
         ) {
             Ok(_) => (),
             Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+        }
+
+        ImageModel::delete_all(&self.id, conn)?;
+        for item in self.images.iter() {
+            item.set_in_db(conn)?;
         }
 
         AttachmentModel::delete_all(&self.id, conn)?;
