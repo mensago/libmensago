@@ -17,7 +17,7 @@ pub struct MessageModel {
     pub thread_id: RandomID,
     pub subject: String,
     pub body: String,
-    //pub images: Vec<ImageModel>,
+    pub images: Vec<ImageModel>,
     pub attachments: Vec<AttachmentModel>,
 }
 
@@ -154,8 +154,7 @@ impl DBModel for MessageModel {
         };
         self.subject = subject;
         self.body = body;
-
-        // TODO: Add ImageModels from db in MessageModel::refresh_from_db()
+        self.images = match ImageModel::load_all(&self.id, conn)?;
 
         // TODO: Finish MessageModel::refresh_from_db()
 
