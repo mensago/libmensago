@@ -5,15 +5,19 @@ use std::str::FromStr;
 /// DocFormat indicates the type of format used in a note -- plain text or SFTM.
 #[derive(Debug, PartialEq, PartialOrd, Clone, Copy)]
 pub enum DocFormat {
-    Text,
+    Markdown,
+    SDF,
     SFTM,
+    Text,
 }
 
 impl fmt::Display for DocFormat {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            DocFormat::Text => write!(f, "text"),
+            DocFormat::Markdown => write!(f, "markdown"),
+            DocFormat::SDF => write!(f, "sdf"),
             DocFormat::SFTM => write!(f, "sftm"),
+            DocFormat::Text => write!(f, "text"),
         }
     }
 }
@@ -23,8 +27,10 @@ impl FromStr for DocFormat {
 
     fn from_str(input: &str) -> Result<DocFormat, Self::Err> {
         match input.to_lowercase().as_str() {
-            "text" => Ok(DocFormat::Text),
+            "markdown" => Ok(DocFormat::Markdown),
+            "sdf" => Ok(DocFormat::SDF),
             "sftm" => Ok(DocFormat::SFTM),
+            "text" => Ok(DocFormat::Text),
             _ => Err(()),
         }
     }
@@ -34,8 +40,10 @@ impl std::convert::TryFrom<&str> for DocFormat {
     type Error = MensagoError;
     fn try_from(input: &str) -> Result<Self, Self::Error> {
         match input.to_lowercase().as_str() {
-            "text" => Ok(DocFormat::Text),
+            "markdown" => Ok(DocFormat::Markdown),
+            "sdf" => Ok(DocFormat::SDF),
             "sftm" => Ok(DocFormat::SFTM),
+            "text" => Ok(DocFormat::Text),
             _ => Err(MensagoError::ErrBadValue),
         }
     }

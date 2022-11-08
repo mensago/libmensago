@@ -78,15 +78,41 @@ impl NoteModel {
     }
 
     /// `import()` instantiates a NoteModel from a file on disk. Currently only plaintext is
-    /// supported, but eventually SFTM support will also be added.
+    /// supported, but eventually SFTM support will also be added and possibly even Markdown.
     pub fn import<P: AsRef<Path>>(
         path: P,
         format: DocFormat,
         title: &str,
         notebook: &str,
     ) -> Result<NoteModel, MensagoError> {
-        if format != DocFormat::Text {
-            return Err(MensagoError::ErrUnimplemented);
+        // Very basic format validation. We don't officially support anything beyond plaintext
+        // right now, so it's not critical.
+        let ext = match path.as_ref().extension() {
+            Some(v) => String::from(v.to_string_lossy()),
+            None => String::new(),
+        };
+
+        match ext.as_str() {
+            "md" => {
+                if format != DocFormat::Markdown {
+                    return Err(MensagoError::ErrTypeMismatch);
+                }
+            }
+            "sdf" => {
+                if format != DocFormat::SDF {
+                    return Err(MensagoError::ErrTypeMismatch);
+                }
+            }
+            "sftm" => {
+                if format != DocFormat::SFTM {
+                    return Err(MensagoError::ErrTypeMismatch);
+                }
+            }
+            _ => {
+                if format != DocFormat::Text {
+                    return Err(MensagoError::ErrTypeMismatch);
+                }
+            }
         }
 
         let filedata = match read_to_string(path) {
