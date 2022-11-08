@@ -1,7 +1,10 @@
 use crate::{base::MensagoError, dbsupport::*, types::DocFormat};
 use libkeycard::*;
 use std::fmt;
+use std::fs::read_to_string;
+use std::path::Path;
 use std::str::FromStr;
+use trust_dns_proto::rr::rdata::hinfo::read;
 
 /// The BinEncoding type is for the type of binary-to-text encoding used
 #[derive(Debug, PartialEq, PartialOrd, Clone, Copy)]
@@ -73,6 +76,27 @@ impl NoteModel {
             images: Vec::new(),
             attachments: Vec::new(),
         }
+    }
+
+    /// `import()` instantiates a NoteModel from a file on disk. Currently only plaintext is
+    /// supported, but eventually SFTM support will also be added.
+    pub fn import<P: AsRef<Path>>(
+        path: P,
+        format: DocFormat,
+        title: &str,
+        notebook: &str,
+    ) -> Result<NoteModel, MensagoError> {
+        if format != DocFormat::Text {
+            return Err(MensagoError::ErrUnimplemented);
+        }
+
+        let filedata = match read_to_string(path) {
+            Ok(v) => v,
+            Err(e) => return Err(MensagoError::ErrProgramException(e.to_string())),
+        };
+        let mut out = NoteModel::new(title, format, notebook);
+        out.body = filedata;
+        Ok(out)
     }
 
     /// `load_from_db()` instantiates an NoteModel from the specified note ID.
