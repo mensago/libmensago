@@ -4,7 +4,6 @@ use std::fmt;
 use std::fs::read_to_string;
 use std::path::Path;
 use std::str::FromStr;
-use trust_dns_proto::rr::rdata::hinfo::read;
 
 /// The BinEncoding type is for the type of binary-to-text encoding used
 #[derive(Debug, PartialEq, PartialOrd, Clone, Copy)]
