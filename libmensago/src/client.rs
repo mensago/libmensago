@@ -1,7 +1,9 @@
 use crate::*;
 use eznacl::*;
+use home::home_dir;
 use hostname;
 use libkeycard::*;
+use std::env;
 use std::path::PathBuf;
 
 /// The Client type primary interface to the entire library.
@@ -525,4 +527,23 @@ impl Client {
     }
 
     // TODO: Finish implementing Client class.
+}
+
+/// Returns the default location for Mensago profiles for the current user. On Windows, this is
+/// in `AppData\Local\mensago` in the user's home directory. For everything else, it is at
+/// `~/mensago`. If, for some bizarre reason, this function cannot determine the home directory of
+/// the current user, it returns an empty string.
+pub fn get_default_profile_path() -> String {
+    let mut home = match home_dir() {
+        Some(v) => v,
+        None => return String::new(),
+    };
+
+    if env::consts::OS == "windows" {
+        home.push("AppData\\Local\\mensago");
+    } else {
+        home.push(".mensago");
+    }
+
+    return home.into_os_string().to_string_lossy().to_string();
 }
