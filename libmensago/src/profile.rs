@@ -1,9 +1,9 @@
 use crate::base::*;
+use crate::client::get_default_profile_path;
 use crate::config::*;
 use crate::workspace::*;
 use libkeycard::*;
 use rusqlite;
-use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -711,19 +711,14 @@ impl ProfileManager {
 
         self.profile_folder = match profile_path {
             Some(s) => PathBuf::from(s),
-            None => {
-                if cfg!(windows) {
-                    let mut out = PathBuf::new();
-                    out.push(&env::var("LOCALAPPDATA").expect("BUG: error getting LOCALAPPDATA"));
-                    out.push("mensago");
-                    out
-                } else {
-                    let mut out = PathBuf::new();
-                    out.push(&env::var("LOCALAPPDATA").expect("BUG: error getting LOCALAPPDATA"));
-                    out.push("mensago");
-                    out
+            None => match get_default_profile_path() {
+                Some(v) => v,
+                None => {
+                    return Err(MensagoError::ErrProgramException(String::from(
+                        "Unable to find the user's home directory",
+                    )))
                 }
-            }
+            },
         };
 
         if !self.profile_folder.exists() {
