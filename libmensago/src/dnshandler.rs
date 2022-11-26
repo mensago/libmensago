@@ -48,11 +48,17 @@ impl DNSHandler {
     pub fn new_default() -> Result<DNSHandler, MensagoError> {
         if cfg!(windows) {
             Ok(DNSHandler {
-                resolver: Resolver::new(ResolverConfig::quad9(), ResolverOpts::default())?,
+                resolver: match Resolver::new(ResolverConfig::quad9(), ResolverOpts::default()) {
+                    Ok(v) => v,
+                    Err(e) => return Err(MensagoError::ErrIO(e.to_string())),
+                },
             })
         } else {
             Ok(DNSHandler {
-                resolver: Resolver::from_system_conf()?,
+                resolver: match Resolver::from_system_conf() {
+                    Ok(v) => v,
+                    Err(e) => return Err(MensagoError::ErrIO(e.to_string())),
+                },
             })
         }
     }
@@ -61,7 +67,10 @@ impl DNSHandler {
     /// `set_server()`.
     pub fn new(config: ResolverConfig, opts: ResolverOpts) -> Result<DNSHandler, MensagoError> {
         Ok(DNSHandler {
-            resolver: Resolver::new(config, opts)?,
+            resolver: match Resolver::new(config, opts) {
+                Ok(v) => v,
+                Err(e) => return Err(MensagoError::ErrIO(e.to_string())),
+            },
         })
     }
 }
@@ -73,15 +82,19 @@ impl DNSHandlerT for DNSHandler {
         config: ResolverConfig,
         opts: ResolverOpts,
     ) -> Result<(), MensagoError> {
-        self.resolver = Resolver::new(config, opts)?;
+        self.resolver = match Resolver::new(config, opts) {
+            Ok(v) => v,
+            Err(e) => return Err(MensagoError::ErrIO(e.to_string())),
+        };
         Ok(())
     }
 
     /// Resolves a DNS domain to an IPv4 address.
     fn lookup_a(&mut self, d: &Domain) -> Result<IpAddr, MensagoError> {
-        let addresses: Vec<SocketAddr> = format!("{}:443", d.as_string())
-            .to_socket_addrs()?
-            .collect();
+        let addresses: Vec<SocketAddr> = match format!("{}:443", d.as_string()).to_socket_addrs() {
+            Ok(v) => v.collect(),
+            Err(e) => return Err(MensagoError::ErrIO(e.to_string())),
+        };
 
         for a in addresses {
             if a.is_ipv4() {
@@ -94,9 +107,10 @@ impl DNSHandlerT for DNSHandler {
 
     /// Resolves a DNS domain to an IPv6 address.
     fn lookup_aaaa(&mut self, d: &Domain) -> Result<IpAddr, MensagoError> {
-        let addresses: Vec<SocketAddr> = format!("{}:443", d.as_string())
-            .to_socket_addrs()?
-            .collect();
+        let addresses: Vec<SocketAddr> = match format!("{}:443", d.as_string()).to_socket_addrs() {
+            Ok(v) => v.collect(),
+            Err(e) => return Err(MensagoError::ErrIO(e.to_string())),
+        };
 
         for a in addresses {
             if a.is_ipv6() {

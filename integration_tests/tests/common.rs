@@ -170,7 +170,10 @@ pub fn load_server_config(testmode: bool) -> Result<Document, MensagoError> {
 
     let mut out: toml_edit::Document;
     if config_file_path.exists() {
-        let rawdata = fs::read_to_string(config_file_path)?;
+        let rawdata = match fs::read_to_string(config_file_path) {
+            Ok(v) => v,
+            Err(e) => return Err(MensagoError::ErrIO(e.to_string())),
+        };
         out = match rawdata.parse::<Document>() {
             Ok(v) => v,
             Err(e) => {
@@ -776,7 +779,10 @@ pub fn reset_workspace_dir(config: &Document) -> Result<(), MensagoError> {
     let mut path = PathBuf::from(config["global"]["workspace_dir"].as_str().unwrap());
     path.push("tmp");
     if !path.exists() {
-        fs::create_dir(&path)?;
+        match fs::create_dir(&path) {
+            Ok(v) => v,
+            Err(e) => return Err(MensagoError::ErrIO(e.to_string())),
+        };
     }
 
     Ok(())
@@ -796,9 +802,15 @@ pub fn setup_profile_base(name: &str) -> Result<String, MensagoError> {
                 }
             }
         }
-        fs::create_dir(&testpath)?;
+        match fs::create_dir(&testpath) {
+            Ok(v) => v,
+            Err(e) => return Err(MensagoError::ErrIO(e.to_string())),
+        };
     } else {
-        fs::create_dir_all(&testpath)?;
+        match fs::create_dir_all(&testpath) {
+            Ok(v) => v,
+            Err(e) => return Err(MensagoError::ErrIO(e.to_string())),
+        };
     }
 
     match testpath.to_str() {

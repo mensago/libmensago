@@ -251,14 +251,20 @@ impl Profile {
         let mut tempdir = self.path.clone();
         tempdir.push("temp");
         if !tempdir.exists() {
-            fs::create_dir_all(tempdir)?;
+            match fs::create_dir_all(tempdir) {
+                Ok(v) => v,
+                Err(e) => return Err(MensagoError::ErrIO(e.to_string())),
+            };
         }
 
         let mut storagepath = self.path.clone();
         storagepath.push("storage.db");
         if storagepath.exists() {
             let db = rusqlite::Connection::open(storagepath)?;
-            self.config.load_from_db(&db)?;
+            match self.config.load_from_db(&db) {
+                Ok(v) => v,
+                Err(e) => return Err(MensagoError::ErrIO(e.to_string())),
+            };
             db.close()
                 .expect("BUG: Profile.activate(): error closing database");
             return Ok(());
@@ -273,11 +279,17 @@ impl Profile {
         dbpath.push("default.txt");
         if is_default {
             if !dbpath.exists() {
-                let _handle = fs::File::create(dbpath)?;
+                let _handle = match fs::File::create(dbpath) {
+                    Ok(v) => v,
+                    Err(e) => return Err(MensagoError::ErrIO(e.to_string())),
+                };
             }
         } else {
             if dbpath.exists() {
-                fs::remove_file(dbpath)?;
+                match fs::remove_file(dbpath) {
+                    Ok(v) => v,
+                    Err(e) => return Err(MensagoError::ErrIO(e.to_string())),
+                };
             }
         }
 
@@ -449,7 +461,10 @@ impl Profile {
             dbpath.push(s.0);
 
             if dbpath.exists() {
-                fs::remove_file(&dbpath)?;
+                match fs::remove_file(&dbpath) {
+                    Ok(v) => v,
+                    Err(e) => return Err(MensagoError::ErrIO(e.to_string())),
+                };
             }
 
             {
@@ -622,7 +637,10 @@ impl ProfileManager {
             defaultpath.push(&name_squashed);
             defaultpath.push("default.txt");
             if !defaultpath.exists() {
-                let _ = fs::File::create(defaultpath)?;
+                let _ = match fs::File::create(defaultpath) {
+                    Ok(v) => v,
+                    Err(e) => return Err(MensagoError::ErrIO(e.to_string())),
+                };
             }
         }
 
@@ -651,7 +669,10 @@ impl ProfileManager {
 
         let profile = self.profiles.remove(pindex as usize);
         if Path::new(profile.path.as_path()).exists() {
-            fs::remove_dir_all(profile.path.as_path())?
+            match fs::remove_dir_all(profile.path.as_path()) {
+                Ok(v) => v,
+                Err(e) => return Err(MensagoError::ErrIO(e.to_string())),
+            }
         }
 
         if profile.is_default() && self.profiles.len() > 0 {
@@ -722,12 +743,21 @@ impl ProfileManager {
         };
 
         if !self.profile_folder.exists() {
-            fs::create_dir_all(self.profile_folder.as_path())?;
+            match fs::create_dir_all(self.profile_folder.as_path()) {
+                Ok(v) => v,
+                Err(e) => return Err(MensagoError::ErrIO(e.to_string())),
+            };
         }
 
         self.profiles.clear();
-        for item in fs::read_dir(self.profile_folder.as_path())? {
-            let entry = item?;
+        for item in match fs::read_dir(self.profile_folder.as_path()) {
+            Ok(v) => v,
+            Err(e) => return Err(MensagoError::ErrIO(e.to_string())),
+        } {
+            let entry = match item {
+                Ok(v) => v,
+                Err(e) => return Err(MensagoError::ErrIO(e.to_string())),
+            };
             let itempath = entry.path();
             if !itempath.is_dir() {
                 continue;
@@ -752,7 +782,10 @@ impl ProfileManager {
         if self.profiles.len() == 0 {
             match self.create_profile("primary") {
                 Ok(_) => {
-                    self.set_default_profile("primary")?;
+                    match self.set_default_profile("primary") {
+                        Ok(v) => v,
+                        Err(e) => return Err(MensagoError::ErrIO(e.to_string())),
+                    };
                 }
                 Err(e) => {
                     return Err(e);
@@ -796,7 +829,10 @@ impl ProfileManager {
         let mut newpath = oldpath.parent().unwrap().to_path_buf();
         newpath.push(&new_squashed);
 
-        fs::rename(&oldpath, &newpath)?;
+        match fs::rename(&oldpath, &newpath) {
+            Ok(v) => v,
+            Err(e) => return Err(MensagoError::ErrIO(e.to_string())),
+        };
 
         self.profiles[index as usize].name = new_squashed;
         self.profiles[index as usize].path = newpath;

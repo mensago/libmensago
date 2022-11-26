@@ -251,7 +251,10 @@ impl Workspace {
         attachmentdir.push("files");
         attachmentdir.push("attachments");
         if !attachmentdir.exists() {
-            fs::create_dir_all(attachmentdir)?;
+            match fs::create_dir_all(attachmentdir) {
+                Ok(v) => v,
+                Err(e) => return Err(MensagoError::ErrIO(e.to_string())),
+            };
         }
 
         self.set_userid(uid)?;

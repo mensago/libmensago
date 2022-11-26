@@ -511,7 +511,10 @@ impl Client {
 
         let storage = profile.open_storage()?;
 
-        let tempname = hostname::get()?;
+        let tempname = match hostname::get() {
+            Ok(v) => v,
+            Err(e) => return Err(MensagoError::ErrIO(e.to_string())),
+        };
         let devicename = tempname.to_string_lossy();
         add_device_session(
             &storage,
