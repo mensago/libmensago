@@ -78,7 +78,7 @@ pub fn get_card_from_db(
             }
         };
 
-        let now = Utc::now().date().naive_utc();
+        let now = Utc::now().date_naive();
 
         if now > exptime {
             return Ok(None);
