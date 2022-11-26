@@ -2,7 +2,6 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::string;
 use thiserror::Error;
-use trust_dns_resolver::error::ResolveError;
 
 /// Type to hold status information from a Mensago protocol command response
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Error)]
@@ -25,7 +24,7 @@ impl fmt::Display for CmdStatus {
     }
 }
 
-#[derive(Error, Debug)]
+#[derive(Error, Debug, PartialEq)]
 pub enum MensagoError {
     // General error codes
     #[error("Empty data error")]
@@ -100,18 +99,16 @@ pub enum MensagoError {
     #[error(transparent)]
     LKCError(#[from] libkeycard::LKCError),
 
-    #[error("IO error: {0}")]
-    ErrIO(String),
-
     #[error(transparent)]
     RusqliteError(#[from] rusqlite::Error),
 
     #[error(transparent)]
-    SerdeError(#[from] serde_json::Error),
-
-    #[error(transparent)]
     Utf8Error(#[from] string::FromUtf8Error),
 
-    #[error(transparent)]
-    ResolveError(#[from] ResolveError),
+    // Workaround error codes because these don't implement PartialEq
+    #[error("IO error: {0}")]
+    ErrIO(String),
+
+    #[error("JSON marshalling error: {0}")]
+    SerdeError(String),
 }

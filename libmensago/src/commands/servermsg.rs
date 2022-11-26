@@ -284,7 +284,11 @@ impl ClientRequest {
 
     /// Converts the ClientRequest to JSON and sends to the server
     pub fn send<W: Write>(&self, conn: &mut W) -> Result<(), MensagoError> {
-        write_message(conn, serde_json::to_string(&self)?.as_bytes())
+        let jsonstr = match serde_json::to_string(&self) {
+            Ok(v) => v,
+            Err(e) => return Err(MensagoError::SerdeError(e.to_string())),
+        };
+        write_message(conn, jsonstr.as_bytes())
     }
 }
 
@@ -312,7 +316,10 @@ impl ServerResponse {
             Ok(v) => v,
             Err(_) => return Err(MensagoError::ErrBadMessage),
         };
-        let msg: ServerResponse = serde_json::from_str(&rawjson)?;
+        let msg: ServerResponse = match serde_json::from_str(&rawjson) {
+            Ok(v) => v,
+            Err(e) => return Err(MensagoError::SerdeError(e.to_string())),
+        };
 
         Ok(msg)
     }
