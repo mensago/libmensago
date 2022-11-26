@@ -532,11 +532,11 @@ impl Client {
 /// Returns the default location for Mensago profiles for the current user. On Windows, this is
 /// in `AppData\Local\mensago` in the user's home directory. For everything else, it is at
 /// `~/mensago`. If, for some bizarre reason, this function cannot determine the home directory of
-/// the current user, it returns an empty string.
-pub fn get_default_profile_path() -> String {
+/// the current user, it returns None.
+pub fn get_default_profile_path() -> Option<PathBuf> {
     let mut home = match home_dir() {
         Some(v) => v,
-        None => return String::new(),
+        None => return None,
     };
 
     if env::consts::OS == "windows" {
@@ -545,5 +545,5 @@ pub fn get_default_profile_path() -> String {
         home.push(".mensago");
     }
 
-    return home.into_os_string().to_string_lossy().to_string();
+    Some(home)
 }
