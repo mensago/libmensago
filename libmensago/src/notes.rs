@@ -301,3 +301,26 @@ impl DBModel for NoteModel {
         Ok(())
     }
 }
+
+/// NoteGroupItem is just a bit of basic high-level information used in note groups. It contains
+/// enough information to display a list of notes in a group and to easily look up the full note
+/// when needed.
+pub struct NoteGroupItem {
+    // The note's unique rowid for faster database lookups
+    rowid: usize,
+    id: RandomID,
+    title: String,
+}
+
+/// Returns a list of the groups of notes in the profile
+pub fn get_notegroups() -> Vec<String> {
+    // TODO: Implement get_notegroups()
+    Vec::new()
+}
+
+/// Returns a list of basic note information for the specified group. If given an empty string,
+/// all notes in the database are returned.
+pub fn get_notes(groupname: &str) -> Vec<NoteGroupItem> {
+    // TODO: Implement get_notes()
+    Vec::new()
+}
