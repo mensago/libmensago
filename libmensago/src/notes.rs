@@ -302,10 +302,10 @@ impl DBModel for NoteModel {
     }
 }
 
-/// NoteGroupItem is just a bit of basic high-level information used in note groups. It contains
+/// NotebookItem is just a bit of basic high-level information used for notebooks. It contains
 /// enough information to display a list of notes in a group and to easily look up the full note
 /// when needed.
-pub struct NoteGroupItem {
+pub struct NotebookItem {
     // The note's unique rowid for faster database lookups
     rowid: usize,
     id: RandomID,
@@ -313,14 +313,41 @@ pub struct NoteGroupItem {
 }
 
 /// Returns a list of the groups of notes in the profile
-pub fn get_notegroups() -> Vec<String> {
-    // TODO: Implement get_notegroups()
-    Vec::new()
+pub fn get_notebooks(conn: &mut rusqlite::Connection) -> Result<Vec<String>, MensagoError> {
+    let mut stmt = match conn.prepare("SELECT DISTINCT notebook FROM notes") {
+        Ok(v) => v,
+        Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+    };
+
+    let mut rows = match stmt.query([]) {
+        Ok(v) => v,
+        Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+    };
+
+    let mut option_row = match rows.next() {
+        Ok(v) => v,
+        Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+    };
+
+    let mut out = Vec::<String>::new();
+
+    while option_row.is_some() {
+        let row = option_row.unwrap();
+
+        out.push(row.get::<usize, String>(0).unwrap());
+
+        option_row = match rows.next() {
+            Ok(v) => v,
+            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+        };
+    }
+
+    Ok(out)
 }
 
 /// Returns a list of basic note information for the specified group. If given an empty string,
 /// all notes in the database are returned.
-pub fn get_notes(groupname: &str) -> Vec<NoteGroupItem> {
+pub fn get_notes(notebook: &str) -> Vec<NotebookItem> {
     // TODO: Implement get_notes()
     Vec::new()
 }
