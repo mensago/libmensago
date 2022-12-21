@@ -347,7 +347,35 @@ pub fn get_notebooks(conn: &mut rusqlite::Connection) -> Result<Vec<String>, Men
 
 /// Returns a list of basic note information for the specified group. If given an empty string,
 /// all notes in the database are returned.
-pub fn get_notes(notebook: &str) -> Vec<NotebookItem> {
-    // TODO: Implement get_notes()
-    Vec::new()
+pub fn get_notes(
+    conn: &mut rusqlite::Connection,
+    notebook: &str,
+) -> Result<Vec<NotebookItem>, MensagoError> {
+    let mut stmt = conn.prepare("SELECT rowid,id,title FROM notes WHERE id = ?1")?;
+
+    let mut rows = match stmt.query([]) {
+        Ok(v) => v,
+        Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+    };
+
+    let mut option_row = match rows.next() {
+        Ok(v) => v,
+        Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+    };
+
+    let mut out = Vec::<NotebookItem>::new();
+
+    while option_row.is_some() {
+        let row = option_row.unwrap();
+
+        // TODO: finish get_notes()
+        // out.push(row.get::<usize, String>(0).unwrap());
+
+        option_row = match rows.next() {
+            Ok(v) => v,
+            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+        };
+    }
+
+    Ok(out)
 }
