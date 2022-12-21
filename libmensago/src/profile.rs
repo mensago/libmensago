@@ -11,6 +11,7 @@ use std::path::{Path, PathBuf};
 static STORAGE_DB_SETUP_COMMANDS: &str = "
 	BEGIN;
 	CREATE TABLE 'workspaces' (
+		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
 		'wid' TEXT NOT NULL UNIQUE,
 		'userid' TEXT,
 		'domain' TEXT,
@@ -19,6 +20,7 @@ static STORAGE_DB_SETUP_COMMANDS: &str = "
 		'type' TEXT
 	);
 	CREATE table 'folders'(
+		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
 		'fid' TEXT NOT NULL UNIQUE,
 		'address' TEXT NOT NULL,
 		'keyid' TEXT NOT NULL,
@@ -39,6 +41,7 @@ static STORAGE_DB_SETUP_COMMANDS: &str = "
 		'ttlexpires' TEXT
 	);
 	CREATE table 'keys' (
+		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
 		'keyid' TEXT NOT NULL UNIQUE,
 		'address' TEXT NOT NULL,
 		'type' TEXT NOT NULL,
@@ -48,6 +51,7 @@ static STORAGE_DB_SETUP_COMMANDS: &str = "
 		'timestamp' TEXT NOT NULL
 	);
 	CREATE table 'sessions'(
+		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
 		'address' TEXT NOT NULL,
 		'devid' TEXT NOT NULL,
 		'devname' TEXT NOT NULL,
@@ -56,6 +60,7 @@ static STORAGE_DB_SETUP_COMMANDS: &str = "
 		'os' TEXT NOT NULL
 	);
 	CREATE table 'messages'(
+		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
 		'id' TEXT NOT NULL UNIQUE,
 		'from'  TEXT NOT NULL,
         'conid' TEXT NOT NULL,
@@ -71,6 +76,7 @@ static STORAGE_DB_SETUP_COMMANDS: &str = "
 		'attachments' TEXT
 	);
 	CREATE TABLE 'contacts' (
+		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
 		'id' TEXT NOT NULL UNIQUE,
 		'entitytype' TEXT NOT NULL,
         'contactgroup' TEXT NOT NULL,
@@ -88,6 +94,7 @@ static STORAGE_DB_SETUP_COMMANDS: &str = "
         'annotation_link' TEXT
 	);
     CREATE TABLE 'contact_names' (
+		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
         'id' TEXT NOT NULL UNIQUE,
         'conid' TEXT NOT NULL,
         'formatted_name' TEXT,
@@ -96,6 +103,7 @@ static STORAGE_DB_SETUP_COMMANDS: &str = "
         'prefix' TEXT
     );
     CREATE TABLE 'contact_nameparts' (
+		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
         'id' TEXT NOT NULL UNIQUE,
         'conid' TEXT NOT NULL,
         'parttype' TEXT NOT NULL,
@@ -103,6 +111,7 @@ static STORAGE_DB_SETUP_COMMANDS: &str = "
         'priority' TEXT NOT NULL
     );
     CREATE TABLE 'contact_mensago' (
+		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
         'id' TEXT NOT NULL UNIQUE,
         'conid' TEXT NOT NULL,
         'label' TEXT NOT NULL,
@@ -111,6 +120,7 @@ static STORAGE_DB_SETUP_COMMANDS: &str = "
         'domain' TEXT NOT NULL
     );
     CREATE TABLE 'contact_address' (
+		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
         'id' TEXT NOT NULL UNIQUE,
         'conid' TEXT NOT NULL,
         'label' TEXT NOT NULL,
@@ -123,6 +133,7 @@ static STORAGE_DB_SETUP_COMMANDS: &str = "
         'preferred' BOOL
     );
     CREATE TABLE 'contact_keyvalue' (
+		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
         'id' TEXT NOT NULL UNIQUE,
         'conid' TEXT NOT NULL,
         'itemtype' TEXT NOT NULL,
@@ -130,12 +141,14 @@ static STORAGE_DB_SETUP_COMMANDS: &str = "
         'value' TEXT
     );
     CREATE TABLE 'contact_photo' (
+		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
         'id' TEXT NOT NULL UNIQUE,
         'conid' TEXT NOT NULL UNIQUE,
         'mime' TEXT NOT NULL,
         'data' BLOB
     );
     CREATE TABLE 'contact_files' (
+		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
         'id' TEXT NOT NULL UNIQUE,
         'conid' TEXT NOT NULL,
         'name' TEXT NOT NULL UNIQUE,
@@ -143,6 +156,7 @@ static STORAGE_DB_SETUP_COMMANDS: &str = "
         'data' BLOB
     );
     CREATE TABLE 'contact_keys' (
+		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
 		'id' TEXT NOT NULL UNIQUE,
         'conid' TEXT NOT NULL,
         'label' TEXT NOT NULL UNIQUE,
@@ -151,12 +165,14 @@ static STORAGE_DB_SETUP_COMMANDS: &str = "
 		'timestamp' TEXT NOT NULL
     );
 	CREATE TABLE 'updates' (
+		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
 		'id'    TEXT NOT NULL UNIQUE,
 		'type'  TEXT NOT NULL,
 		'data'  TEXT NOT NULL,
 		'time'  TEXT NOT NULL
 	);
 	CREATE TABLE 'photos' (
+		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
 		'id'            TEXT NOT NULL UNIQUE,
 		'type'          TEXT NOT NULL,
 		'photodata'     BLOB,
@@ -164,6 +180,7 @@ static STORAGE_DB_SETUP_COMMANDS: &str = "
 		'contactgroup'  TEXT
 	);
 	CREATE TABLE 'notes' (
+		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
 		'id'	        TEXT NOT NULL UNIQUE,
 		'title'         TEXT NOT NULL,
         'format'        TEXT NOT NULL,
@@ -176,6 +193,7 @@ static STORAGE_DB_SETUP_COMMANDS: &str = "
         'attachments'   TEXT
 	);
 	CREATE TABLE 'images' (
+		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
 		'id'	    TEXT NOT NULL UNIQUE,
 		'ownid'   TEXT NOT NULL,
 		'name'  	TEXT NOT NULL,
@@ -183,6 +201,7 @@ static STORAGE_DB_SETUP_COMMANDS: &str = "
         'data'      BLOB
 	);
 	CREATE TABLE 'attachments' (
+		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
 		'id'	    TEXT NOT NULL UNIQUE,
 		'ownid'	    TEXT NOT NULL,
 		'name'  	TEXT NOT NULL,
@@ -190,6 +209,7 @@ static STORAGE_DB_SETUP_COMMANDS: &str = "
         'data'      BLOB
 	);
 	CREATE TABLE 'files' (
+		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
 		'id'	TEXT NOT NULL UNIQUE,
 		'name'	TEXT NOT NULL,
 		'type'	TEXT NOT NULL,
