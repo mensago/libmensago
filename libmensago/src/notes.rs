@@ -235,7 +235,7 @@ impl NoteModel {
         match conn.execute(
             "UPDATE notes SET body=?1,updated=?2 WHERE id=?3",
             rusqlite::params![
-                &self.title.to_string(),
+                &self.body.to_string(),
                 &self.updated.to_string(),
                 &self.id.to_string(),
             ],

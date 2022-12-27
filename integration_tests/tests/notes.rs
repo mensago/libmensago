@@ -214,4 +214,85 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_update_title_text() -> Result<(), MensagoError> {
+        let testname = "test_update_title_text";
+
+        // The list of full data is as follows:
+        // let (config, pwhash, profman) = setup_db_test(testname)?;
+        let (_, _, profman) = setup_db_test(testname)?;
+
+        let profile = profman.get_active_profile().unwrap();
+        let mut db = profile.open_storage()?;
+
+        match import_demonotes(&mut db) {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: error importing demo notes: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        };
+
+        let notes = match get_notes(&mut db, "Default") {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: error getting notebook names: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        };
+
+        let noteitem = &notes[1];
+        if noteitem.rowid != 2 || noteitem.title != "Dartpass: README" {
+            return Err(MensagoError::ErrProgramException(format!(
+                "{}: test note had unexpected incoming value: {:?}",
+                testname, noteitem,
+            )));
+        }
+
+        let mut note = match NoteModel::load_from_db(&noteitem.id, &mut db) {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: error loading test note content: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        };
+
+        match note.update_title(&mut db, "Test Note #2") {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: error renaming test note: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        };
+
+        // TODO: query DB to confirm correct title
+
+        match note.update_text(&mut db, "Dummy data for test note #2") {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: error updating test note body text: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        };
+
+        // TODO: query DB to confirm correct body text
+
+        Ok(())
+    }
 }
