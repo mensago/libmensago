@@ -1,4 +1,5 @@
 mod tests {
+    use super::super::demodata::import_demonotes;
     use crate::common::*;
     use libkeycard::*;
     use libmensago::*;
@@ -105,6 +106,50 @@ mod tests {
                 )))
             }
             Err(_) => (),
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_notebooks() -> Result<(), MensagoError> {
+        let testname = "test_get_notebooks";
+
+        // The list of full data is as follows:
+        // let (config, pwhash, profman) = setup_db_test(testname)?;
+        let (_, _, profman) = setup_db_test(testname)?;
+
+        let profile = profman.get_active_profile().unwrap();
+        let mut db = profile.open_storage()?;
+
+        match import_demonotes(&mut db) {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: error importing demo notes: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        };
+
+        let notebooks = match get_notebooks(&mut db) {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: error getting notebook names: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        };
+
+        if notebooks.len() != 2 {
+            return Err(MensagoError::ErrProgramException(format!(
+                "{}: expected 2 notebooks, got {}",
+                testname,
+                notebooks.len()
+            )));
         }
 
         Ok(())

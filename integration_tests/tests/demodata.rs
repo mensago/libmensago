@@ -1,7 +1,7 @@
 use libmensago::*;
 use libmensago::{DBModel, MensagoError};
 
-pub fn load_demonotes(db: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+pub fn import_demonotes(db: &mut rusqlite::Connection) -> Result<(), MensagoError> {
     let txtnote = NoteModel::import(
         "tests/demofiles/pilgrimsprogress.txt",
         DocFormat::Text,
@@ -22,7 +22,7 @@ pub fn load_demonotes(db: &mut rusqlite::Connection) -> Result<(), MensagoError>
         "tests/demofiles/roadnottaken.sftm",
         DocFormat::SFTM,
         "The Road Not Taken",
-        "Default",
+        "SFTM",
     )?;
     sftmnote.set_in_db(db)?;
 
@@ -30,7 +30,7 @@ pub fn load_demonotes(db: &mut rusqlite::Connection) -> Result<(), MensagoError>
 }
 
 mod tests {
-    use super::load_demonotes;
+    use super::import_demonotes;
     use crate::common::*;
     use libmensago::MensagoError;
 
@@ -45,7 +45,7 @@ mod tests {
         let profile = profman.get_active_profile().unwrap();
         let mut db = profile.open_storage()?;
 
-        match load_demonotes(&mut db) {
+        match import_demonotes(&mut db) {
             Ok(_) => (),
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
