@@ -368,11 +368,12 @@ pub fn get_notes(
     while option_row.is_some() {
         let row = option_row.unwrap();
 
-        let srowid = row.get::<usize, String>(0).unwrap();
-        let rowid = match usize::from_str(&srowid) {
-            Ok(v) => v,
-            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-        };
+        // let srowid = row.get::<usize, String>(0).unwrap();
+        // let rowid = match usize::from_str(&srowid) {
+        //     Ok(v) => v,
+        //     Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+        // };
+        let rowid = row.get::<usize, usize>(0).unwrap();
         let snoteid = row.get::<usize, String>(1).unwrap();
         let noteid = match RandomID::from(&snoteid) {
             Some(v) => v,

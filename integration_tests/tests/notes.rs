@@ -154,4 +154,48 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_get_notes() -> Result<(), MensagoError> {
+        let testname = "test_get_notes";
+
+        // The list of full data is as follows:
+        // let (config, pwhash, profman) = setup_db_test(testname)?;
+        let (_, _, profman) = setup_db_test(testname)?;
+
+        let profile = profman.get_active_profile().unwrap();
+        let mut db = profile.open_storage()?;
+
+        match import_demonotes(&mut db) {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: error importing demo notes: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        };
+
+        let notes = match get_notes(&mut db, "Default") {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: error getting notebook names: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        };
+
+        if notes.len() != 2 {
+            return Err(MensagoError::ErrProgramException(format!(
+                "{}: expected 2 notes, got {}",
+                testname,
+                notes.len()
+            )));
+        }
+
+        Ok(())
+    }
 }
