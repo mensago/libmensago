@@ -205,10 +205,15 @@ impl NoteModel {
         }
 
         self.title = String::from(text);
+        self.updated = Timestamp::new();
 
         match conn.execute(
-            "UPDATE workspaces SET title=?1 WHERE id=?2",
-            rusqlite::params![&self.title.to_string(), &self.id.to_string()],
+            "UPDATE notes SET title=?1,updated=?2 WHERE id=?3",
+            rusqlite::params![
+                &self.title.to_string(),
+                &self.updated.to_string(),
+                &self.id.to_string(),
+            ],
         ) {
             Ok(_) => (),
             Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
@@ -224,7 +229,21 @@ impl NoteModel {
         conn: &mut rusqlite::Connection,
         text: &str,
     ) -> Result<(), MensagoError> {
-        // TODO: implement NoteModel::update_text()
+        self.body = String::from(text);
+        self.updated = Timestamp::new();
+
+        match conn.execute(
+            "UPDATE notes SET body=?1,updated=?2 WHERE id=?3",
+            rusqlite::params![
+                &self.title.to_string(),
+                &self.updated.to_string(),
+                &self.id.to_string(),
+            ],
+        ) {
+            Ok(_) => (),
+            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+        }
+
         Ok(())
     }
 }
