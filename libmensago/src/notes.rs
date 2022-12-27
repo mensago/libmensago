@@ -192,6 +192,19 @@ impl NoteModel {
             attachments: AttachmentModel::load_all(id, conn)?,
         })
     }
+
+    /// update_title() renames the note ensures the corresponding database row is current.
+    pub fn update_title(text: &str) -> Result<(), MensagoError> {
+        // TODO: implement NoteModel::update_title()
+        Ok(())
+    }
+
+    /// update_text() updates the text in the NoteModel and ensures the corresponding database row
+    /// is current.
+    pub fn update_text(text: &str) -> Result<(), MensagoError> {
+        // TODO: implement NoteModel::update_text()
+        Ok(())
+    }
 }
 
 impl DBModel for NoteModel {
