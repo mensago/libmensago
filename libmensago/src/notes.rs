@@ -305,6 +305,7 @@ impl DBModel for NoteModel {
 /// NotebookItem is just a bit of basic high-level information used for notebooks. It contains
 /// enough information to display a list of notes in a group and to easily look up the full note
 /// when needed.
+#[derive(Debug, Clone)]
 pub struct NotebookItem {
     // The note's unique rowid for faster database lookups
     pub rowid: usize,

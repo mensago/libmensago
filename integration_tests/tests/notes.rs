@@ -196,6 +196,22 @@ mod tests {
             )));
         }
 
+        let note = &notes[0];
+        if note.rowid != 1 || note.title != "The Pilgrim's Progress" {
+            return Err(MensagoError::ErrProgramException(format!(
+                "{}: first note had unexpected values: {:?}",
+                testname, note,
+            )));
+        }
+
+        let note = &notes[1];
+        if note.rowid != 2 || note.title != "Dartpass: README" {
+            return Err(MensagoError::ErrProgramException(format!(
+                "{}: second note had unexpected values: {:?}",
+                testname, note,
+            )));
+        }
+
         Ok(())
     }
 }
