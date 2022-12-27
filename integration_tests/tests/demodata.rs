@@ -1,35 +1,38 @@
+use libmensago::*;
+use libmensago::{DBModel, MensagoError};
+
+pub fn load_demonotes(db: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+    let txtnote = NoteModel::import(
+        "tests/demofiles/pilgrimsprogress.txt",
+        DocFormat::Text,
+        "The Pilgrim's Progress",
+        "Default",
+    )?;
+    txtnote.set_in_db(db)?;
+
+    let mdnote = NoteModel::import(
+        "tests/demofiles/dartpass_readme.md",
+        DocFormat::Markdown,
+        "Dartpass: README",
+        "Default",
+    )?;
+    mdnote.set_in_db(db)?;
+
+    let sftmnote = NoteModel::import(
+        "tests/demofiles/roadnottaken.sftm",
+        DocFormat::SFTM,
+        "The Road Not Taken",
+        "Default",
+    )?;
+    sftmnote.set_in_db(db)?;
+
+    Ok(())
+}
+
 mod tests {
+    use super::load_demonotes;
     use crate::common::*;
-    use libmensago::*;
-    use libmensago::{DBModel, MensagoError};
-
-    pub fn load_demonotes(db: &mut rusqlite::Connection) -> Result<(), MensagoError> {
-        let txtnote = NoteModel::import(
-            "tests/demofiles/pilgrimsprogress.txt",
-            DocFormat::Text,
-            "The Pilgrim's Progress",
-            "Default",
-        )?;
-        txtnote.set_in_db(db)?;
-
-        let mdnote = NoteModel::import(
-            "tests/demofiles/dartpass_readme.md",
-            DocFormat::Markdown,
-            "Dartpass: README",
-            "Default",
-        )?;
-        mdnote.set_in_db(db)?;
-
-        let sftmnote = NoteModel::import(
-            "tests/demofiles/roadnottaken.sftm",
-            DocFormat::SFTM,
-            "The Road Not Taken",
-            "Default",
-        )?;
-        sftmnote.set_in_db(db)?;
-
-        Ok(())
-    }
+    use libmensago::MensagoError;
 
     #[test]
     fn test_load_demonotes() -> Result<(), MensagoError> {
