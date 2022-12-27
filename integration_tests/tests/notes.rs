@@ -278,8 +278,6 @@ mod tests {
             }
         };
 
-        // TODO: query DB to confirm correct title
-
         match note.update_text(&mut db, "Dummy data for test note #2") {
             Ok(_) => (),
             Err(e) => {
@@ -291,7 +289,31 @@ mod tests {
             }
         };
 
-        // TODO: query DB to confirm correct body text
+        let mut stmt = db.prepare("SELECT title FROM notes WHERE id=?1")?;
+
+        let title = stmt.query_row([note.id.as_string()], |row| {
+            Ok(row.get::<usize, String>(0).unwrap())
+        })?;
+
+        if title != note.title {
+            return Err(MensagoError::ErrProgramException(format!(
+                "{}: test note had wrong title: {}",
+                testname, title,
+            )));
+        }
+
+        let mut stmt = db.prepare("SELECT body FROM notes WHERE id=?1")?;
+
+        let body = stmt.query_row([note.id.as_string()], |row| {
+            Ok(row.get::<usize, String>(0).unwrap())
+        })?;
+
+        if body != note.body {
+            return Err(MensagoError::ErrProgramException(format!(
+                "{}: test note had wrong body text: {}",
+                testname, body,
+            )));
+        }
 
         Ok(())
     }
