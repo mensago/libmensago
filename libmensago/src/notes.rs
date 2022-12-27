@@ -194,14 +194,36 @@ impl NoteModel {
     }
 
     /// update_title() renames the note ensures the corresponding database row is current.
-    pub fn update_title(text: &str) -> Result<(), MensagoError> {
-        // TODO: implement NoteModel::update_title()
+    pub fn update_title(
+        &mut self,
+        conn: &mut rusqlite::Connection,
+        text: &str,
+    ) -> Result<(), MensagoError> {
+        // Empty titles are not permitted
+        if text.len() < 1 {
+            return Err(MensagoError::ErrEmptyData);
+        }
+
+        self.title = String::from(text);
+
+        match conn.execute(
+            "UPDATE workspaces SET title=?1 WHERE id=?2",
+            rusqlite::params![&self.title.to_string(), &self.id.to_string()],
+        ) {
+            Ok(_) => (),
+            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+        }
+
         Ok(())
     }
 
     /// update_text() updates the text in the NoteModel and ensures the corresponding database row
     /// is current.
-    pub fn update_text(text: &str) -> Result<(), MensagoError> {
+    pub fn update_text(
+        &mut self,
+        conn: &mut rusqlite::Connection,
+        text: &str,
+    ) -> Result<(), MensagoError> {
         // TODO: implement NoteModel::update_text()
         Ok(())
     }
