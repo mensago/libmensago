@@ -307,9 +307,9 @@ impl DBModel for NoteModel {
 /// when needed.
 pub struct NotebookItem {
     // The note's unique rowid for faster database lookups
-    rowid: usize,
-    id: RandomID,
-    title: String,
+    pub rowid: usize,
+    pub id: RandomID,
+    pub title: String,
 }
 
 /// Returns a list of the groups of notes in the profile
@@ -351,9 +351,9 @@ pub fn get_notes(
     conn: &mut rusqlite::Connection,
     notebook: &str,
 ) -> Result<Vec<NotebookItem>, MensagoError> {
-    let mut stmt = conn.prepare("SELECT rowid,id,title FROM notes WHERE id = ?1")?;
+    let mut stmt = conn.prepare("SELECT rowid,id,title FROM notes WHERE notebook = ?1")?;
 
-    let mut rows = match stmt.query([]) {
+    let mut rows = match stmt.query([notebook]) {
         Ok(v) => v,
         Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
     };
@@ -368,8 +368,28 @@ pub fn get_notes(
     while option_row.is_some() {
         let row = option_row.unwrap();
 
-        // TODO: finish get_notes()
-        // out.push(row.get::<usize, String>(0).unwrap());
+        let srowid = row.get::<usize, String>(0).unwrap();
+        let rowid = match usize::from_str(&srowid) {
+            Ok(v) => v,
+            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+        };
+        let snoteid = row.get::<usize, String>(1).unwrap();
+        let noteid = match RandomID::from(&snoteid) {
+            Some(v) => v,
+            None => {
+                return Err(MensagoError::ErrDatabaseException(format!(
+                    "Bad note ID in get_notes(): {}",
+                    snoteid
+                )))
+            }
+        };
+        let title = row.get::<usize, String>(2).unwrap();
+
+        out.push(NotebookItem {
+            rowid,
+            id: noteid,
+            title,
+        });
 
         option_row = match rows.next() {
             Ok(v) => v,
