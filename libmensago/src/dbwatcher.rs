@@ -21,6 +21,15 @@ pub enum DBEvent {
 	Delete,
 }
 
+// Event Channels
+pub enum DBChannel {
+	Messages,
+	Contacts,
+	Schedule,
+	Tasks,
+	Notes,
+}
+
 struct DBDispatcher {
 	db: rusqlite::Connection,
 }
