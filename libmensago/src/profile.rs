@@ -551,7 +551,10 @@ impl Profile {
     pub fn open_storage(&self) -> Result<rusqlite::Connection, rusqlite::Error> {
         let mut dbpath = self.path.clone();
         dbpath.push("storage.db");
-        rusqlite::Connection::open_with_flags(dbpath, rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE)
+        rusqlite::Connection::open_with_flags(
+            dbpath,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        )
     }
 }
 
