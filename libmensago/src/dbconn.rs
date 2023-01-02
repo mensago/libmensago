@@ -30,6 +30,14 @@ impl fmt::Display for DBConn {
 }
 
 impl DBConn {
+    /// Creates a new, empty DBConn instance.
+    pub fn new() -> DBConn {
+        DBConn {
+            db: Mutex::new(None),
+            path: String::new(),
+        }
+    }
+
     /// get_path() returns a string containing the path to the database or an empty string if the
     /// object is not connected to any database.
     pub fn get_path(&self) -> &str {
