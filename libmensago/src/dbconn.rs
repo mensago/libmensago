@@ -107,35 +107,6 @@ impl DBConn {
     }
 
     /// query_row() executes a query intended to only return one row of results.
-    pub fn query_row<P: rusqlite::Params>(
-        &mut self,
-        cmd: &str,
-        params: P,
-    ) -> Result<Vec<String>, MensagoError> {
-        let connhandle = self.db.lock().unwrap();
-        if (*connhandle).is_none() {
-            return Err(MensagoError::ErrNoInit);
-        }
-
-        let conn = connhandle.as_ref().unwrap();
-        let mut stmt = conn.prepare(cmd)?;
-
-        let out = stmt.query_row(params, |row| {
-            let mut valuelist = Vec::new();
-
-            let mut i = 0;
-            while let Ok(rowval) = row.get::<usize, String>(i) {
-                valuelist.push(rowval);
-                i += 1;
-            }
-
-            Ok(valuelist)
-        })?;
-
-        Ok(out)
-    }
-
-    /// query_row() executes a query intended to only return one row of results.
     pub fn query<P: rusqlite::Params>(
         &mut self,
         cmd: &str,

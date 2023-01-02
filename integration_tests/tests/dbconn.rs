@@ -162,6 +162,4 @@ mod tests {
 
         Ok(())
     }
-
-    // TODO: implement test case for query_row()
 }
