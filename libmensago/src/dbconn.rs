@@ -41,12 +41,12 @@ impl DBConn {
     /// ensure that there are not multiple callers which still depend on the connection and
     /// disconnect the instance at that time.
     pub fn connect(&mut self, path: &PathBuf) -> Result<(), MensagoError> {
-        let mut db = self.db.lock().unwrap();
-        if (*db).is_some() {
+        let mut dbhandle = self.db.lock().unwrap();
+        if (*dbhandle).is_some() {
             return Err(MensagoError::ErrExists);
         }
 
-        *db = match rusqlite::Connection::open_with_flags(
+        *dbhandle = match rusqlite::Connection::open_with_flags(
             path,
             rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
         ) {
@@ -62,7 +62,18 @@ impl DBConn {
         Ok(())
     }
 
+    /// disconnect() disconnects from the SQLite3 database. If already disconnected, this will not
+    /// return an error.
     pub fn disconnect(&mut self) -> Result<(), MensagoError> {
+        let mut dbhandle = self.db.lock().unwrap();
+        if (*dbhandle).is_none() {
+            return Ok(());
+        }
+
+        // Calling close() is functionally equivalent to calling the drop(), so we're just going
+        // to assign None to close the db connection
+        *dbhandle = None;
+
         Ok(())
     }
 
