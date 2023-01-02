@@ -41,12 +41,12 @@ impl DBConn {
     /// ensure that there are not multiple callers which still depend on the connection and
     /// disconnect the instance at that time.
     pub fn connect(&mut self, path: &PathBuf) -> Result<(), MensagoError> {
-        let mut dbhandle = self.db.lock().unwrap();
-        if (*dbhandle).is_some() {
+        let mut connhandle = self.db.lock().unwrap();
+        if (*connhandle).is_some() {
             return Err(MensagoError::ErrExists);
         }
 
-        *dbhandle = match rusqlite::Connection::open_with_flags(
+        *connhandle = match rusqlite::Connection::open_with_flags(
             path,
             rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
         ) {
@@ -65,14 +65,14 @@ impl DBConn {
     /// disconnect() disconnects from the SQLite3 database. If already disconnected, this will not
     /// return an error.
     pub fn disconnect(&mut self) -> Result<(), MensagoError> {
-        let mut dbhandle = self.db.lock().unwrap();
-        if (*dbhandle).is_none() {
+        let mut connhandle = self.db.lock().unwrap();
+        if (*connhandle).is_none() {
             return Ok(());
         }
 
         // Calling close() is functionally equivalent to calling the drop(), so we're just going
         // to assign None to close the db connection
-        *dbhandle = None;
+        *connhandle = None;
 
         Ok(())
     }
@@ -84,12 +84,12 @@ impl DBConn {
         cmd: &str,
         params: P,
     ) -> Result<(), MensagoError> {
-        let dbhandle = self.db.lock().unwrap();
-        if (*dbhandle).is_none() {
+        let connhandle = self.db.lock().unwrap();
+        if (*connhandle).is_none() {
             return Err(MensagoError::ErrNoInit);
         }
 
-        let conn = dbhandle.as_ref().unwrap();
+        let conn = connhandle.as_ref().unwrap();
         match conn.execute(cmd, params) {
             Ok(_) => Ok(()),
             Err(e) => Err(MensagoError::RusqliteError(e)),
@@ -102,12 +102,12 @@ impl DBConn {
         cmd: &str,
         params: P,
     ) -> Result<Vec<String>, MensagoError> {
-        let dbhandle = self.db.lock().unwrap();
-        if (*dbhandle).is_none() {
+        let connhandle = self.db.lock().unwrap();
+        if (*connhandle).is_none() {
             return Err(MensagoError::ErrNoInit);
         }
 
-        let conn = dbhandle.as_ref().unwrap();
+        let conn = connhandle.as_ref().unwrap();
         let mut stmt = conn.prepare(cmd)?;
 
         let out = stmt.query_row(params, |row| {
@@ -121,6 +121,62 @@ impl DBConn {
 
             Ok(valuelist)
         })?;
+
+        Ok(out)
+    }
+
+    /// query_row() executes a query intended to only return one row of results.
+    pub fn query<P: rusqlite::Params>(
+        &mut self,
+        cmd: &str,
+        params: P,
+    ) -> Result<Vec<Vec<String>>, MensagoError> {
+        let connhandle = self.db.lock().unwrap();
+        if (*connhandle).is_none() {
+            return Err(MensagoError::ErrNoInit);
+        }
+
+        let conn = connhandle.as_ref().unwrap();
+        let mut stmt = conn.prepare(cmd)?;
+
+        // Queries with rusqlite are extremely ugly because the results wrapped several layers
+        // deep. The query() call returns a Result containing a Rows() structure. If we get an
+        // error here, there was a problem either with the query or the database.
+        let mut rows = match stmt.query(params) {
+            Ok(v) => v,
+            Err(e) => return Err(MensagoError::RusqliteError(e)),
+        };
+
+        // The Rows::next() call returns Result<Some<Result<Row>>>. Seriously. The possible
+        // return values are:
+        //
+        // Err() -> an error occurred getting the next row
+        // Ok(Some(Row)) -> another row was returned
+        // Ok(None) -> all results have been returned
+
+        let mut option_row = match rows.next() {
+            Ok(v) => v,
+            Err(e) => return Err(MensagoError::RusqliteError(e)),
+        };
+
+        let mut out = Vec::new();
+        while option_row.is_some() {
+            let row = option_row.unwrap();
+
+            let mut valuelist = Vec::new();
+
+            let mut i = 0;
+            while let Ok(rowval) = row.get::<usize, String>(i) {
+                valuelist.push(rowval);
+                i += 1;
+            }
+            out.push(valuelist);
+
+            option_row = match rows.next() {
+                Ok(v) => v,
+                Err(e) => return Err(MensagoError::RusqliteError(e)),
+            };
+        }
 
         Ok(out)
     }
