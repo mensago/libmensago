@@ -89,11 +89,40 @@ impl DBConn {
             return Err(MensagoError::ErrNoInit);
         }
 
-        let db = dbhandle.as_ref().unwrap();
-        match db.execute(cmd, params) {
+        let conn = dbhandle.as_ref().unwrap();
+        match conn.execute(cmd, params) {
             Ok(_) => Ok(()),
             Err(e) => Err(MensagoError::RusqliteError(e)),
         }
+    }
+
+    /// query_row() executes a query intended to only return one row of results.
+    pub fn query_row<P: rusqlite::Params>(
+        &mut self,
+        cmd: &str,
+        params: P,
+    ) -> Result<Vec<String>, MensagoError> {
+        let dbhandle = self.db.lock().unwrap();
+        if (*dbhandle).is_none() {
+            return Err(MensagoError::ErrNoInit);
+        }
+
+        let conn = dbhandle.as_ref().unwrap();
+        let mut stmt = conn.prepare(cmd)?;
+
+        let out = stmt.query_row(params, |row| {
+            let mut valuelist = Vec::new();
+
+            let mut i = 0;
+            while let Ok(rowval) = row.get::<usize, String>(i) {
+                valuelist.push(rowval);
+                i += 1;
+            }
+
+            Ok(valuelist)
+        })?;
+
+        Ok(out)
     }
 }
 
