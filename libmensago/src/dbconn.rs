@@ -5,8 +5,10 @@
 
 use crate::base::MensagoError;
 use rusqlite;
+use rusqlite::types::ValueRef;
 use std::fmt;
 use std::path::PathBuf;
+use std::str;
 use std::sync::Mutex;
 
 /// The DBConn type is a thread-safe shared connection to an SQLite3 database.
@@ -174,8 +176,17 @@ impl DBConn {
             let mut valuelist = Vec::new();
 
             let mut i = 0;
-            while let Ok(rowval) = row.get::<usize, String>(i) {
-                valuelist.push(rowval);
+            while let Ok(rowval) = row.get_ref(i) {
+                match rowval {
+                    ValueRef::Null => valuelist.push(String::new()),
+                    ValueRef::Integer(v) => valuelist.push(v.to_string()),
+                    ValueRef::Real(v) => valuelist.push(v.to_string()),
+                    ValueRef::Text(v) => match str::from_utf8(v) {
+                        Ok(s) => valuelist.push(String::from(s)),
+                        Err(_) => return Err(MensagoError::ErrUTF8),
+                    },
+                    ValueRef::Blob(_) => return Err(MensagoError::ErrTypeMismatch),
+                };
                 i += 1;
             }
             out.push(valuelist);
