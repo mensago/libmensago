@@ -79,7 +79,22 @@ impl DBConn {
 
     /// execute() runs a SQL statement, taking a string containing the SQL command and a Vec! of any
     /// parameters
-    pub fn execute<P: rusqlite::Params>(cmd: &str, params: P) {}
+    pub fn execute<P: rusqlite::Params>(
+        &mut self,
+        cmd: &str,
+        params: P,
+    ) -> Result<(), MensagoError> {
+        let dbhandle = self.db.lock().unwrap();
+        if (*dbhandle).is_none() {
+            return Err(MensagoError::ErrNoInit);
+        }
+
+        let db = dbhandle.as_ref().unwrap();
+        match db.execute(cmd, params) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(MensagoError::RusqliteError(e)),
+        }
+    }
 }
 
 // Event Types
