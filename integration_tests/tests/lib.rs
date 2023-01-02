@@ -3,6 +3,7 @@
 mod client;
 mod common;
 mod contactmodels;
+mod dbconn;
 mod dbsupport;
 mod demodata;
 mod iscmds;
