@@ -54,6 +54,15 @@ impl DBConn {
             Err(e) => return Err(MensagoError::RusqliteError(e)),
         };
 
+        self.path = match path.to_str() {
+            Some(v) => String::from(v),
+            None => return Err(MensagoError::ErrPathUTF8),
+        };
+
+        Ok(())
+    }
+
+    pub fn disconnect(&mut self) -> Result<(), MensagoError> {
         Ok(())
     }
 
