@@ -31,6 +31,8 @@ pub enum MensagoError {
     ErrEmptyData,
     #[error("Not initialized")]
     ErrNoInit,
+    #[error("Non-UTF8 path")]
+    ErrPathUTF8,
     #[error("Bad value")]
     ErrBadValue,
     #[error("Resource already exists")]
