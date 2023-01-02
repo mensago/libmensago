@@ -3,6 +3,7 @@
 //! so that clients don't have to do all the filtering. It also exists because the rusqlite module
 //! is painful to use and this attempts to make database interactions less so.
 
+use crate::base::MensagoError;
 use rusqlite;
 use std::fmt;
 use std::path::PathBuf;
@@ -39,18 +40,19 @@ impl DBConn {
     /// connection in place, this call will return an error. It is the caller's reponsibility to
     /// ensure that there are not multiple callers which still depend on the connection and
     /// disconnect the instance at that time.
-    pub fn connect(&self, path: &PathBuf) -> Result<(), rusqlite::Error> {
-        // TODO: finish connect()
+    pub fn connect(&mut self, path: &PathBuf) -> Result<(), MensagoError> {
+        let mut db = self.db.lock().unwrap();
+        if (*db).is_some() {
+            return Err(MensagoError::ErrExists);
+        }
 
-        // let db = self.db.lock().unwrap();
-
-        // let db = match rusqlite::Connection::open_with_flags(
-        //     path,
-        //     rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
-        // ) {
-        //     Ok(v) => v,
-        //     Err(e) => return Err(e),
-        // };
+        *db = match rusqlite::Connection::open_with_flags(
+            path,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        ) {
+            Ok(v) => Some(v),
+            Err(e) => return Err(MensagoError::RusqliteError(e)),
+        };
 
         Ok(())
     }
