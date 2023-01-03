@@ -1,6 +1,7 @@
 use crate::base::*;
 use crate::client::get_default_profile_path;
 use crate::config::*;
+use crate::dbconn::*;
 use crate::workspace::*;
 use libkeycard::*;
 use rusqlite;
@@ -223,7 +224,7 @@ static STORAGE_DB_SETUP_COMMANDS: &str = "
 /// database is encrypted currently, but will be a future date. Each profile also contains a
 /// folder called 'files' for storing files outside the databases to cut down on bloat and make
 /// it easier for the user to access attachments with other programs in the OS.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Profile {
     pub name: String,
     pub path: PathBuf,
@@ -233,6 +234,7 @@ pub struct Profile {
     pub domain: Option<Domain>,
     pub devid: Option<RandomID>,
     pub config: Config,
+    pub dbconn: DBConn,
 }
 
 impl Profile {
@@ -255,6 +257,7 @@ impl Profile {
             domain: None,
             devid: None,
             config: Config::new(""),
+            dbconn: DBConn::new(),
         };
 
         let mut defpath = profile.path.to_path_buf();
@@ -556,6 +559,17 @@ impl Profile {
             rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
         )
     }
+
+    /// Creates a connection to the profile's main storage database
+    pub fn get_db(&mut self) -> Result<&mut DBConn, MensagoError> {
+        if !self.dbconn.is_connected() {
+            let mut dbpath = self.path.clone();
+            dbpath.push("storage.db");
+            self.dbconn.connect(&dbpath)?;
+        }
+
+        Ok(&mut self.dbconn)
+    }
 }
 
 /// The ProfileManager is an type which creates and deletes user on-disk profiles and otherwise
@@ -650,6 +664,7 @@ impl ProfileManager {
             domain: None,
             devid: Some(RandomID::generate()),
             config: Config::new(""),
+            dbconn: DBConn::new(),
         };
 
         if self.count_profiles() == 0 {
