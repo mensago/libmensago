@@ -16,8 +16,8 @@ use std::sync::Mutex;
 pub struct DBConn {
     db: Mutex<Option<rusqlite::Connection>>,
 
-    // Yes, POSIX non-UTF8 paths. If someone has a non-UTF8 path in their *NIX box, they can fix
-    // their paths or go pound sand.
+    // Yes, I know about POSIX non-UTF8 paths. If someone has a non-UTF8 path in their *NIX box,
+    // they can fix their paths or go pound sand.👿
     path: String,
 }
 
@@ -85,6 +85,12 @@ impl DBConn {
         *connhandle = None;
 
         Ok(())
+    }
+
+    /// is_connected() returns true if the instance is connected to a SQLite database
+    pub fn is_connected(&self) -> bool {
+        let mut connhandle = self.db.lock().unwrap();
+        (*connhandle).is_some()
     }
 
     /// execute() runs a SQL statement, taking a string containing the SQL command and a Vec! of any
