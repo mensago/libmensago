@@ -237,6 +237,36 @@ pub struct Profile {
     pub dbconn: DBConn,
 }
 
+// Profile implements Clone DBConn can't/doesn't implement Clone and, truthfully, it doesn't make
+// sense to clone a database connection.
+impl Clone for Profile {
+    fn clone(&self) -> Self {
+        return Profile {
+            name: self.name.clone(),
+            path: self.path.clone(),
+            is_default: self.is_default,
+            uid: self.uid.clone(),
+            wid: self.wid.clone(),
+            domain: self.domain.clone(),
+            devid: self.devid.clone(),
+            config: self.config.clone(),
+            dbconn: DBConn::new(),
+        };
+    }
+
+    fn clone_from(&mut self, source: &Self) {
+        self.name = source.name.clone();
+        self.path = source.path.clone();
+        self.is_default = source.is_default;
+        self.uid = source.uid.clone();
+        self.wid = source.wid.clone();
+        self.domain = source.domain.clone();
+        self.devid = source.devid.clone();
+        self.config = source.config.clone();
+        self.dbconn = DBConn::new();
+    }
+}
+
 impl Profile {
     /// Creates a new profile from a specified path
     fn new(profpath: &Path) -> Result<Profile, MensagoError> {
