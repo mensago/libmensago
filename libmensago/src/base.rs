@@ -43,6 +43,8 @@ pub enum MensagoError {
     ErrNotFound,
     #[error("Reserved")]
     ErrReserved,
+    #[error("Value mismatch")]
+    ErrValueMismatch,
     #[error("Type mismatch")]
     ErrTypeMismatch,
     #[error("Unsupported algorithm")]
