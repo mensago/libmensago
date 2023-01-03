@@ -89,7 +89,7 @@ impl DBConn {
 
     /// is_connected() returns true if the instance is connected to a SQLite database
     pub fn is_connected(&self) -> bool {
-        let mut connhandle = self.db.lock().unwrap();
+        let connhandle = self.db.lock().unwrap();
         (*connhandle).is_some()
     }
 
