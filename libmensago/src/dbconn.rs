@@ -4,6 +4,7 @@
 //! is painful to use and this attempts to make database interactions less so.
 
 use crate::base::MensagoError;
+use pretty_hex::simple_hex_write;
 use rusqlite;
 use rusqlite::types::ValueRef;
 use std::fmt;
@@ -175,6 +176,111 @@ impl DBConn {
         }
 
         Ok(out)
+    }
+}
+
+/// DBValueType makes it easy to tell what type a DBValue has
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum DBValueType {
+    Text,
+    Bool,
+    Float,
+    Integer,
+    Binary,
+    Null,
+}
+
+impl fmt::Display for DBValueType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self {
+            DBValueType::Text => write!(f, "text"),
+            DBValueType::Bool => write!(f, "bool"),
+            DBValueType::Float => write!(f, "float"),
+            DBValueType::Integer => write!(f, "integer"),
+            DBValueType::Binary => write!(f, "binary"),
+            DBValueType::Null => write!(f, "null"),
+        }
+    }
+}
+
+/// DBValue is a type which we control that easily maps to rusqlite's Value type, but we will
+/// actually own the memory with it and we can add other methods to make working with rusqlite
+/// less painful.
+#[derive(Debug, Clone, PartialEq)]
+pub enum DBValue {
+    Text(String),
+    Bool(bool),
+    Float(f64),
+    Integer(i64),
+    Binary(Vec<u8>),
+    Null,
+}
+
+impl From<String> for DBValue {
+    #[inline]
+    fn from(val: String) -> DBValue {
+        DBValue::Text(val)
+    }
+}
+
+impl From<bool> for DBValue {
+    #[inline]
+    fn from(val: bool) -> DBValue {
+        DBValue::Bool(val)
+    }
+}
+
+impl From<f64> for DBValue {
+    #[inline]
+    fn from(val: f64) -> DBValue {
+        DBValue::Float(val)
+    }
+}
+
+impl From<isize> for DBValue {
+    #[inline]
+    fn from(val: isize) -> DBValue {
+        DBValue::Integer(val as i64)
+    }
+}
+
+impl From<i64> for DBValue {
+    #[inline]
+    fn from(val: i64) -> DBValue {
+        DBValue::Integer(val)
+    }
+}
+
+impl From<Vec<u8>> for DBValue {
+    #[inline]
+    fn from(data: Vec<u8>) -> DBValue {
+        DBValue::Binary(data)
+    }
+}
+
+impl fmt::Display for DBValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self {
+            DBValue::Text(v) => write!(f, "{}", v),
+            DBValue::Bool(v) => write!(f, "{}", v.to_string()),
+            DBValue::Float(v) => write!(f, "{}", v.to_string()),
+            DBValue::Integer(v) => write!(f, "{}", v.to_string()),
+            DBValue::Binary(v) => simple_hex_write(f, v),
+            DBValue::Null => write!(f, "null"),
+        }
+    }
+}
+
+impl DBValue {
+    pub fn get_type(&self) -> DBValueType {
+        match *self {
+            DBValue::Text(_) => DBValueType::Text,
+            DBValue::Bool(_) => DBValueType::Bool,
+            DBValue::Float(_) => DBValueType::Float,
+            DBValue::Integer(_) => DBValueType::Integer,
+            DBValue::Binary(_) => DBValueType::Binary,
+            DBValue::Null => DBValueType::Null,
+        }
     }
 }
 

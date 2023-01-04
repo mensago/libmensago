@@ -25,6 +25,7 @@ lazy_static = "1.4.0"
 libkeycard = { git = "https://gitlab.com/darkwyrm/libkeycard", features = ["use_serde"] }
 mime = "0.3.16"
 os_info = { version = "3", default-features = false }
+pretty-hex = "0.3.0"
 rand = "0.8.5"
 regex = "1.5.5"
 rusqlite = { version = "0.27.0", features = ["bundled", "hooks"] }
