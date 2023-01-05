@@ -286,6 +286,72 @@ impl DBValue {
             DBValue::Null => DBValueType::Null,
         }
     }
+
+    #[inline]
+    pub fn to_bool(&self) -> Option<bool> {
+        match self {
+            DBValue::Text(v) => Some(v.len() > 0),
+            DBValue::Bool(v) => Some(*v),
+            DBValue::Float(v) => Some(*v != 0.0),
+            DBValue::Integer(v) => Some(*v != 0),
+            DBValue::Binary(v) => Some(v.len() > 0),
+            DBValue::Null => Some(false),
+        }
+    }
+
+    #[inline]
+    pub fn to_float(&self) -> Option<f64> {
+        match self {
+            DBValue::Text(v) => None,
+            DBValue::Bool(v) => {
+                if *v {
+                    Some(1.0)
+                } else {
+                    Some(0.0)
+                }
+            }
+            DBValue::Float(v) => Some(*v),
+            DBValue::Integer(v) => Some(*v as f64),
+            DBValue::Binary(v) => None,
+            DBValue::Null => Some(0.0),
+        }
+    }
+
+    #[inline]
+    pub fn to_int(&self) -> Option<i64> {
+        match self {
+            DBValue::Text(v) => None,
+            DBValue::Bool(v) => {
+                if *v {
+                    Some(1)
+                } else {
+                    Some(0)
+                }
+            }
+            DBValue::Float(v) => Some(*v as i64),
+            DBValue::Integer(v) => Some(*v),
+            DBValue::Binary(v) => None,
+            DBValue::Null => Some(0),
+        }
+    }
+
+    #[inline]
+    pub fn to_vec(&self) -> Option<Vec<u8>> {
+        match self {
+            DBValue::Text(v) => Some(v.as_bytes().to_vec()),
+            DBValue::Bool(v) => {
+                if *v {
+                    Some(vec![1])
+                } else {
+                    Some(vec![0])
+                }
+            }
+            DBValue::Float(v) => Some(vec![*v as u8]),
+            DBValue::Integer(v) => Some(vec![*v as u8]),
+            DBValue::Binary(v) => Some(v.clone()),
+            DBValue::Null => Some(vec![]),
+        }
+    }
 }
 
 // Event Types
