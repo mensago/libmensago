@@ -1,4 +1,5 @@
 use crate::base::*;
+use crate::dbconn::*;
 use libkeycard::*;
 use mime::Mime;
 use rusqlite;
@@ -140,26 +141,23 @@ impl AttachmentModel {
 
     /// `load_from_db()` instantiates an AttachmentModel from the specified file ID and owning
     /// document ID.
-    pub fn load_from_db(
-        id: &RandomID,
-        conn: &mut rusqlite::Connection,
-    ) -> Result<AttachmentModel, MensagoError> {
+    pub fn load_from_db(id: &RandomID, conn: &mut DBConn) -> Result<AttachmentModel, MensagoError> {
         let mut out: AttachmentModel;
 
-        let mut stmt =
-            conn.prepare("SELECT ownid,name,mimetype,data FROM attachments WHERE id = ?1")?;
-        let (ownidstr, name, mimestr, attdata) = match stmt.query_row(&[&id.to_string()], |row| {
-            Ok((
-                row.get::<usize, String>(0).unwrap(),
-                row.get::<usize, String>(1).unwrap(),
-                row.get::<usize, String>(2).unwrap(),
-                row.get::<usize, Vec<u8>>(3).unwrap(),
-            ))
-        }) {
-            Ok(v) => v,
-            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-        };
-        drop(stmt);
+        let values = conn.query(
+            "SELECT ownid,name,mimetype,data FROM attachments WHERE id = ?1",
+            &[&id.to_string()],
+        )?;
+        if values.len() != 1 {
+            return Err(MensagoError::ErrNotFound);
+        }
+        if values[0].len() != 4 {
+            return Err(MensagoError::ErrSchemaFailure);
+        }
+        let ownidstr = values[0][0].to_string();
+        let name = values[0][1].to_string();
+        let mimestr = values[0][2].to_string();
+        let attdata = values[0][3].to_vec().unwrap();
 
         let ownid = match RandomID::from(&ownidstr) {
             Some(v) => v,
@@ -190,50 +188,73 @@ impl AttachmentModel {
     /// Returns a list of all AttachmentModels that belong to a specific contact.
     pub fn load_all(
         ownid: &RandomID,
-        conn: &mut rusqlite::Connection,
+        conn: &mut DBConn,
     ) -> Result<Vec<AttachmentModel>, MensagoError> {
         let mut ids = Vec::<RandomID>::new();
 
-        let mut stmt = match conn.prepare("SELECT id FROM attachments WHERE ownid = ?1") {
-            Ok(v) => v,
-            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-        };
+        // let mut stmt = match conn.prepare("SELECT id FROM attachments WHERE ownid = ?1") {
+        //     Ok(v) => v,
+        //     Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+        // };
 
-        let mut rows = match stmt.query([&ownid.as_string()]) {
-            Ok(v) => v,
-            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-        };
+        // let mut rows = match stmt.query([&ownid.as_string()]) {
+        //     Ok(v) => v,
+        //     Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+        // };
 
-        let mut option_row = match rows.next() {
-            Ok(v) => v,
-            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-        };
+        // let mut option_row = match rows.next() {
+        //     Ok(v) => v,
+        //     Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+        // };
 
-        while option_row.is_some() {
-            let row = option_row.unwrap();
-            let partid = match RandomID::from(&row.get::<usize, String>(0).unwrap()) {
+        // while option_row.is_some() {
+        //     let row = option_row.unwrap();
+        //     let partid = match RandomID::from(&row.get::<usize, String>(0).unwrap()) {
+        //         Some(v) => v,
+        //         None => {
+        //             return Err(MensagoError::ErrDatabaseException(format!(
+        //                 "Bad attachment model ID {} in attachments",
+        //                 &row.get::<usize, String>(0).unwrap()
+        //             )))
+        //         }
+        //     };
+        //     ids.push(partid);
+
+        //     option_row = match rows.next() {
+        //         Ok(v) => v,
+        //         Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+        //     };
+        // }
+        // drop(rows);
+        // drop(stmt);
+        let rows = conn.query(
+            "SELECT id FROM attachments WHERE ownid = ?1",
+            [&ownid.as_string()],
+        )?;
+        if rows.len() == 0 {
+            return Err(MensagoError::ErrNotFound);
+        }
+        for row in rows {
+            if row.len() != 1 || row[0].get_type() != DBValueType::Text {
+                return Err(MensagoError::ErrSchemaFailure);
+            }
+
+            let partid = match RandomID::from(&row[0].to_string()) {
                 Some(v) => v,
                 None => {
                     return Err(MensagoError::ErrDatabaseException(format!(
                         "Bad attachment model ID {} in attachments",
-                        &row.get::<usize, String>(0).unwrap()
+                        row[0]
                     )))
                 }
             };
             ids.push(partid);
-
-            option_row = match rows.next() {
-                Ok(v) => v,
-                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-            };
         }
-        drop(rows);
-        drop(stmt);
 
         let mut out = Vec::new();
-        for id in ids.iter() {
-            out.push(AttachmentModel::load_from_db(&id, conn)?);
-        }
+        // for id in ids.iter() {
+        //     out.push(AttachmentModel::load_from_db(&id, conn)?);
+        // }
 
         Ok(out)
     }

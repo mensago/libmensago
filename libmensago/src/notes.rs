@@ -189,7 +189,9 @@ impl NoteModel {
             notebook,
             tags: taglist.items,
             images: ImageModel::load_all(id, conn)?,
-            attachments: AttachmentModel::load_all(id, conn)?,
+            // TODO: Update load_from_db() to use DBConn
+            // attachments: AttachmentModel::load_all(id, conn)?,
+            attachments: Vec::new(),
         })
     }
 
@@ -319,7 +321,10 @@ impl DBModel for NoteModel {
         self.notebook = notebook;
         self.tags = taglist.items;
         self.images = ImageModel::load_all(&self.id, conn)?;
-        self.attachments = AttachmentModel::load_all(&self.id, conn)?;
+
+        // TODO: update refresh_from_db to use DBConn
+        // self.attachments = AttachmentModel::load_all(&self.id, conn)?;
+        self.attachments = Vec::new();
 
         Ok(())
     }
