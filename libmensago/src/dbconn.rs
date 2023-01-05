@@ -118,7 +118,7 @@ impl DBConn {
         &mut self,
         cmd: &str,
         params: P,
-    ) -> Result<Vec<Vec<String>>, MensagoError> {
+    ) -> Result<Vec<Vec<DBValue>>, MensagoError> {
         let connhandle = self.db.lock().unwrap();
         if (*connhandle).is_none() {
             return Err(MensagoError::ErrNoInit);
@@ -155,16 +155,7 @@ impl DBConn {
 
             let mut i = 0;
             while let Ok(rowval) = row.get_ref(i) {
-                match rowval {
-                    ValueRef::Null => valuelist.push(String::new()),
-                    ValueRef::Integer(v) => valuelist.push(v.to_string()),
-                    ValueRef::Real(v) => valuelist.push(v.to_string()),
-                    ValueRef::Text(v) => match str::from_utf8(v) {
-                        Ok(s) => valuelist.push(String::from(s)),
-                        Err(_) => return Err(MensagoError::ErrUTF8),
-                    },
-                    ValueRef::Blob(_) => return Err(MensagoError::ErrTypeMismatch),
-                };
+                valuelist.push(DBValue::from(rowval));
                 i += 1;
             }
             out.push(valuelist);

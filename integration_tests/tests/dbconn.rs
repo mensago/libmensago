@@ -97,7 +97,8 @@ mod tests {
         match db.execute(
             "CREATE TABLE 'test_table' (
 				'name' TEXT NOT NULL,
-				'value' TEXT NOT NULL
+				'value' TEXT NOT NULL,
+                'value2' INTEGER NOT NULL
 			);",
             [],
         ) {
@@ -111,21 +112,43 @@ mod tests {
             }
         }
 
-        let testdata = vec![
-            ["name1", "value1"],
-            ["name2", "value2"],
-            ["name3", "value3"],
-        ];
-        for item in testdata.iter() {
-            match db.execute("INSERT INTO test_table(name,value) VALUES(?1,?2)", item) {
-                Ok(_) => (),
-                Err(e) => {
-                    return Err(MensagoError::ErrProgramException(format!(
-                        "{}: error populating test table: {}",
-                        testname,
-                        e.to_string()
-                    )))
-                }
+        match db.execute(
+            "INSERT INTO test_table(name,value,value2) VALUES(?1,?2,?3)",
+            rusqlite::params!["name1", "value1", 1],
+        ) {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: error populating test table step 1: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        }
+        match db.execute(
+            "INSERT INTO test_table(name,value,value2) VALUES(?1,?2,?3)",
+            rusqlite::params!["name2", "value2", 2],
+        ) {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: error populating test table step 2: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        }
+        match db.execute(
+            "INSERT INTO test_table(name,value,value2) VALUES(?1,?2,?3)",
+            rusqlite::params!["name3", "value3", 3],
+        ) {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: error populating test table step 3: {}",
+                    testname,
+                    e.to_string()
+                )))
             }
         }
 
@@ -147,16 +170,23 @@ mod tests {
                 rows.len(),
             )));
         }
-        if rows[0][0] != "name1" {
+        if rows[0][0].to_string() != "name1" {
             return Err(MensagoError::ErrProgramException(format!(
                 "{}: query() - first value should have been 'name1', got '{}'",
                 testname, rows[0][0],
             )));
         }
-        if rows[0][1] != "value1" {
+        if rows[0][1].to_string() != "value1" {
             return Err(MensagoError::ErrProgramException(format!(
                 "{}: query() - second value should have been 'value1', got '{}'",
                 testname, rows[0][1],
+            )));
+        }
+        if rows[0][2] != DBValue::Integer(1) {
+            return Err(MensagoError::ErrProgramException(format!(
+                "{}: query() - third value should have been 1, got '{}'",
+                testname,
+                rows[0][2].to_string(),
             )));
         }
 
