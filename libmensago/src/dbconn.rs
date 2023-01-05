@@ -302,7 +302,7 @@ impl DBValue {
     #[inline]
     pub fn to_float(&self) -> Option<f64> {
         match self {
-            DBValue::Text(v) => None,
+            DBValue::Text(_) => None,
             DBValue::Bool(v) => {
                 if *v {
                     Some(1.0)
@@ -312,7 +312,7 @@ impl DBValue {
             }
             DBValue::Float(v) => Some(*v),
             DBValue::Integer(v) => Some(*v as f64),
-            DBValue::Binary(v) => None,
+            DBValue::Binary(_) => None,
             DBValue::Null => Some(0.0),
         }
     }
@@ -320,7 +320,7 @@ impl DBValue {
     #[inline]
     pub fn to_int(&self) -> Option<i64> {
         match self {
-            DBValue::Text(v) => None,
+            DBValue::Text(_) => None,
             DBValue::Bool(v) => {
                 if *v {
                     Some(1)
@@ -330,7 +330,7 @@ impl DBValue {
             }
             DBValue::Float(v) => Some(*v as i64),
             DBValue::Integer(v) => Some(*v),
-            DBValue::Binary(v) => None,
+            DBValue::Binary(_) => None,
             DBValue::Null => Some(0),
         }
     }
