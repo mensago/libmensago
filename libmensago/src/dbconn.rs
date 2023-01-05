@@ -6,7 +6,7 @@
 use crate::base::MensagoError;
 use pretty_hex::simple_hex_write;
 use rusqlite;
-use rusqlite::types::ValueRef;
+use rusqlite::types::*;
 use std::fmt;
 use std::path::PathBuf;
 use std::str;
@@ -214,6 +214,19 @@ pub enum DBValue {
     Integer(i64),
     Binary(Vec<u8>),
     Null,
+}
+
+impl From<ValueRef<'_>> for DBValue {
+    #[inline]
+    fn from(val: ValueRef) -> DBValue {
+        match val.data_type() {
+            rusqlite::types::Type::Text => DBValue::Text(String::from(val.as_str().unwrap())),
+            rusqlite::types::Type::Real => DBValue::Float(val.as_f64().unwrap()),
+            rusqlite::types::Type::Integer => DBValue::Integer(val.as_i64().unwrap()),
+            rusqlite::types::Type::Blob => DBValue::Binary(val.as_blob().unwrap().to_vec()),
+            rusqlite::types::Type::Null => DBValue::Null,
+        }
+    }
 }
 
 impl From<String> for DBValue {
