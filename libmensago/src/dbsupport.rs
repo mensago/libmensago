@@ -7,9 +7,9 @@ use std::fmt;
 use std::str::FromStr;
 
 pub trait DBModel {
-    fn delete_from_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError>;
-    fn refresh_from_db(&mut self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError>;
-    fn set_in_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError>;
+    fn delete_from_db(&self, conn: &mut DBConn) -> Result<(), MensagoError>;
+    fn refresh_from_db(&mut self, conn: &mut DBConn) -> Result<(), MensagoError>;
+    fn set_in_db(&self, conn: &mut DBConn) -> Result<(), MensagoError>;
 }
 
 /// SeparatedStrList represents a group of strings which are separated by a string of some type,
@@ -234,7 +234,7 @@ impl AttachmentModel {
 }
 
 impl DBModel for AttachmentModel {
-    fn delete_from_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+    fn delete_from_db(&self, conn: &mut DBConn) -> Result<(), MensagoError> {
         match conn.execute(
             "DELETE FROM attachments WHERE id=?1",
             &[&self.id.to_string()],
@@ -244,20 +244,21 @@ impl DBModel for AttachmentModel {
         }
     }
 
-    fn refresh_from_db(&mut self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+    fn refresh_from_db(&mut self, conn: &mut DBConn) -> Result<(), MensagoError> {
         {
-            let mut stmt =
-                conn.prepare("SELECT name,mimetype,data FROM attachments WHERE id = ?1")?;
-            let (name, mimestr, attdata) = match stmt.query_row(&[&self.id.to_string()], |row| {
-                Ok((
-                    row.get::<usize, String>(0).unwrap(),
-                    row.get::<usize, String>(1).unwrap(),
-                    row.get::<usize, Vec<u8>>(2).unwrap(),
-                ))
-            }) {
-                Ok(v) => v,
-                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-            };
+            let values = conn.query(
+                "SELECT name,mimetype,data FROM attachments WHERE id = ?1",
+                &[&self.id.to_string()],
+            )?;
+            if values.len() != 1 {
+                return Err(MensagoError::ErrNotFound);
+            }
+            if values[0].len() != 4 {
+                return Err(MensagoError::ErrSchemaFailure);
+            }
+            let name = values[0][0].to_string();
+            let mimestr = values[0][1].to_string();
+            let attdata = values[0][2].to_vec().unwrap();
 
             let atttype = match Mime::from_str(&mimestr) {
                 Ok(v) => v,
@@ -276,8 +277,8 @@ impl DBModel for AttachmentModel {
         Ok(())
     }
 
-    fn set_in_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
-        match conn.execute(
+    fn set_in_db(&self, conn: &mut DBConn) -> Result<(), MensagoError> {
+        conn.execute(
             "INSERT OR REPLACE INTO attachments(id,ownid,name,mimetype,data) VALUES(?1,?2,?3,?4,?5)",
             rusqlite::params![
                 &self.id.to_string(),
@@ -286,10 +287,7 @@ impl DBModel for AttachmentModel {
                 &self.mimetype.to_string(),
                 &self.data,
             ],
-        ) {
-            Ok(_) => Ok(()),
-            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-        }
+        )
     }
 }
 
@@ -415,26 +413,28 @@ impl ImageModel {
 }
 
 impl DBModel for ImageModel {
-    fn delete_from_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+    fn delete_from_db(&self, conn: &mut DBConn) -> Result<(), MensagoError> {
         match conn.execute("DELETE FROM images WHERE id=?1", &[&self.id.to_string()]) {
             Ok(_) => Ok(()),
             Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
         }
     }
 
-    fn refresh_from_db(&mut self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+    fn refresh_from_db(&mut self, conn: &mut DBConn) -> Result<(), MensagoError> {
         {
-            let mut stmt = conn.prepare("SELECT name,mimetype,data FROM images WHERE id = ?1")?;
-            let (name, mimestr, attdata) = match stmt.query_row(&[&self.id.to_string()], |row| {
-                Ok((
-                    row.get::<usize, String>(0).unwrap(),
-                    row.get::<usize, String>(1).unwrap(),
-                    row.get::<usize, Vec<u8>>(2).unwrap(),
-                ))
-            }) {
-                Ok(v) => v,
-                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-            };
+            let values = conn.query(
+                "SELECT name,mimetype,data FROM images WHERE id = ?1",
+                &[&self.id.to_string()],
+            )?;
+            if values.len() != 1 {
+                return Err(MensagoError::ErrNotFound);
+            }
+            if values[0].len() != 4 {
+                return Err(MensagoError::ErrSchemaFailure);
+            }
+            let name = values[0][0].to_string();
+            let mimestr = values[0][1].to_string();
+            let attdata = values[0][2].to_vec().unwrap();
 
             let atttype = match Mime::from_str(&mimestr) {
                 Ok(v) => v,
@@ -453,8 +453,8 @@ impl DBModel for ImageModel {
         Ok(())
     }
 
-    fn set_in_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
-        match conn.execute(
+    fn set_in_db(&self, conn: &mut DBConn) -> Result<(), MensagoError> {
+        conn.execute(
             "INSERT OR REPLACE INTO images(id,ownid,name,mimetype,data) VALUES(?1,?2,?3,?4,?5)",
             rusqlite::params![
                 &self.id.to_string(),
@@ -463,10 +463,7 @@ impl DBModel for ImageModel {
                 &self.mimetype.to_string(),
                 &self.data,
             ],
-        ) {
-            Ok(_) => Ok(()),
-            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-        }
+        )
     }
 }
 
