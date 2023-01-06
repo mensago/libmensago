@@ -326,10 +326,11 @@ impl DBModel for MessageModel {
         };
         self.subject = subject;
         self.body = body;
-        self.images = ImageModel::load_all(&self.id, conn)?;
 
         // TODO: update refresh_from_db to use DBConn
+        // self.images = ImageModel::load_all(&self.id, conn)?;
         // self.attachments = AttachmentModel::load_all(&self.id, conn)?;
+        self.images = Vec::new();
         self.attachments = Vec::new();
 
         Ok(())

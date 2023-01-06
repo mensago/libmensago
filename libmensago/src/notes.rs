@@ -188,9 +188,10 @@ impl NoteModel {
             updated,
             notebook,
             tags: taglist.items,
-            images: ImageModel::load_all(id, conn)?,
             // TODO: Update load_from_db() to use DBConn
+            // images: ImageModel::load_all(id, conn)?,
             // attachments: AttachmentModel::load_all(id, conn)?,
+            images: Vec::new(),
             attachments: Vec::new(),
         })
     }
@@ -321,10 +322,11 @@ impl DBModel for NoteModel {
         self.updated = updated;
         self.notebook = notebook;
         self.tags = taglist.items;
-        self.images = ImageModel::load_all(&self.id, conn)?;
 
         // TODO: update refresh_from_db to use DBConn
+        // self.images = ImageModel::load_all(&self.id, conn)?;
         // self.attachments = AttachmentModel::load_all(&self.id, conn)?;
+        self.images = Vec::new();
         self.attachments = Vec::new();
 
         Ok(())
@@ -349,12 +351,12 @@ impl DBModel for NoteModel {
             Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
         }
 
-        ImageModel::delete_all(&self.id, conn)?;
-        for item in self.images.iter() {
-            item.set_in_db(conn)?;
-        }
-
         // TODO: resolve DBConn dependency in NoteModel::DBModel::set_in_db
+        // ImageModel::delete_all(&self.id, conn)?;
+        // for item in self.images.iter() {
+        //     item.set_in_db(conn)?;
+        // }
+
         // AttachmentModel::delete_all(&self.id, conn)?;
         // for item in self.attachments.iter() {
         //     item.set_in_db(conn)?;
