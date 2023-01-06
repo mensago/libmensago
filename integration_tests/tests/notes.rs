@@ -10,10 +10,20 @@ mod tests {
 
         // The list of full data is as follows:
         // let (config, pwhash, profman) = setup_db_test(testname)?;
-        let (_, _, profman) = setup_db_test(testname)?;
+        let (_, _, mut profman) = setup_db_test(testname)?;
 
-        let profile = profman.get_active_profile().unwrap();
+        let profile = profman.get_active_profile_mut().unwrap();
         let mut db = profile.open_storage()?;
+        let mut dbconn = match profile.get_db() {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: new db conn failed to connect: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        };
 
         let modelid = RandomID::from("00000000-1111-2222-3333-444444444444").unwrap();
         let mut model = NoteModel::new("Untitled", DocFormat::Text, "Default");
@@ -68,7 +78,7 @@ mod tests {
         }
 
         // Load from db
-        let loadmodel = match NoteModel::load_from_db(&model.id, &mut db) {
+        let loadmodel = match NoteModel::load_from_db(&model.id, &mut dbconn) {
             Ok(v) => v,
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
@@ -117,10 +127,20 @@ mod tests {
 
         // The list of full data is as follows:
         // let (config, pwhash, profman) = setup_db_test(testname)?;
-        let (_, _, profman) = setup_db_test(testname)?;
+        let (_, _, mut profman) = setup_db_test(testname)?;
 
-        let profile = profman.get_active_profile().unwrap();
+        let profile = profman.get_active_profile_mut().unwrap();
         let mut db = profile.open_storage()?;
+        let mut dbconn = match profile.get_db() {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: new db conn failed to connect: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        };
 
         match import_demonotes(&mut db) {
             Ok(_) => (),
@@ -133,7 +153,7 @@ mod tests {
             }
         };
 
-        let notebooks = match get_notebooks(&mut db) {
+        let notebooks = match get_notebooks(&mut dbconn) {
             Ok(v) => v,
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
@@ -161,10 +181,20 @@ mod tests {
 
         // The list of full data is as follows:
         // let (config, pwhash, profman) = setup_db_test(testname)?;
-        let (_, _, profman) = setup_db_test(testname)?;
+        let (_, _, mut profman) = setup_db_test(testname)?;
 
-        let profile = profman.get_active_profile().unwrap();
+        let profile = profman.get_active_profile_mut().unwrap();
         let mut db = profile.open_storage()?;
+        let mut dbconn = match profile.get_db() {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: new db conn failed to connect: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        };
 
         match import_demonotes(&mut db) {
             Ok(_) => (),
@@ -177,7 +207,7 @@ mod tests {
             }
         };
 
-        let notes = match get_notes(&mut db, "Default") {
+        let notes = match get_notes(&mut dbconn, "Default") {
             Ok(v) => v,
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
@@ -221,10 +251,20 @@ mod tests {
 
         // The list of full data is as follows:
         // let (config, pwhash, profman) = setup_db_test(testname)?;
-        let (_, _, profman) = setup_db_test(testname)?;
+        let (_, _, mut profman) = setup_db_test(testname)?;
 
-        let profile = profman.get_active_profile().unwrap();
+        let profile = profman.get_active_profile_mut().unwrap();
         let mut db = profile.open_storage()?;
+        let mut dbconn = match profile.get_db() {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: new db conn failed to connect: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        };
 
         match import_demonotes(&mut db) {
             Ok(_) => (),
@@ -237,7 +277,7 @@ mod tests {
             }
         };
 
-        let notes = match get_notes(&mut db, "Default") {
+        let notes = match get_notes(&mut dbconn, "Default") {
             Ok(v) => v,
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
@@ -256,7 +296,7 @@ mod tests {
             )));
         }
 
-        let mut note = match NoteModel::load_from_db(&noteitem.id, &mut db) {
+        let mut note = match NoteModel::load_from_db(&noteitem.id, &mut dbconn) {
             Ok(v) => v,
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
@@ -267,7 +307,7 @@ mod tests {
             }
         };
 
-        match note.update_title(&mut db, "Test Note #2") {
+        match note.update_title(&mut dbconn, "Test Note #2") {
             Ok(_) => (),
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
@@ -278,7 +318,7 @@ mod tests {
             }
         };
 
-        match note.update_text(&mut db, "Dummy data for test note #2") {
+        match note.update_text(&mut dbconn, "Dummy data for test note #2") {
             Ok(_) => (),
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(

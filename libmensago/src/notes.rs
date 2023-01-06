@@ -1,4 +1,4 @@
-use crate::{base::MensagoError, dbsupport::*, types::DocFormat};
+use crate::{base::MensagoError, dbconn::*, dbsupport::*, types::DocFormat};
 use libkeycard::*;
 use std::fmt;
 use std::fs::read_to_string;
@@ -125,29 +125,24 @@ impl NoteModel {
     }
 
     /// `load_from_db()` instantiates an NoteModel from the specified note ID.
-    pub fn load_from_db(
-        id: &RandomID,
-        conn: &mut rusqlite::Connection,
-    ) -> Result<NoteModel, MensagoError> {
-        let mut stmt = conn.prepare(
+    pub fn load_from_db(id: &RandomID, conn: &mut DBConn) -> Result<NoteModel, MensagoError> {
+        let values = conn.query(
             "SELECT title,format,body,created,updated,notebook,tags FROM notes WHERE id = ?1",
+            &[&id.to_string()],
         )?;
-        let (title, formatstr, body, createdstr, updatedstr, notebook, tagstr) = match stmt
-            .query_row(&[&id.to_string()], |row| {
-                Ok((
-                    row.get::<usize, String>(0).unwrap(),
-                    row.get::<usize, String>(1).unwrap(),
-                    row.get::<usize, String>(2).unwrap(),
-                    row.get::<usize, String>(3).unwrap(),
-                    row.get::<usize, String>(4).unwrap(),
-                    row.get::<usize, String>(5).unwrap(),
-                    row.get::<usize, String>(6).unwrap(),
-                ))
-            }) {
-            Ok(v) => v,
-            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-        };
-        drop(stmt);
+        if values.len() != 1 {
+            return Err(MensagoError::ErrNotFound);
+        }
+        if values[0].len() != 7 {
+            return Err(MensagoError::ErrSchemaFailure);
+        }
+        let title = values[0][0].to_string();
+        let formatstr = values[0][1].to_string();
+        let body = values[0][2].to_string();
+        let createdstr = values[0][3].to_string();
+        let updatedstr = values[0][4].to_string();
+        let notebook = values[0][5].to_string();
+        let tagstr = values[0][6].to_string();
 
         let docformat = match DocFormat::from_str(&formatstr) {
             Ok(v) => v,
@@ -197,11 +192,7 @@ impl NoteModel {
     }
 
     /// update_title() renames the note ensures the corresponding database row is current.
-    pub fn update_title(
-        &mut self,
-        conn: &mut rusqlite::Connection,
-        text: &str,
-    ) -> Result<(), MensagoError> {
+    pub fn update_title(&mut self, conn: &mut DBConn, text: &str) -> Result<(), MensagoError> {
         // Empty titles are not permitted
         if text.len() < 1 {
             return Err(MensagoError::ErrEmptyData);
@@ -210,44 +201,30 @@ impl NoteModel {
         self.title = String::from(text);
         self.updated = Timestamp::new();
 
-        match conn.execute(
+        conn.execute(
             "UPDATE notes SET title=?1,updated=?2 WHERE id=?3",
-            rusqlite::params![
+            [
                 &self.title.to_string(),
                 &self.updated.to_string(),
                 &self.id.to_string(),
             ],
-        ) {
-            Ok(_) => (),
-            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-        }
-
-        Ok(())
+        )
     }
 
     /// update_text() updates the text in the NoteModel and ensures the corresponding database row
     /// is current.
-    pub fn update_text(
-        &mut self,
-        conn: &mut rusqlite::Connection,
-        text: &str,
-    ) -> Result<(), MensagoError> {
+    pub fn update_text(&mut self, conn: &mut DBConn, text: &str) -> Result<(), MensagoError> {
         self.body = String::from(text);
         self.updated = Timestamp::new();
 
-        match conn.execute(
+        conn.execute(
             "UPDATE notes SET body=?1,updated=?2 WHERE id=?3",
             rusqlite::params![
                 &self.body.to_string(),
                 &self.updated.to_string(),
                 &self.id.to_string(),
             ],
-        ) {
-            Ok(_) => (),
-            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-        }
-
-        Ok(())
+        )
     }
 }
 
@@ -378,33 +355,19 @@ pub struct NotebookItem {
 }
 
 /// Returns a list of the groups of notes in the profile
-pub fn get_notebooks(conn: &mut rusqlite::Connection) -> Result<Vec<String>, MensagoError> {
-    let mut stmt = match conn.prepare("SELECT DISTINCT notebook FROM notes") {
-        Ok(v) => v,
-        Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-    };
-
-    let mut rows = match stmt.query([]) {
-        Ok(v) => v,
-        Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-    };
-
-    let mut option_row = match rows.next() {
-        Ok(v) => v,
-        Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-    };
+pub fn get_notebooks(conn: &mut DBConn) -> Result<Vec<String>, MensagoError> {
+    let rows = conn.query("SELECT DISTINCT notebook FROM notes", [])?;
+    if rows.len() == 0 {
+        return Err(MensagoError::ErrNotFound);
+    }
 
     let mut out = Vec::<String>::new();
+    for row in rows {
+        if row.len() != 1 || row[0].get_type() != DBValueType::Text {
+            return Err(MensagoError::ErrSchemaFailure);
+        }
 
-    while option_row.is_some() {
-        let row = option_row.unwrap();
-
-        out.push(row.get::<usize, String>(0).unwrap());
-
-        option_row = match rows.next() {
-            Ok(v) => v,
-            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-        };
+        out.push(row[0].to_string());
     }
 
     Ok(out)
@@ -412,55 +375,39 @@ pub fn get_notebooks(conn: &mut rusqlite::Connection) -> Result<Vec<String>, Men
 
 /// Returns a list of basic note information for the specified group. If given an empty string,
 /// all notes in the database are returned.
-pub fn get_notes(
-    conn: &mut rusqlite::Connection,
-    notebook: &str,
-) -> Result<Vec<NotebookItem>, MensagoError> {
-    let mut stmt = conn.prepare("SELECT rowid,id,title FROM notes WHERE notebook = ?1")?;
-
-    let mut rows = match stmt.query([notebook]) {
-        Ok(v) => v,
-        Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-    };
-
-    let mut option_row = match rows.next() {
-        Ok(v) => v,
-        Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-    };
+pub fn get_notes(conn: &mut DBConn, notebook: &str) -> Result<Vec<NotebookItem>, MensagoError> {
+    let rows = conn.query(
+        "SELECT rowid,id,title FROM notes WHERE notebook = ?1",
+        [notebook],
+    )?;
+    if rows.len() == 0 {
+        return Err(MensagoError::ErrNotFound);
+    }
 
     let mut out = Vec::<NotebookItem>::new();
+    for row in rows {
+        if row.len() != 3
+            || row[0].get_type() != DBValueType::Integer
+            || row[1].get_type() != DBValueType::Text
+            || row[2].get_type() != DBValueType::Text
+        {
+            return Err(MensagoError::ErrSchemaFailure);
+        }
 
-    while option_row.is_some() {
-        let row = option_row.unwrap();
-
-        // let srowid = row.get::<usize, String>(0).unwrap();
-        // let rowid = match usize::from_str(&srowid) {
-        //     Ok(v) => v,
-        //     Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-        // };
-        let rowid = row.get::<usize, usize>(0).unwrap();
-        let snoteid = row.get::<usize, String>(1).unwrap();
-        let noteid = match RandomID::from(&snoteid) {
+        let noteid = match RandomID::from(&row[1].to_string()) {
             Some(v) => v,
             None => {
                 return Err(MensagoError::ErrDatabaseException(format!(
-                    "Bad note ID in get_notes(): {}",
-                    snoteid
+                    "Bad note ID {} in notes",
+                    row[0]
                 )))
             }
         };
-        let title = row.get::<usize, String>(2).unwrap();
-
         out.push(NotebookItem {
-            rowid,
+            rowid: row[0].to_int().unwrap() as usize,
             id: noteid,
-            title,
+            title: row[1].to_string(),
         });
-
-        option_row = match rows.next() {
-            Ok(v) => v,
-            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-        };
     }
 
     Ok(out)
