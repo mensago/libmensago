@@ -1,5 +1,6 @@
 use crate::base::*;
 use crate::contacts::*;
+use crate::dbconn::*;
 use libkeycard::*;
 
 /// Contact represents a complete contact, including annotations
@@ -35,41 +36,28 @@ impl Contact {
     /// contacts, this method and `get_names()` are the two ways of getting information
     /// about all of the user's contacts at once and dealing with them iteratively. Generally
     /// speaking, you probably want `get_names()`.
-    pub fn get_ids(conn: &mut rusqlite::Connection) -> Result<Vec<RandomID>, MensagoError> {
+    pub fn get_ids(conn: &mut DBConn) -> Result<Vec<RandomID>, MensagoError> {
         let mut ids = Vec::<RandomID>::new();
 
-        let mut stmt = match conn.prepare("SELECT id FROM contacts") {
-            Ok(v) => v,
-            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-        };
+        let rows = conn.query("SELECT id FROM contacts", [])?;
+        if rows.len() == 0 {
+            return Err(MensagoError::ErrNotFound);
+        }
+        for row in rows {
+            if row.len() != 1 || row[0].get_type() != DBValueType::Text {
+                return Err(MensagoError::ErrSchemaFailure);
+            }
 
-        let mut rows = match stmt.query([]) {
-            Ok(v) => v,
-            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-        };
-
-        let mut option_row = match rows.next() {
-            Ok(v) => v,
-            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-        };
-
-        while option_row.is_some() {
-            let row = option_row.unwrap();
-            let partid = match RandomID::from(&row.get::<usize, String>(0).unwrap()) {
+            let conid = match RandomID::from(&row[0].to_string()) {
                 Some(v) => v,
                 None => {
                     return Err(MensagoError::ErrDatabaseException(format!(
                         "Bad contact model ID {} in contacts",
-                        &row.get::<usize, String>(0).unwrap()
+                        row[0]
                     )))
                 }
             };
-            ids.push(partid);
-
-            option_row = match rows.next() {
-                Ok(v) => v,
-                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-            };
+            ids.push(conid);
         }
 
         Ok(ids)
@@ -81,7 +69,7 @@ impl Contact {
     /// contacts, this method and `get_ids()` are the two ways of getting information about all of
     /// the user's contacts at once and dealing with them iteratively.
     #[inline]
-    pub fn get_names(conn: &mut rusqlite::Connection) -> Result<Vec<NameModel>, MensagoError> {
+    pub fn get_names(conn: &mut DBConn) -> Result<Vec<NameModel>, MensagoError> {
         let mut out = Vec::<NameModel>::new();
 
         for id in Contact::get_ids(conn)? {

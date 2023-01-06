@@ -1,4 +1,4 @@
-use crate::{base::*, contacts::EntityType, dbsupport::*, types::*};
+use crate::{base::*, contacts::EntityType, dbconn::*, dbsupport::*, types::*};
 use eznacl::*;
 use libkeycard::*;
 use mime::Mime;
@@ -30,23 +30,21 @@ impl StringModel {
         }
     }
 
-    pub fn load_from_db(
-        id: &RandomID,
-        conn: &mut rusqlite::Connection,
-    ) -> Result<StringModel, MensagoError> {
-        let mut stmt =
-            conn.prepare("SELECT conid,itemtype,label,value FROM contact_keyvalue WHERE id = ?1")?;
-        let (conidstr, itemtype, label, value) = match stmt.query_row(&[&id.to_string()], |row| {
-            Ok((
-                row.get::<usize, String>(0).unwrap(),
-                row.get::<usize, String>(1).unwrap(),
-                row.get::<usize, String>(2).unwrap(),
-                row.get::<usize, String>(3).unwrap(),
-            ))
-        }) {
-            Ok(v) => v,
-            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-        };
+    pub fn load_from_db(id: &RandomID, conn: &mut DBConn) -> Result<StringModel, MensagoError> {
+        let values = conn.query(
+            "SELECT conid,itemtype,label,value FROM contact_keyvalue WHERE id = ?1",
+            &[&id.to_string()],
+        )?;
+        if values.len() != 1 {
+            return Err(MensagoError::ErrNotFound);
+        }
+        if values[0].len() != 4 {
+            return Err(MensagoError::ErrSchemaFailure);
+        }
+        let conidstr = values[0][0].to_string();
+        let itemtype = values[0][1].to_string();
+        let label = values[0][2].to_string();
+        let value = values[0][3].to_string();
 
         Ok(StringModel {
             id: id.clone(),
@@ -69,47 +67,36 @@ impl StringModel {
     pub fn load_all(
         conid: &RandomID,
         itemtype: &str,
-        conn: &mut rusqlite::Connection,
+        conn: &mut DBConn,
     ) -> Result<Vec<StringModel>, MensagoError> {
         let mut ids = Vec::<RandomID>::new();
 
-        let mut stmt = match conn
-            .prepare("SELECT id FROM contact_keyvalue WHERE conid = ?1 AND itemtype = ?2")
-        {
-            Ok(v) => v,
-            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-        };
+        let rows = conn.query(
+            "SELECT id FROM contact_keyvalue WHERE conid = ?1 AND itemtype = ?2",
+            [&conid.as_string(), itemtype],
+        )?;
+        if rows.len() == 0 {
+            return Err(MensagoError::ErrNotFound);
+        }
+        for row in rows {
+            if row.len() != 1
+                || row[0].get_type() != DBValueType::Text
+                || row[1].get_type() != DBValueType::Text
+            {
+                return Err(MensagoError::ErrSchemaFailure);
+            }
 
-        let mut rows = match stmt.query([&conid.as_string(), itemtype]) {
-            Ok(v) => v,
-            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-        };
-
-        let mut option_row = match rows.next() {
-            Ok(v) => v,
-            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-        };
-
-        while option_row.is_some() {
-            let row = option_row.unwrap();
-            let partid = match RandomID::from(&row.get::<usize, String>(0).unwrap()) {
+            let partid = match RandomID::from(&row[0].to_string()) {
                 Some(v) => v,
                 None => {
                     return Err(MensagoError::ErrDatabaseException(format!(
                         "Bad string model ID {} in contact_keyvalue",
-                        &row.get::<usize, String>(0).unwrap()
+                        row[0]
                     )))
                 }
             };
             ids.push(partid);
-
-            option_row = match rows.next() {
-                Ok(v) => v,
-                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-            };
         }
-        drop(rows);
-        drop(stmt);
 
         let mut out = Vec::new();
         for id in ids.iter() {
@@ -120,17 +107,11 @@ impl StringModel {
     }
 
     /// Removes all of a contact's StringModels from the database
-    pub fn delete_all(
-        conid: &RandomID,
-        conn: &mut rusqlite::Connection,
-    ) -> Result<(), MensagoError> {
-        match conn.execute(
+    pub fn delete_all(conid: &RandomID, conn: &mut DBConn) -> Result<(), MensagoError> {
+        conn.execute(
             "DELETE FROM contact_keyvalue WHERE conid=?1",
             &[&conid.to_string()],
-        ) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
-        }
+        )
     }
 }
 
@@ -268,23 +249,21 @@ impl NamePartModel {
     /// different from `NameModel::load_from_db` in that the model's ID is required, not the contact
     /// ID. This is because a contact has only one name structure, but the name structure itself
     /// has components which can be in multiples, such as nicknames.
-    pub fn load_from_db(
-        id: &RandomID,
-        conn: &mut rusqlite::Connection,
-    ) -> Result<NamePartModel, MensagoError> {
-        let mut stmt = conn
-            .prepare("SELECT conid,parttype,value,priority FROM contact_nameparts WHERE id = ?1")?;
-        let (conid, parttype, value, priority) = match stmt.query_row(&[&id.to_string()], |row| {
-            Ok((
-                row.get::<usize, String>(0).unwrap(),
-                row.get::<usize, String>(1).unwrap(),
-                row.get::<usize, String>(2).unwrap(),
-                row.get::<usize, String>(3).unwrap(),
-            ))
-        }) {
-            Ok(v) => v,
-            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-        };
+    pub fn load_from_db(id: &RandomID, conn: &mut DBConn) -> Result<NamePartModel, MensagoError> {
+        let values = conn.query(
+            "SELECT conid,parttype,value,priority FROM contact_nameparts WHERE id = ?1",
+            &[&id.to_string()],
+        )?;
+        if values.len() != 1 {
+            return Err(MensagoError::ErrNotFound);
+        }
+        if values[0].len() != 4 {
+            return Err(MensagoError::ErrSchemaFailure);
+        }
+        let conid = values[0][0].to_string();
+        let parttype = values[0][1].to_string();
+        let value = values[0][2].to_string();
+        let priority = values[0][3].to_string();
 
         Ok(NamePartModel {
             id: id.clone(),
@@ -316,45 +295,32 @@ impl NamePartModel {
     pub fn load_all(
         conid: &RandomID,
         parttype: NamePartType,
-        conn: &mut rusqlite::Connection,
+        conn: &mut DBConn,
     ) -> Result<Vec<NamePartModel>, MensagoError> {
         let mut ids = Vec::<RandomID>::new();
-        {
-            let mut stmt = match conn
-                .prepare("SELECT id FROM contact_nameparts WHERE conid = ?1 and parttype = ?2")
-            {
-                Ok(v) => v,
-                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-            };
 
-            let mut rows = match stmt.query([&conid.as_string(), parttype.to_string().as_str()]) {
-                Ok(v) => v,
-                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-            };
-
-            let mut option_row = match rows.next() {
-                Ok(v) => v,
-                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-            };
-
-            while option_row.is_some() {
-                let row = option_row.unwrap();
-                let partid = match RandomID::from(&row.get::<usize, String>(0).unwrap()) {
-                    Some(v) => v,
-                    None => {
-                        return Err(MensagoError::ErrDatabaseException(format!(
-                            "Bad name part ID {} in contact_nameparts",
-                            &row.get::<usize, String>(0).unwrap()
-                        )))
-                    }
-                };
-                ids.push(partid);
-
-                option_row = match rows.next() {
-                    Ok(v) => v,
-                    Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-                };
+        let rows = conn.query(
+            "SELECT id FROM contact_nameparts WHERE conid = ?1 and parttype = ?2",
+            [&conid.as_string(), parttype.to_string().as_str()],
+        )?;
+        if rows.len() == 0 {
+            return Err(MensagoError::ErrNotFound);
+        }
+        for row in rows {
+            if row.len() != 1 || row[0].get_type() != DBValueType::Text {
+                return Err(MensagoError::ErrSchemaFailure);
             }
+
+            let partid = match RandomID::from(&row[0].to_string()) {
+                Some(v) => v,
+                None => {
+                    return Err(MensagoError::ErrDatabaseException(format!(
+                        "Bad name part model ID {} in contact_nameparts",
+                        row[0]
+                    )))
+                }
+            };
+            ids.push(partid);
         }
 
         let mut out = Vec::new();
@@ -376,17 +342,11 @@ impl NamePartModel {
     }
 
     /// Removes all of a contact's NamePartModels from the database
-    pub fn delete_all(
-        conid: &RandomID,
-        conn: &mut rusqlite::Connection,
-    ) -> Result<(), MensagoError> {
-        match conn.execute(
+    pub fn delete_all(conid: &RandomID, conn: &mut DBConn) -> Result<(), MensagoError> {
+        conn.execute(
             "DELETE FROM contact_nameparts WHERE conid=?1",
             &[&conid.to_string()],
-        ) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
-        }
+        )
     }
 }
 
@@ -501,48 +461,41 @@ impl NameModel {
     }
 
     /// `load_from_db()` instantiates a NameModel from the specified contact ID.
-    pub fn load_from_db(
-        conid: &RandomID,
-        conn: &mut rusqlite::Connection,
-    ) -> Result<NameModel, MensagoError> {
+    pub fn load_from_db(conid: &RandomID, conn: &mut DBConn) -> Result<NameModel, MensagoError> {
         let mut out: NameModel;
 
-        {
-            let mut stmt = conn.prepare(
+        let values = conn.query(
             "SELECT id,formatted_name,given_name,family_name,prefix FROM contact_names WHERE conid = ?1",
+            &[&conid.to_string()],
         )?;
-            let (idstr, formattedname, givenname, familyname, prefix) =
-                match stmt.query_row(&[&conid.to_string()], |row| {
-                    Ok((
-                        row.get::<usize, String>(0).unwrap(),
-                        row.get::<usize, String>(1).unwrap(),
-                        row.get::<usize, String>(2).unwrap(),
-                        row.get::<usize, String>(3).unwrap(),
-                        row.get::<usize, String>(4).unwrap(),
-                    ))
-                }) {
-                    Ok(v) => v,
-                    Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-                };
-
-            let id = match RandomID::from(&idstr) {
-                Some(v) => v,
-                None => {
-                    return Err(MensagoError::ErrDatabaseException(format!(
-                        "Bad contact name ID received from database: '{}'",
-                        idstr
-                    )))
-                }
-            };
-
-            out = NameModel::new(&conid, &givenname);
-            out.id = id;
-            out.formatted_name = formattedname;
-            out.given_name = givenname;
-            out.family_name = familyname;
-            out.prefix = prefix;
+        if values.len() != 1 {
+            return Err(MensagoError::ErrNotFound);
         }
+        if values[0].len() != 5 {
+            return Err(MensagoError::ErrSchemaFailure);
+        }
+        let idstr = values[0][0].to_string();
+        let formattedname = values[0][1].to_string();
+        let givenname = values[0][2].to_string();
+        let familyname = values[0][3].to_string();
+        let prefix = values[0][4].to_string();
 
+        let id = match RandomID::from(&idstr) {
+            Some(v) => v,
+            None => {
+                return Err(MensagoError::ErrDatabaseException(format!(
+                    "Bad contact name ID received from database: '{}'",
+                    idstr
+                )))
+            }
+        };
+
+        out = NameModel::new(&conid, &givenname);
+        out.id = id;
+        out.formatted_name = formattedname;
+        out.given_name = givenname;
+        out.family_name = familyname;
+        out.prefix = prefix;
         out.additional_names = NamePartModel::load_all(&conid, NamePartType::Additional, conn)?;
         out.nicknames = NamePartModel::load_all(&conid, NamePartType::Nickname, conn)?;
         out.suffixes = NamePartModel::load_all(&conid, NamePartType::Suffix, conn)?;
