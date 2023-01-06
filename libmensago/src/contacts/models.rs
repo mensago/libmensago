@@ -621,25 +621,22 @@ impl MensagoModel {
 
     /// Instantiates a MensagoModel from a model ID in the database. If you would like to load all
     /// of a contact's Mensago addresses, look at `load_all()` in combination with this call.
-    pub fn load_from_db(
-        id: &RandomID,
-        conn: &mut rusqlite::Connection,
-    ) -> Result<MensagoModel, MensagoError> {
-        let mut stmt =
-            conn.prepare("SELECT conid,label,uid,wid,domain FROM contact_mensago WHERE id = ?1")?;
-        let (conidstr, label, uidstr, widstr, domstr) =
-            match stmt.query_row(&[&id.to_string()], |row| {
-                Ok((
-                    row.get::<usize, String>(0).unwrap(),
-                    row.get::<usize, String>(1).unwrap(),
-                    row.get::<usize, String>(2).unwrap(),
-                    row.get::<usize, String>(3).unwrap(),
-                    row.get::<usize, String>(4).unwrap(),
-                ))
-            }) {
-                Ok(v) => v,
-                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-            };
+    pub fn load_from_db(id: &RandomID, conn: &mut DBConn) -> Result<MensagoModel, MensagoError> {
+        let values = conn.query(
+            "SELECT conid,label,uid,wid,domain FROM contact_mensago WHERE id = ?1",
+            &[&id.to_string()],
+        )?;
+        if values.len() != 1 {
+            return Err(MensagoError::ErrNotFound);
+        }
+        if values[0].len() != 5 {
+            return Err(MensagoError::ErrSchemaFailure);
+        }
+        let conidstr = values[0][0].to_string();
+        let label = values[0][1].to_string();
+        let uidstr = values[0][2].to_string();
+        let widstr = values[0][3].to_string();
+        let domstr = values[0][4].to_string();
 
         Ok(MensagoModel {
             id: id.clone(),
@@ -655,43 +652,32 @@ impl MensagoModel {
     /// specific contact.
     pub fn load_all(
         conid: &RandomID,
-        conn: &mut rusqlite::Connection,
+        conn: &mut DBConn,
     ) -> Result<Vec<MensagoModel>, MensagoError> {
         let mut ids = Vec::<RandomID>::new();
-        {
-            let mut stmt = match conn.prepare("SELECT id FROM contact_mensago WHERE conid = ?1") {
-                Ok(v) => v,
-                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-            };
 
-            let mut rows = match stmt.query([&conid.as_string()]) {
-                Ok(v) => v,
-                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-            };
-
-            let mut option_row = match rows.next() {
-                Ok(v) => v,
-                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-            };
-
-            while option_row.is_some() {
-                let row = option_row.unwrap();
-                let partid = match RandomID::from(&row.get::<usize, String>(0).unwrap()) {
-                    Some(v) => v,
-                    None => {
-                        return Err(MensagoError::ErrDatabaseException(format!(
-                            "Bad Mensago address ID {} in contact_mensago",
-                            &row.get::<usize, String>(0).unwrap()
-                        )))
-                    }
-                };
-                ids.push(partid);
-
-                option_row = match rows.next() {
-                    Ok(v) => v,
-                    Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-                };
+        let rows = conn.query(
+            "SELECT id FROM contact_mensago WHERE conid = ?1",
+            [&conid.as_string()],
+        )?;
+        if rows.len() == 0 {
+            return Err(MensagoError::ErrNotFound);
+        }
+        for row in rows {
+            if row.len() != 1 || row[0].get_type() != DBValueType::Text {
+                return Err(MensagoError::ErrSchemaFailure);
             }
+
+            let addrid = match RandomID::from(&row[0].to_string()) {
+                Some(v) => v,
+                None => {
+                    return Err(MensagoError::ErrDatabaseException(format!(
+                        "Bad Mensago address ID {} in contact_mensago",
+                        row[0]
+                    )))
+                }
+            };
+            ids.push(addrid);
         }
 
         let mut out = Vec::new();
@@ -713,17 +699,11 @@ impl MensagoModel {
     }
 
     /// Removes all of a contact's MensagoModels from the database
-    pub fn delete_all(
-        conid: &RandomID,
-        conn: &mut rusqlite::Connection,
-    ) -> Result<(), MensagoError> {
-        match conn.execute(
+    pub fn delete_all(conid: &RandomID, conn: &mut DBConn) -> Result<(), MensagoError> {
+        conn.execute(
             "DELETE FROM contact_mensago WHERE conid=?1",
             &[&conid.to_string()],
-        ) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
-        }
+        )
     }
 }
 
@@ -847,26 +827,22 @@ impl KeyModel {
 
     /// Instantiates a KeyModel from a model ID in the database. If you would like to load all
     /// of a contact's keys, look at `load_all()`.
-    pub fn load_from_db(
-        id: &RandomID,
-        conn: &mut rusqlite::Connection,
-    ) -> Result<KeyModel, MensagoError> {
-        let mut stmt = conn.prepare(
+    pub fn load_from_db(id: &RandomID, conn: &mut DBConn) -> Result<KeyModel, MensagoError> {
+        let values = conn.query(
             "SELECT conid,label,category,value,timestamp FROM contact_keys WHERE id = ?1",
+            &[&id.to_string()],
         )?;
-        let (conidstr, label, catstr, valstr, timestr) =
-            match stmt.query_row(&[&id.to_string()], |row| {
-                Ok((
-                    row.get::<usize, String>(0).unwrap(),
-                    row.get::<usize, String>(1).unwrap(),
-                    row.get::<usize, String>(2).unwrap(),
-                    row.get::<usize, String>(3).unwrap(),
-                    row.get::<usize, String>(4).unwrap(),
-                ))
-            }) {
-                Ok(v) => v,
-                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-            };
+        if values.len() != 1 {
+            return Err(MensagoError::ErrNotFound);
+        }
+        if values[0].len() != 5 {
+            return Err(MensagoError::ErrSchemaFailure);
+        }
+        let conidstr = values[0][0].to_string();
+        let label = values[0][1].to_string();
+        let catstr = values[0][2].to_string();
+        let valstr = values[0][3].to_string();
+        let timestr = values[0][4].to_string();
 
         Ok(KeyModel {
             id: id.clone(),
@@ -880,45 +856,30 @@ impl KeyModel {
 
     /// Returns a list of all KeyModels in the database of a particular type that belong to a
     /// specific contact.
-    pub fn load_all(
-        conid: &RandomID,
-        conn: &mut rusqlite::Connection,
-    ) -> Result<Vec<KeyModel>, MensagoError> {
+    pub fn load_all(conid: &RandomID, conn: &mut DBConn) -> Result<Vec<KeyModel>, MensagoError> {
         let mut ids = Vec::<RandomID>::new();
-        {
-            let mut stmt = match conn.prepare("SELECT id FROM contact_keys WHERE conid = ?1") {
-                Ok(v) => v,
-                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-            };
-
-            let mut rows = match stmt.query([&conid.as_string()]) {
-                Ok(v) => v,
-                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-            };
-
-            let mut option_row = match rows.next() {
-                Ok(v) => v,
-                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-            };
-
-            while option_row.is_some() {
-                let row = option_row.unwrap();
-                let partid = match RandomID::from(&row.get::<usize, String>(0).unwrap()) {
-                    Some(v) => v,
-                    None => {
-                        return Err(MensagoError::ErrDatabaseException(format!(
-                            "Bad key model ID {} in contact_keys",
-                            &row.get::<usize, String>(0).unwrap()
-                        )))
-                    }
-                };
-                ids.push(partid);
-
-                option_row = match rows.next() {
-                    Ok(v) => v,
-                    Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-                };
+        let rows = conn.query(
+            "SELECT id FROM contact_keys WHERE conid = ?1",
+            [&conid.as_string()],
+        )?;
+        if rows.len() == 0 {
+            return Err(MensagoError::ErrNotFound);
+        }
+        for row in rows {
+            if row.len() != 1 || row[0].get_type() != DBValueType::Text {
+                return Err(MensagoError::ErrSchemaFailure);
             }
+
+            let partid = match RandomID::from(&row[0].to_string()) {
+                Some(v) => v,
+                None => {
+                    return Err(MensagoError::ErrDatabaseException(format!(
+                        "Bad key model ID {} in contact_keys",
+                        row[0]
+                    )))
+                }
+            };
+            ids.push(partid);
         }
 
         let mut out = Vec::new();
@@ -940,17 +901,11 @@ impl KeyModel {
     }
 
     /// Removes all of a contact's KeyModels from the database
-    pub fn delete_all(
-        conid: &RandomID,
-        conn: &mut rusqlite::Connection,
-    ) -> Result<(), MensagoError> {
-        match conn.execute(
+    pub fn delete_all(conid: &RandomID, conn: &mut DBConn) -> Result<(), MensagoError> {
+        conn.execute(
             "DELETE FROM contact_keys WHERE conid=?1",
             &[&conid.to_string()],
-        ) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
-        }
+        )
     }
 }
 
@@ -1081,31 +1036,27 @@ impl AddressModel {
 
     /// Instantiates a AddressModel from a model ID in the database. If you would like to load all
     /// of a contact's keys, look at `load_all()`.
-    pub fn load_from_db(
-        id: &RandomID,
-        conn: &mut rusqlite::Connection,
-    ) -> Result<AddressModel, MensagoError> {
-        let mut stmt = conn.prepare(
+    pub fn load_from_db(id: &RandomID, conn: &mut DBConn) -> Result<AddressModel, MensagoError> {
+        let values = conn.query(
             "SELECT conid,label,street,extended,locality,region,postalcode,country,preferred 
-            FROM contact_address WHERE id = ?1",
+        //     FROM contact_address WHERE id = ?1",
+            &[&id.to_string()],
         )?;
-        let (conidstr, label, street, extended, locality, region, postalcode, country, preferred) =
-            match stmt.query_row(&[&id.to_string()], |row| {
-                Ok((
-                    row.get::<usize, String>(0).unwrap(),
-                    row.get::<usize, String>(1).unwrap(),
-                    row.get::<usize, String>(2).unwrap(),
-                    row.get::<usize, String>(3).unwrap(),
-                    row.get::<usize, String>(4).unwrap(),
-                    row.get::<usize, String>(5).unwrap(),
-                    row.get::<usize, String>(6).unwrap(),
-                    row.get::<usize, String>(7).unwrap(),
-                    row.get::<usize, bool>(8).unwrap(),
-                ))
-            }) {
-                Ok(v) => v,
-                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-            };
+        if values.len() != 1 {
+            return Err(MensagoError::ErrNotFound);
+        }
+        if values[0].len() != 9 {
+            return Err(MensagoError::ErrSchemaFailure);
+        }
+        let conidstr = values[0][0].to_string();
+        let label = values[0][1].to_string();
+        let street = values[0][2].to_string();
+        let extended = values[0][3].to_string();
+        let locality = values[0][4].to_string();
+        let region = values[0][5].to_string();
+        let postalcode = values[0][6].to_string();
+        let country = values[0][7].to_string();
+        let preferred = values[0][8].to_bool().unwrap();
 
         Ok(AddressModel {
             id: id.clone(),
@@ -1125,43 +1076,31 @@ impl AddressModel {
     /// specific contact.
     pub fn load_all(
         conid: &RandomID,
-        conn: &mut rusqlite::Connection,
+        conn: &mut DBConn,
     ) -> Result<Vec<AddressModel>, MensagoError> {
         let mut ids = Vec::<RandomID>::new();
-        {
-            let mut stmt = match conn.prepare("SELECT id FROM contact_address WHERE conid = ?1") {
-                Ok(v) => v,
-                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-            };
-
-            let mut rows = match stmt.query([&conid.as_string()]) {
-                Ok(v) => v,
-                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-            };
-
-            let mut option_row = match rows.next() {
-                Ok(v) => v,
-                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-            };
-
-            while option_row.is_some() {
-                let row = option_row.unwrap();
-                let partid = match RandomID::from(&row.get::<usize, String>(0).unwrap()) {
-                    Some(v) => v,
-                    None => {
-                        return Err(MensagoError::ErrDatabaseException(format!(
-                            "Bad address model ID {} in contact_address",
-                            &row.get::<usize, String>(0).unwrap()
-                        )))
-                    }
-                };
-                ids.push(partid);
-
-                option_row = match rows.next() {
-                    Ok(v) => v,
-                    Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-                };
+        let rows = conn.query(
+            "SELECT id FROM contact_address WHERE conid = ?1",
+            [&conid.as_string()],
+        )?;
+        if rows.len() == 0 {
+            return Err(MensagoError::ErrNotFound);
+        }
+        for row in rows {
+            if row.len() != 1 || row[0].get_type() != DBValueType::Text {
+                return Err(MensagoError::ErrSchemaFailure);
             }
+
+            let partid = match RandomID::from(&row[0].to_string()) {
+                Some(v) => v,
+                None => {
+                    return Err(MensagoError::ErrDatabaseException(format!(
+                        "Bad address model ID {} in contact_address",
+                        row[0]
+                    )))
+                }
+            };
+            ids.push(partid);
         }
 
         let mut out = Vec::new();
@@ -1183,17 +1122,11 @@ impl AddressModel {
     }
 
     /// Removes all of a contact's AddressModels from the database
-    pub fn delete_all(
-        conid: &RandomID,
-        conn: &mut rusqlite::Connection,
-    ) -> Result<(), MensagoError> {
-        match conn.execute(
+    pub fn delete_all(conid: &RandomID, conn: &mut DBConn) -> Result<(), MensagoError> {
+        conn.execute(
             "DELETE FROM contact_address WHERE conid=?1",
             &[&conid.to_string()],
-        ) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
-        }
+        )
     }
 }
 
@@ -1297,48 +1230,44 @@ impl PhotoModel {
     }
 
     /// `load_from_db()` instantiates a PhotoModel from the specified contact ID.
-    pub fn load_from_db(
-        conid: &RandomID,
-        conn: &mut rusqlite::Connection,
-    ) -> Result<PhotoModel, MensagoError> {
+    pub fn load_from_db(conid: &RandomID, conn: &mut DBConn) -> Result<PhotoModel, MensagoError> {
         let mut out: PhotoModel;
 
-        {
-            let mut stmt =
-                conn.prepare("SELECT id,mime,data FROM contact_photo WHERE conid = ?1")?;
-            let (idstr, mimestr, imgdata) = match stmt.query_row(&[&conid.to_string()], |row| {
-                Ok((
-                    row.get::<usize, String>(0).unwrap(),
-                    row.get::<usize, String>(1).unwrap(),
-                    row.get::<usize, Vec<u8>>(2).unwrap(),
-                ))
-            }) {
-                Ok(v) => v,
-                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-            };
-
-            let id = match RandomID::from(&idstr) {
-                Some(v) => v,
-                None => {
-                    return Err(MensagoError::ErrDatabaseException(format!(
-                        "Bad photo ID received from database: '{}'",
-                        idstr
-                    )))
-                }
-            };
-            let imgtype = match Mime::from_str(&mimestr) {
-                Ok(v) => v,
-                Err(_) => {
-                    return Err(MensagoError::ErrDatabaseException(format!(
-                        "Bad photo MIME type received from database: '{}'",
-                        mimestr
-                    )))
-                }
-            };
-
-            out = PhotoModel::new(&conid, &imgtype, &imgdata);
-            out.id = id;
+        let values = conn.query(
+            "SELECT id,mime,data FROM contact_photo WHERE conid = ?1",
+            &[&conid.to_string()],
+        )?;
+        if values.len() != 1 {
+            return Err(MensagoError::ErrNotFound);
         }
+        if values[0].len() != 3 {
+            return Err(MensagoError::ErrSchemaFailure);
+        }
+        let idstr = values[0][0].to_string();
+        let mimestr = values[0][1].to_string();
+        let imgdata = values[0][2].to_vec().unwrap();
+
+        let id = match RandomID::from(&idstr) {
+            Some(v) => v,
+            None => {
+                return Err(MensagoError::ErrDatabaseException(format!(
+                    "Bad photo ID received from database: '{}'",
+                    idstr
+                )))
+            }
+        };
+        let imgtype = match Mime::from_str(&mimestr) {
+            Ok(v) => v,
+            Err(_) => {
+                return Err(MensagoError::ErrDatabaseException(format!(
+                    "Bad photo MIME type received from database: '{}'",
+                    mimestr
+                )))
+            }
+        };
+
+        out = PhotoModel::new(&conid, &imgtype, &imgdata);
+        out.id = id;
         Ok(out)
     }
 
@@ -1449,94 +1378,76 @@ impl FileModel {
     }
 
     /// `load_from_db()` instantiates a FileModel from the specified file ID.
-    pub fn load_from_db(
-        id: &RandomID,
-        conn: &mut rusqlite::Connection,
-    ) -> Result<FileModel, MensagoError> {
+    pub fn load_from_db(id: &RandomID, conn: &mut DBConn) -> Result<FileModel, MensagoError> {
         let mut out: FileModel;
 
-        {
-            let mut stmt =
-                conn.prepare("SELECT conid,name,mime,data FROM contact_files WHERE id = ?1")?;
-            let (idstr, name, mimestr, imgdata) = match stmt.query_row(&[&id.to_string()], |row| {
-                Ok((
-                    row.get::<usize, String>(0).unwrap(),
-                    row.get::<usize, String>(1).unwrap(),
-                    row.get::<usize, String>(2).unwrap(),
-                    row.get::<usize, Vec<u8>>(3).unwrap(),
-                ))
-            }) {
-                Ok(v) => v,
-                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-            };
-
-            let id = match RandomID::from(&idstr) {
-                Some(v) => v,
-                None => {
-                    return Err(MensagoError::ErrDatabaseException(format!(
-                        "Bad file ID received from database: '{}'",
-                        idstr
-                    )))
-                }
-            };
-            let imgtype = match Mime::from_str(&mimestr) {
-                Ok(v) => v,
-                Err(_) => {
-                    return Err(MensagoError::ErrDatabaseException(format!(
-                        "Bad file MIME type received from database: '{}'",
-                        mimestr
-                    )))
-                }
-            };
-
-            out = FileModel::new(&id, &name, &imgtype, &imgdata);
-            out.id = id;
+        let values = conn.query(
+            "SELECT conid,name,mime,data FROM contact_files WHERE id = ?1",
+            &[&id.to_string()],
+        )?;
+        if values.len() != 1 {
+            return Err(MensagoError::ErrNotFound);
         }
+        if values[0].len() != 4 {
+            return Err(MensagoError::ErrSchemaFailure);
+        }
+        let idstr = values[0][0].to_string();
+        let name = values[0][1].to_string();
+        let mimestr = values[0][2].to_string();
+        let imgdata = values[0][3].to_vec().unwrap();
+
+        let id = match RandomID::from(&idstr) {
+            Some(v) => v,
+            None => {
+                return Err(MensagoError::ErrDatabaseException(format!(
+                    "Bad file ID received from database: '{}'",
+                    idstr
+                )))
+            }
+        };
+        let imgtype = match Mime::from_str(&mimestr) {
+            Ok(v) => v,
+            Err(_) => {
+                return Err(MensagoError::ErrDatabaseException(format!(
+                    "Bad file MIME type received from database: '{}'",
+                    mimestr
+                )))
+            }
+        };
+
+        out = FileModel::new(&id, &name, &imgtype, &imgdata);
+        out.id = id;
+
         Ok(out)
     }
 
     /// Returns a list of all FileModels that belong to a specific contact.
-    pub fn load_all(
-        conid: &RandomID,
-        conn: &mut rusqlite::Connection,
-    ) -> Result<Vec<FileModel>, MensagoError> {
+    pub fn load_all(conid: &RandomID, conn: &mut DBConn) -> Result<Vec<FileModel>, MensagoError> {
         let mut ids = Vec::<RandomID>::new();
 
-        let mut stmt = match conn.prepare("SELECT id FROM contact_files WHERE conid = ?1") {
-            Ok(v) => v,
-            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-        };
+        let rows = conn.query(
+            "SELECT id FROM contact_files WHERE conid = ?1",
+            [&conid.as_string()],
+        )?;
+        if rows.len() == 0 {
+            return Err(MensagoError::ErrNotFound);
+        }
+        for row in rows {
+            if row.len() != 1 || row[0].get_type() != DBValueType::Text {
+                return Err(MensagoError::ErrSchemaFailure);
+            }
 
-        let mut rows = match stmt.query([&conid.as_string()]) {
-            Ok(v) => v,
-            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-        };
-
-        let mut option_row = match rows.next() {
-            Ok(v) => v,
-            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-        };
-
-        while option_row.is_some() {
-            let row = option_row.unwrap();
-            let partid = match RandomID::from(&row.get::<usize, String>(0).unwrap()) {
+            let partid = match RandomID::from(&row[0].to_string()) {
                 Some(v) => v,
                 None => {
                     return Err(MensagoError::ErrDatabaseException(format!(
                         "Bad file model ID {} in contact_files",
-                        &row.get::<usize, String>(0).unwrap()
+                        row[0]
                     )))
                 }
             };
             ids.push(partid);
-
-            option_row = match rows.next() {
-                Ok(v) => v,
-                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-            };
         }
-        drop(rows);
-        drop(stmt);
 
         let mut out = Vec::new();
         for id in ids.iter() {
@@ -1547,17 +1458,11 @@ impl FileModel {
     }
 
     /// Removes all of a contact's FileModels from the database
-    pub fn delete_all(
-        conid: &RandomID,
-        conn: &mut rusqlite::Connection,
-    ) -> Result<(), MensagoError> {
-        match conn.execute(
+    pub fn delete_all(conid: &RandomID, conn: &mut DBConn) -> Result<(), MensagoError> {
+        conn.execute(
             "DELETE FROM contact_files WHERE conid=?1",
             &[&conid.to_string()],
-        ) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
-        }
+        )
     }
 }
 
@@ -1725,55 +1630,34 @@ impl ContactDataModel {
     /// `load_from_db()` instantiates a ContactDataModel from the specified contact ID.
     pub fn load_from_db(
         conid: &RandomID,
-        storage: &mut rusqlite::Connection,
+        storage: &mut DBConn,
         is_annotation: bool,
     ) -> Result<ContactDataModel, MensagoError> {
-        let mut stmt = storage.prepare(
+        let values = storage.query(
             "SELECT entitytype,contactgroup,gender,bio,anniversary,birthday,organization,orgunits,
             title,categories,languages,notes,annotation_link FROM contacts WHERE id = ?1 AND
             annotation=?2",
-        )?;
-
-        let (
-            entitytypestr,
-            group,
-            gender,
-            bio,
-            anniversary,
-            birthday,
-            organization,
-            orgunitstr,
-            title,
-            categorystr,
-            languagestr,
-            notes,
-            annlinkstr,
-        ) = match stmt.query_row(
             rusqlite::params![&conid.to_string(), &is_annotation],
-            |row| {
-                Ok((
-                    row.get::<usize, String>(0).unwrap(),
-                    row.get::<usize, String>(1).unwrap(),
-                    row.get::<usize, String>(2).unwrap(),
-                    row.get::<usize, String>(3).unwrap(),
-                    row.get::<usize, String>(4).unwrap(),
-                    row.get::<usize, String>(5).unwrap(),
-                    row.get::<usize, String>(6).unwrap(),
-                    row.get::<usize, String>(7).unwrap(),
-                    row.get::<usize, String>(8).unwrap(),
-                    row.get::<usize, String>(9).unwrap(),
-                    row.get::<usize, String>(10).unwrap(),
-                    row.get::<usize, String>(11).unwrap(),
-                    row.get::<usize, String>(12).unwrap(),
-                ))
-            },
-        ) {
-            Ok(v) => v,
-            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-        };
-
-        // Drop so we can use conn again later on
-        drop(stmt);
+        )?;
+        if values.len() != 1 {
+            return Err(MensagoError::ErrNotFound);
+        }
+        if values[0].len() != 13 {
+            return Err(MensagoError::ErrSchemaFailure);
+        }
+        let entitytypestr = values[0][0].to_string();
+        let group = values[0][1].to_string();
+        let gender = values[0][2].to_string();
+        let bio = values[0][3].to_string();
+        let anniversary = values[0][4].to_string();
+        let birthday = values[0][5].to_string();
+        let organization = values[0][6].to_string();
+        let orgunitstr = values[0][7].to_string();
+        let title = values[0][8].to_string();
+        let categorystr = values[0][9].to_string();
+        let languagestr = values[0][10].to_string();
+        let notes = values[0][11].to_string();
+        let annlinkstr = values[0][12].to_string();
 
         let entity_type = match EntityType::try_from(entitytypestr.as_str()) {
             Ok(v) => v,
