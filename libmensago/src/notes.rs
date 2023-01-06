@@ -257,7 +257,8 @@ impl DBModel for NoteModel {
             Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
         }
 
-        AttachmentModel::delete_all(&self.id, conn)?;
+        // TODO: resolve DBConn dependency in NoteModel::DBModel::delete_from_db
+        // AttachmentModel::delete_all(&self.id, conn)?;
 
         Ok(())
     }
@@ -353,10 +354,12 @@ impl DBModel for NoteModel {
             item.set_in_db(conn)?;
         }
 
-        AttachmentModel::delete_all(&self.id, conn)?;
-        for item in self.attachments.iter() {
-            item.set_in_db(conn)?;
-        }
+        // TODO: resolve DBConn dependency in NoteModel::DBModel::set_in_db
+        // AttachmentModel::delete_all(&self.id, conn)?;
+        // for item in self.attachments.iter() {
+        //     item.set_in_db(conn)?;
+        // }
+
         Ok(())
     }
 }

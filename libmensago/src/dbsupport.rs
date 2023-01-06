@@ -225,17 +225,11 @@ impl AttachmentModel {
     }
 
     /// Removes all of a document's AttachmentModels from the database
-    pub fn delete_all(
-        ownid: &RandomID,
-        conn: &mut rusqlite::Connection,
-    ) -> Result<(), MensagoError> {
-        match conn.execute(
+    pub fn delete_all(ownid: &RandomID, conn: &mut DBConn) -> Result<(), MensagoError> {
+        conn.execute(
             "DELETE FROM attachments WHERE ownid=?1",
             &[&ownid.to_string()],
-        ) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
-        }
+        )
     }
 }
 
