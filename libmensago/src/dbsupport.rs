@@ -245,35 +245,34 @@ impl DBModel for AttachmentModel {
     }
 
     fn refresh_from_db(&mut self, conn: &mut DBConn) -> Result<(), MensagoError> {
-        {
-            let values = conn.query(
-                "SELECT name,mimetype,data FROM attachments WHERE id = ?1",
-                &[&self.id.to_string()],
-            )?;
-            if values.len() != 1 {
-                return Err(MensagoError::ErrNotFound);
-            }
-            if values[0].len() != 4 {
-                return Err(MensagoError::ErrSchemaFailure);
-            }
-            let name = values[0][0].to_string();
-            let mimestr = values[0][1].to_string();
-            let attdata = values[0][2].to_vec().unwrap();
-
-            let atttype = match Mime::from_str(&mimestr) {
-                Ok(v) => v,
-                Err(_) => {
-                    return Err(MensagoError::ErrDatabaseException(format!(
-                        "Bad attachment MIME type received from database: '{}'",
-                        mimestr
-                    )))
-                }
-            };
-
-            self.name = name;
-            self.mimetype = atttype;
-            self.data = attdata;
+        let values = conn.query(
+            "SELECT name,mimetype,data FROM attachments WHERE id = ?1",
+            &[&self.id.to_string()],
+        )?;
+        if values.len() != 1 {
+            return Err(MensagoError::ErrNotFound);
         }
+        if values[0].len() != 3 {
+            return Err(MensagoError::ErrSchemaFailure);
+        }
+        let name = values[0][0].to_string();
+        let mimestr = values[0][1].to_string();
+        let attdata = values[0][2].to_vec().unwrap();
+
+        let atttype = match Mime::from_str(&mimestr) {
+            Ok(v) => v,
+            Err(_) => {
+                return Err(MensagoError::ErrDatabaseException(format!(
+                    "Bad attachment MIME type received from database: '{}'",
+                    mimestr
+                )))
+            }
+        };
+
+        self.name = name;
+        self.mimetype = atttype;
+        self.data = attdata;
+
         Ok(())
     }
 
@@ -421,35 +420,34 @@ impl DBModel for ImageModel {
     }
 
     fn refresh_from_db(&mut self, conn: &mut DBConn) -> Result<(), MensagoError> {
-        {
-            let values = conn.query(
-                "SELECT name,mimetype,data FROM images WHERE id = ?1",
-                &[&self.id.to_string()],
-            )?;
-            if values.len() != 1 {
-                return Err(MensagoError::ErrNotFound);
-            }
-            if values[0].len() != 4 {
-                return Err(MensagoError::ErrSchemaFailure);
-            }
-            let name = values[0][0].to_string();
-            let mimestr = values[0][1].to_string();
-            let attdata = values[0][2].to_vec().unwrap();
-
-            let atttype = match Mime::from_str(&mimestr) {
-                Ok(v) => v,
-                Err(_) => {
-                    return Err(MensagoError::ErrDatabaseException(format!(
-                        "Bad image MIME type received from database: '{}'",
-                        mimestr
-                    )))
-                }
-            };
-
-            self.name = name;
-            self.mimetype = atttype;
-            self.data = attdata;
+        let values = conn.query(
+            "SELECT name,mimetype,data FROM images WHERE id = ?1",
+            &[&self.id.to_string()],
+        )?;
+        if values.len() != 1 {
+            return Err(MensagoError::ErrNotFound);
         }
+        if values[0].len() != 3 {
+            return Err(MensagoError::ErrSchemaFailure);
+        }
+        let name = values[0][0].to_string();
+        let mimestr = values[0][1].to_string();
+        let attdata = values[0][2].to_vec().unwrap();
+
+        let atttype = match Mime::from_str(&mimestr) {
+            Ok(v) => v,
+            Err(_) => {
+                return Err(MensagoError::ErrDatabaseException(format!(
+                    "Bad image MIME type received from database: '{}'",
+                    mimestr
+                )))
+            }
+        };
+
+        self.name = name;
+        self.mimetype = atttype;
+        self.data = attdata;
+
         Ok(())
     }
 
