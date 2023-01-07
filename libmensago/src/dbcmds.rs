@@ -1,6 +1,6 @@
 // This module contains miscellaneous commands related to the local profile database
 
-use crate::base::MensagoError;
+use crate::{base::MensagoError, dbconn::*};
 use chrono::prelude::*;
 use libkeycard::*;
 
@@ -13,7 +13,7 @@ use libkeycard::*;
 /// directly. When check_ttl is true, Ok(None) will be returned if the keycard doesn't exist or if
 /// the Time-To-Live has expired.
 pub fn get_card_from_db(
-    conn: &rusqlite::Connection,
+    conn: &DBConn,
     owner: &str,
     etype: EntryType,
     check_ttl: bool,
@@ -25,30 +25,20 @@ pub fn get_card_from_db(
     // because that's already been done once, we don't need to do it again here -- just create
     // entries from each row and add them to the card.
 
-    // A huge chunk of rusqlite-related code just to add the entries to the card. :(
+    let rows = conn.query(
+        "SELECT entry FROM keycards WHERE owner=?1 ORDER BY 'index'",
+        [owner],
+    )?;
+    if rows.len() == 0 {
+        return Err(MensagoError::ErrNotFound);
+    }
+    for row in rows {
+        if row.len() != 1 || row[0].get_type() != DBValueType::Text {
+            return Err(MensagoError::ErrSchemaFailure);
+        }
 
-    let mut stmt = conn.prepare("SELECT entry FROM keycards WHERE owner=? ORDER BY 'index'")?;
-
-    let mut rows = match stmt.query([owner]) {
-        Ok(v) => v,
-        Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-    };
-
-    let mut option_row = match rows.next() {
-        Ok(v) => v,
-        Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-    };
-
-    while option_row.is_some() {
-        let row = option_row.unwrap();
-
-        let entry = Entry::from(&row.get::<usize, String>(0).unwrap())?;
+        let entry = Entry::from(&row[0].to_string())?;
         card.entries.push(entry);
-
-        option_row = match rows.next() {
-            Ok(v) => v,
-            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-        };
     }
 
     if card.entries.len() < 1 {
@@ -57,12 +47,18 @@ pub fn get_card_from_db(
 
     if check_ttl {
         let current = card.get_current().unwrap();
-        let mut stmt =
-            conn.prepare("SELECT ttlexpires FROM keycards WHERE owner=?1 AND index=?2")?;
-        let ttlstr = stmt.query_row(
+
+        let values = conn.query(
+            "SELECT ttlexpires FROM keycards WHERE owner=?1 AND index=?2",
             [&owner, current.get_field("Index").unwrap().as_str()],
-            |row| Ok(row.get::<usize, String>(0).unwrap()),
         )?;
+        if values.len() != 1 {
+            return Err(MensagoError::ErrNotFound);
+        }
+        if values[0].len() != 1 {
+            return Err(MensagoError::ErrSchemaFailure);
+        }
+        let ttlstr = values[0][0].to_string();
 
         // The only way that the TTL expiration string will be empty is if this belongs to the
         // user's keycard and this never expires.
@@ -94,7 +90,7 @@ pub fn get_card_from_db(
 /// sure that for_caching is set to false to ensure that the user's local copy isn't accidentally
 /// deleted because its Time-To-Live value expired!
 pub fn update_keycard_in_db(
-    conn: &rusqlite::Connection,
+    conn: &DBConn,
     card: &Keycard,
     for_caching: bool,
 ) -> Result<(), MensagoError> {
@@ -105,10 +101,7 @@ pub fn update_keycard_in_db(
 
     let owner = current.get_owner()?;
 
-    match conn.execute("DELETE FROM keycards WHERE owner=?1", [&owner]) {
-        Ok(_) => (),
-        Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-    }
+    conn.execute("DELETE FROM keycards WHERE owner=?1", [&owner])?;
 
     // Calculate the expiration time of the current entries
     let ttl_offset = current
@@ -131,7 +124,7 @@ pub fn update_keycard_in_db(
     };
 
     for entry in card.entries.iter() {
-        match conn.execute(
+        conn.execute(
             "INSERT INTO keycards(
 			owner, entryindex, type, entry, textentry, hash, expires, timestamp, ttlexpires)
 			VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9)",
@@ -146,10 +139,7 @@ pub fn update_keycard_in_db(
                 &entry.get_field("Timestamp").unwrap(),
                 &ttl_expires.to_string(),
             ],
-        ) {
-            Ok(_) => (),
-            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-        };
+        )?;
     }
 
     Ok(())

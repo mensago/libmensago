@@ -206,11 +206,11 @@ impl KCResolver {
             }
         }
 
-        let dbconn = self.profile.open_storage()?;
+        let dbconn = self.profile.get_db()?;
         let mut card: Option<Keycard> = None;
 
         if !force_update {
-            card = get_card_from_db(&dbconn, owner, owner_type, true)?;
+            card = get_card_from_db(dbconn, owner, owner_type, true)?;
         }
 
         // If we got a card from the call, it means a successful cache hit and the TTL timestamp
@@ -243,7 +243,7 @@ impl KCResolver {
 
         conn.disconnect()?;
 
-        update_keycard_in_db(&dbconn, &card, true)?;
+        update_keycard_in_db(dbconn, &card, true)?;
         Ok(card)
     }
 

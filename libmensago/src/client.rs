@@ -110,12 +110,12 @@ impl Client {
         let serverkey = EncryptionKey::from(&record.ek)?;
         login(&mut self.conn, waddr.get_wid(), &serverkey)?;
 
-        let storage = profile.open_storage()?;
-        let passhash = get_credentials(&storage, &waddr)?;
+        let db = profile.get_db()?;
+        let passhash = get_credentials(&db, &waddr)?;
 
         password(&mut self.conn, &passhash)?;
 
-        let devpair = get_session_keypair(&storage, &waddr)?;
+        let devpair = get_session_keypair(&db, &waddr)?;
         self.is_admin = device(&mut self.conn, waddr.get_wid(), &devpair)?;
 
         self.login_active = true;
@@ -331,10 +331,10 @@ impl Client {
             None => return Err(MensagoError::ErrNoProfile),
         };
 
-        let mut storage = profile.open_storage()?;
+        let mut db = profile.get_db()?;
 
         let cardopt = get_card_from_db(
-            &storage,
+            db,
             &profile.get_waddress().unwrap().to_string(),
             EntryType::User,
             false,
@@ -346,7 +346,7 @@ impl Client {
         if cardopt.is_some() {
             let mut card = cardopt.unwrap();
             card.verify()?;
-            let cstemp = get_keypair_by_category(&storage, &KeyCategory::ConReqSigning)?;
+            let cstemp = get_keypair_by_category(db, &KeyCategory::ConReqSigning)?;
             let crspair = match SigningPair::from(&cstemp[0], &cstemp[1]) {
                 Ok(v) => v,
                 Err(e) => {
@@ -363,7 +363,7 @@ impl Client {
             addentry(&mut self.conn, &mut entry, &ovkey, &crspair)?;
 
             add_keypair(
-                &mut storage,
+                db,
                 &profile.get_waddress().unwrap(),
                 &keys["crsigning.public"],
                 &keys["crsigning.private"],
@@ -372,7 +372,7 @@ impl Client {
                 &KeyCategory::ConReqSigning,
             )?;
             add_keypair(
-                &mut storage,
+                db,
                 &profile.get_waddress().unwrap(),
                 &keys["crencryption.public"],
                 &keys["crencryption.private"],
@@ -381,7 +381,7 @@ impl Client {
                 &KeyCategory::ConReqEncryption,
             )?;
             add_keypair(
-                &mut storage,
+                db,
                 &profile.get_waddress().unwrap(),
                 &keys["signing.public"],
                 &keys["signing.private"],
@@ -390,7 +390,7 @@ impl Client {
                 &KeyCategory::Signing,
             )?;
             add_keypair(
-                &mut storage,
+                db,
                 &profile.get_waddress().unwrap(),
                 &keys["encryption.public"],
                 &keys["encryption.private"],
@@ -399,14 +399,14 @@ impl Client {
                 &KeyCategory::Encryption,
             )?;
 
-            // return update_keycard_in_db(&storage, card.as_ref().unwrap(), false);
-            return update_keycard_in_db(&storage, &card, false);
+            // return update_keycard_in_db(db, card.as_ref().unwrap(), false);
+            return update_keycard_in_db(db, &card, false);
         };
 
         // `card` is none, so it means that we need to create a new root keycard entry for the user.
         // We also don't need to generate any new keys because that was done when the workspace was
         // provisioned -- just pull them from the database and go. :)
-        let cstemp = get_keypair_by_category(&storage, &KeyCategory::ConReqSigning)?;
+        let cstemp = get_keypair_by_category(db, &KeyCategory::ConReqSigning)?;
         let crspair = match SigningPair::from(&cstemp[0], &cstemp[1]) {
             Ok(v) => v,
             Err(e) => {
@@ -417,32 +417,28 @@ impl Client {
             }
         };
 
-        let crekey = match EncryptionKey::from(&get_key_by_category(
-            &storage,
-            &KeyCategory::ConReqEncryption,
-        )?) {
-            Ok(v) => v,
-            Err(e) => {
-                return Err(MensagoError::ErrDatabaseException(format!(
-                    "BUG: bad CR encryption key obtained in update_keycard: {}",
-                    e
-                )))
-            }
-        };
-
-        let ekey =
-            match EncryptionKey::from(&get_key_by_category(&storage, &KeyCategory::Encryption)?) {
+        let crekey =
+            match EncryptionKey::from(&get_key_by_category(db, &KeyCategory::ConReqEncryption)?) {
                 Ok(v) => v,
                 Err(e) => {
                     return Err(MensagoError::ErrDatabaseException(format!(
-                        "BUG: bad encryption key obtained in update_keycard: {}",
+                        "BUG: bad CR encryption key obtained in update_keycard: {}",
                         e
                     )))
                 }
             };
 
-        let vkey = match EncryptionKey::from(&get_key_by_category(&storage, &KeyCategory::Signing)?)
-        {
+        let ekey = match EncryptionKey::from(&get_key_by_category(db, &KeyCategory::Encryption)?) {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(MensagoError::ErrDatabaseException(format!(
+                    "BUG: bad encryption key obtained in update_keycard: {}",
+                    e
+                )))
+            }
+        };
+
+        let vkey = match EncryptionKey::from(&get_key_by_category(db, &KeyCategory::Signing)?) {
             Ok(v) => v,
             Err(e) => {
                 return Err(MensagoError::ErrDatabaseException(format!(
@@ -488,7 +484,7 @@ impl Client {
 
         let mut card = Keycard::new(EntryType::User);
         card.entries.push(entry);
-        update_keycard_in_db(&storage, &card, false)
+        update_keycard_in_db(db, &card, false)
     }
 
     /// Internal method which finishes all the profile and workspace setup common to standard
@@ -509,7 +505,7 @@ impl Client {
 
         profile.set_identity(w, &reginfo.password)?;
 
-        let storage = profile.open_storage()?;
+        let db = profile.get_db()?;
 
         let tempname = match hostname::get() {
             Ok(v) => v,
@@ -517,7 +513,7 @@ impl Client {
         };
         let devicename = tempname.to_string_lossy();
         add_device_session(
-            &storage,
+            db,
             &WAddress::from_parts(&reginfo.wid, &reginfo.domain),
             &reginfo.devid,
             &reginfo.devpair,

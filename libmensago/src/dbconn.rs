@@ -113,6 +113,24 @@ impl DBConn {
         }
     }
 
+    pub fn exists<P: rusqlite::Params>(
+        &mut self,
+        cmd: &str,
+        params: P,
+    ) -> Result<bool, MensagoError> {
+        let connhandle = self.db.lock().unwrap();
+        if (*connhandle).is_none() {
+            return Err(MensagoError::ErrNoInit);
+        }
+
+        let conn = connhandle.as_ref().unwrap();
+        let mut stmt = conn.prepare(cmd)?;
+        match stmt.exists(params) {
+            Ok(v) => Ok(v),
+            Err(e) => Err(MensagoError::RusqliteError(e)),
+        }
+    }
+
     /// query_row() executes a query intended to only return one row of results.
     pub fn query<P: rusqlite::Params>(
         &mut self,

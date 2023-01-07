@@ -385,57 +385,33 @@ impl Profile {
         }
 
         // We got this far, which means we need to get the info from the profile database
+        let conn = self.get_db()?;
+        let rows = conn.query(
+            "SELECT wid,domain,userid FROM workspaces WHERE type = 'identity'",
+            [],
+        )?;
+        if rows.len() == 0 {
+            // We have a problem: no identity entry in the database for the workspace.
+            return Err(MensagoError::ErrDatabaseException(String::from(
+                "Database has no identity entry in 'workspaces'",
+            )));
+        }
+        if rows[0].len() != 3
+            || rows[0][0].get_type() != DBValueType::Text
+            || rows[0][1].get_type() != DBValueType::Text
+            || rows[0][2].get_type() != DBValueType::Text
         {
-            let conn = self.open_storage()?;
+            return Err(MensagoError::ErrSchemaFailure);
+        }
 
-            let mut stmt = match conn
-                .prepare("SELECT wid,domain,userid FROM workspaces WHERE type = 'identity'")
-            {
-                Ok(v) => v,
-                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-            };
-
-            // Queries with rusqlite are extremely ugly because the results wrapped several layers
-            // deep. The query() call returns a Result containing a Rows() structure. If we get an
-            // error here, there was a problem either with the query or the database.
-            let mut rows = match stmt.query([]) {
-                Ok(v) => v,
-                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-            };
-
-            // The Rows::next() call returns Result<Some<Result<Row>>>. Seriously. The possible
-            // return values are:
-            //
-            // Err() -> an error occurred getting the next row
-            // Ok(Some(Row)) -> another row was returned
-            // Ok(None) -> all results have been returned
-
-            let option_row = match rows.next() {
-                Ok(v) => v,
-                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-            };
-
-            // We've actually removed enough layers to get an idea of if we actually were successful
-            // in finding the identity info.
-            if option_row.is_none() {
-                // We have a problem: no identity entry in the database for the workspace.
-                return Err(MensagoError::ErrDatabaseException(String::from(
-                    "Database has no identity entry in 'workspaces'",
-                )));
-            }
-
-            let row = option_row.unwrap();
-            if self.wid.is_none() {
-                self.wid = RandomID::from(&row.get::<usize, String>(0).unwrap());
-            }
-            if self.domain.is_none() {
-                self.domain = Domain::from(&row.get::<usize, String>(1).unwrap());
-            }
-            if self.uid.is_none() {
-                self.uid = UserID::from(&row.get::<usize, String>(2).unwrap());
-            }
-
-            // Connection to the database will be closed when the connection object is dropped
+        if self.wid.is_none() {
+            self.wid = RandomID::from(&rows[0][0].to_string());
+        }
+        if self.domain.is_none() {
+            self.domain = Domain::from(&rows[0][1].to_string());
+        }
+        if self.uid.is_none() {
+            self.uid = UserID::from(&rows[0][2].to_string());
         }
 
         if self.uid.is_some() && self.domain.is_some() {
@@ -469,32 +445,17 @@ impl Profile {
             return Err(MensagoError::ErrExists);
         }
 
-        let conn = self.open_storage()?;
+        let conn = self.get_db()?;
 
         // Cached version doesn't exist, so check the database
-        {
-            let mut stmt = match conn
-                .prepare("SELECT wid,domain,userid FROM workspaces WHERE type = 'identity'")
-            {
-                Ok(v) => v,
-                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-            };
-
-            let mut rows = match stmt.query([]) {
-                Ok(v) => v,
-                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-            };
-
-            let option_row = match rows.next() {
-                Ok(v) => v,
-                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-            };
-
-            if option_row.is_some() {
-                // Identity exists, return an error
-                return Err(MensagoError::ErrExists);
+        match conn.exists("SELECT wid FROM workspaces WHERE type = 'identity'", []) {
+            Ok(v) => {
+                if v {
+                    return Err(MensagoError::ErrExists);
+                }
             }
-        }
+            Err(e) => return Err(e),
+        };
 
         w.add_to_db(pw)?;
 
@@ -546,48 +507,24 @@ impl Profile {
 
     /// Resolves a Mensago address to its corresponding workspace ID
     pub fn resolve_address(&self, a: MAddress) -> Result<RandomID, MensagoError> {
-        let conn = self.open_storage()?;
+        let conn = self.get_db()?;
 
-        let mut stmt =
-            match conn.prepare("SELECT wid FROM workspaces WHERE userid=?1 AND domain=?2") {
-                Ok(v) => v,
-                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-            };
-
-        let mut rows = match stmt.query([a.get_uid().as_string(), a.get_domain().as_string()]) {
-            Ok(v) => v,
-            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-        };
-
-        let option_row = match rows.next() {
-            Ok(v) => v,
-            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-        };
-
-        if option_row.is_none() {
-            // We have a problem: no identity entry in the database for the workspace.
-            return Err(MensagoError::ErrDatabaseException(String::from(
-                "Database has no identity",
-            )));
+        let values = conn.query(
+            "SELECT wid FROM workspaces WHERE userid=?1 AND domain=?2",
+            [a.get_uid().as_string(), a.get_domain().as_string()],
+        )?;
+        if values.len() != 1 {
+            return Err(MensagoError::ErrNotFound);
         }
-
-        let row = option_row.unwrap();
-        match RandomID::from(&row.get::<usize, String>(0).unwrap()) {
+        if values[0].len() != 1 {
+            return Err(MensagoError::ErrSchemaFailure);
+        }
+        match RandomID::from(&values[0][0].to_string()) {
             Some(v) => Ok(v),
             None => Err(MensagoError::ErrDatabaseException(String::from(
                 "Bad identity workspace ID in database",
             ))),
         }
-    }
-
-    /// Creates a connection to the profile's main storage database
-    pub fn open_storage(&self) -> Result<rusqlite::Connection, rusqlite::Error> {
-        let mut dbpath = self.path.clone();
-        dbpath.push("storage.db");
-        rusqlite::Connection::open_with_flags(
-            dbpath,
-            rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
-        )
     }
 
     /// Creates a connection to the profile's main storage database

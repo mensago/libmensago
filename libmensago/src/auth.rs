@@ -24,23 +24,23 @@
 
 use eznacl::*;
 use libkeycard::*;
-use rusqlite;
 use sys_info;
 
-use crate::base::*;
-use crate::types::*;
+use crate::{base::*, dbconn::*, types::*};
 
 /// Gets the password hash for the workspace
-pub fn get_credentials(
-    conn: &rusqlite::Connection,
-    waddr: &WAddress,
-) -> Result<ArgonHash, MensagoError> {
-    let mut stmt = conn.prepare("SELECT password FROM workspaces WHERE wid=?1 AND domain=?2")?;
-
-    let pwstr = stmt.query_row(
+pub fn get_credentials(conn: &DBConn, waddr: &WAddress) -> Result<ArgonHash, MensagoError> {
+    let values = conn.query(
+        "SELECT password FROM workspaces WHERE wid=?1 AND domain=?2",
         [waddr.get_wid().as_string(), waddr.get_domain().as_string()],
-        |row| Ok(row.get::<usize, String>(0).unwrap()),
     )?;
+    if values.len() != 1 {
+        return Err(MensagoError::ErrNotFound);
+    }
+    if values[0].len() != 1 {
+        return Err(MensagoError::ErrSchemaFailure);
+    }
+    let pwstr = values[0][0].to_string();
 
     if pwstr.len() == 0 {
         return Err(MensagoError::ErrNotFound);
@@ -51,14 +51,14 @@ pub fn get_credentials(
 
 /// Sets the password and hash type for the specified workspace
 pub fn set_credentials(
-    conn: &rusqlite::Connection,
+    conn: &DBConn,
     waddr: &WAddress,
     pwh: Option<&ArgonHash>,
 ) -> Result<(), MensagoError> {
-    check_workspace_exists(&conn, waddr)?;
+    check_workspace_exists(conn, waddr)?;
     match pwh {
         Some(v) => {
-            match conn.execute(
+            conn.execute(
                 "UPDATE workspaces SET password=?1,pwhashtype=?2 WHERE wid=?3 AND domain=?4",
                 &[
                     v.get_hash(),
@@ -66,40 +66,38 @@ pub fn set_credentials(
                     waddr.get_wid().as_string(),
                     waddr.get_domain().as_string(),
                 ],
-            ) {
-                Ok(_) => Ok(()),
-                Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
-            }
+            )?;
         }
         None => {
-            match conn.execute(
+            conn.execute(
                 "UPDATE workspaces SET password='',pwhashtype='' WHERE wid=?1 AND domain=?2",
                 &[waddr.get_wid().as_string(), waddr.get_domain().as_string()],
-            ) {
-                Ok(_) => Ok(()),
-                Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
-            }
+            )?;
         }
     }
+    Ok(())
 }
 
 /// Adds a device ID to a workspace
 pub fn add_device_session(
-    conn: &rusqlite::Connection,
+    conn: &DBConn,
     waddr: &WAddress,
     devid: &RandomID,
     devpair: &EncryptionPair,
     devname: Option<&str>,
 ) -> Result<(), MensagoError> {
     // Can't have a session on that specified server already
-    let mut stmt = conn.prepare("SELECT address FROM sessions WHERE address=?1")?;
-    match stmt.exists([waddr.as_string()]) {
+
+    match conn.exists(
+        "SELECT address FROM sessions WHERE address=?1",
+        [waddr.as_string()],
+    ) {
         Ok(v) => {
             if v {
                 return Err(MensagoError::ErrExists);
             }
         }
-        Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+        Err(e) => return Err(e),
     };
 
     let realname = match devname {
@@ -107,7 +105,7 @@ pub fn add_device_session(
         None => make_device_name(),
     };
 
-    match conn.execute(
+    conn.execute(
         "INSERT INTO sessions(address, devid, devname, public_key, private_key, os)
 		VALUES(?1,?2,?3,?4,?5,?6)",
         [
@@ -118,45 +116,45 @@ pub fn add_device_session(
             devpair.get_private_str(),
             os_info::get().os_type().to_string().to_lowercase(),
         ],
-    ) {
-        Ok(_) => Ok(()),
-        Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
-    }
+    )?;
+
+    Ok(())
 }
 
 /// Removes an authorized device from the workspace
-pub fn remove_device_session(
-    conn: &rusqlite::Connection,
-    devid: &RandomID,
-) -> Result<(), MensagoError> {
-    let mut stmt = conn.prepare("SELECT devid FROM sessions WHERE devid=?1")?;
-    match stmt.exists([devid.as_string()]) {
+pub fn remove_device_session(conn: &DBConn, devid: &RandomID) -> Result<(), MensagoError> {
+    match conn.exists(
+        "SELECT devid FROM sessions WHERE devid=?1",
+        [devid.as_string()],
+    ) {
         Ok(v) => {
             if !v {
                 return Err(MensagoError::ErrNotFound);
             }
         }
-        Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+        Err(e) => return Err(e),
     };
 
-    match conn.execute("DELETE FROM sessions WHERE devid=?1", [devid.as_string()]) {
-        Ok(_) => Ok(()),
-        Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
-    }
+    conn.execute("DELETE FROM sessions WHERE devid=?1", [devid.as_string()])
 }
 
 /// Returns the device key for a server session
 pub fn get_session_keypair(
-    conn: &rusqlite::Connection,
+    conn: &DBConn,
     waddr: &WAddress,
 ) -> Result<EncryptionPair, MensagoError> {
-    let mut stmt = conn.prepare("SELECT public_key,private_key FROM sessions WHERE address=?1")?;
-    let (pubstr, privstr) = stmt.query_row([waddr.as_string()], |row| {
-        Ok((
-            row.get::<usize, String>(0).unwrap(),
-            row.get::<usize, String>(1).unwrap(),
-        ))
-    })?;
+    let values = conn.query(
+        "SELECT public_key,private_key FROM sessions WHERE address=?1",
+        [waddr.as_string()],
+    )?;
+    if values.len() != 1 {
+        return Err(MensagoError::ErrNotFound);
+    }
+    if values[0].len() != 2 {
+        return Err(MensagoError::ErrSchemaFailure);
+    }
+    let pubstr = values[0][0].to_string();
+    let privstr = values[0][1].to_string();
 
     match EncryptionPair::from_strings(&pubstr, &privstr) {
         Ok(v) => Ok(v),
@@ -166,7 +164,7 @@ pub fn get_session_keypair(
 
 /// Adds a key pair to a workspace.
 pub fn add_keypair(
-    conn: &rusqlite::Connection,
+    conn: &DBConn,
     waddr: &WAddress,
     pubkey: &CryptoString,
     privkey: &CryptoString,
@@ -205,15 +203,12 @@ pub fn add_keypair(
         ],
     ) {
         Ok(_) => Ok(pubhash),
-        Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+        Err(e) => Err(e),
     }
 }
 
 /// Deletes a cryptography keypair from a workspace.
-pub fn remove_keypair(
-    conn: &rusqlite::Connection,
-    keyhash: &CryptoString,
-) -> Result<(), MensagoError> {
+pub fn remove_keypair(conn: &DBConn, keyhash: &CryptoString) -> Result<(), MensagoError> {
     remove_key(&conn, &keyhash)
 }
 
@@ -221,16 +216,21 @@ pub fn remove_keypair(
 /// element 1. This is to accommodate retrieval of all key types. If a symmetric key is obtained
 /// through this call, the public and private key values will be the same.
 pub fn get_keypair(
-    conn: &rusqlite::Connection,
+    conn: &DBConn,
     keyhash: &CryptoString,
 ) -> Result<[CryptoString; 2], MensagoError> {
-    let mut stmt = conn.prepare("SELECT public,private FROM keys WHERE keyid=?1")?;
-    let (pubstr, privstr) = stmt.query_row([keyhash.as_str()], |row| {
-        Ok((
-            row.get::<usize, String>(0).unwrap(),
-            row.get::<usize, String>(1).unwrap(),
-        ))
-    })?;
+    let values = conn.query(
+        "SELECT public,private FROM keys WHERE keyid=?1",
+        [keyhash.as_str()],
+    )?;
+    if values.len() != 1 {
+        return Err(MensagoError::ErrNotFound);
+    }
+    if values[0].len() != 2 {
+        return Err(MensagoError::ErrSchemaFailure);
+    }
+    let pubstr = values[0][0].to_string();
+    let privstr = values[0][1].to_string();
 
     if pubstr.len() == 0 || privstr.len() == 0 {
         return Err(MensagoError::ErrEmptyData);
@@ -250,16 +250,21 @@ pub fn get_keypair(
 
 /// Returns a keypair based on its category
 pub fn get_keypair_by_category(
-    conn: &rusqlite::Connection,
+    conn: &DBConn,
     category: &KeyCategory,
 ) -> Result<[CryptoString; 2], MensagoError> {
-    let mut stmt = conn.prepare("SELECT public,private FROM keys WHERE category=?1")?;
-    let (pubstr, privstr) = stmt.query_row([category.to_string()], |row| {
-        Ok((
-            row.get::<usize, String>(0).unwrap(),
-            row.get::<usize, String>(1).unwrap(),
-        ))
-    })?;
+    let values = conn.query(
+        "SELECT public,private FROM keys WHERE category=?1",
+        [category.to_string()],
+    )?;
+    if values.len() != 1 {
+        return Err(MensagoError::ErrNotFound);
+    }
+    if values[0].len() != 2 {
+        return Err(MensagoError::ErrSchemaFailure);
+    }
+    let pubstr = values[0][0].to_string();
+    let privstr = values[0][1].to_string();
 
     if pubstr.len() == 0 || privstr.len() == 0 {
         return Err(MensagoError::ErrEmptyData);
@@ -280,7 +285,7 @@ pub fn get_keypair_by_category(
 /// Adds a single symmetric key to a workspace. It also creates a hash of the Base85-encoded
 /// public key using the requested algorithm and adds it to the database
 pub fn add_key(
-    conn: &rusqlite::Connection,
+    conn: &DBConn,
     waddr: &WAddress,
     key: &CryptoString,
     hashtype: &str,
@@ -316,9 +321,8 @@ pub fn add_key(
 /// Deletes a cryptography key from a workspace. Note that the algorithm must match, i.e. if a key
 /// is stored using a BLAKE2B-256 hash, passing a BLAKE3-256 hash of the exact same key will result
 /// in a ErrNotFound error.
-pub fn remove_key(conn: &rusqlite::Connection, keyhash: &CryptoString) -> Result<(), MensagoError> {
-    let mut stmt = conn.prepare("SELECT keyid FROM keys WHERE keyid=?1")?;
-    match stmt.exists([keyhash.as_str()]) {
+pub fn remove_key(conn: &DBConn, keyhash: &CryptoString) -> Result<(), MensagoError> {
+    match conn.exists("SELECT keyid FROM keys WHERE keyid=?1", [keyhash.as_str()]) {
         Ok(v) => {
             if !v {
                 return Err(MensagoError::ErrNotFound);
@@ -327,22 +331,23 @@ pub fn remove_key(conn: &rusqlite::Connection, keyhash: &CryptoString) -> Result
         Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
     };
 
-    match conn.execute("DELETE FROM keys WHERE keyid=?1)", [keyhash.as_str()]) {
-        Ok(_) => return Ok(()),
-        Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-    }
+    conn.execute("DELETE FROM keys WHERE keyid=?1)", [keyhash.as_str()])
 }
 
 /// Gets a key given its hash. As with get_keypair(), if the hash given does not use the
 /// same algorithm, this function will not find the key.
-pub fn get_key(
-    conn: &rusqlite::Connection,
-    keyhash: &CryptoString,
-) -> Result<CryptoString, MensagoError> {
-    let mut stmt = conn.prepare("SELECT public FROM keys WHERE keyid=?1")?;
-    let pubstr = stmt.query_row([keyhash.to_string()], |row| {
-        Ok(row.get::<usize, String>(0).unwrap())
-    })?;
+pub fn get_key(conn: &DBConn, keyhash: &CryptoString) -> Result<CryptoString, MensagoError> {
+    let values = conn.query(
+        "SELECT public FROM keys WHERE keyid=?1",
+        [keyhash.to_string()],
+    )?;
+    if values.len() != 1 {
+        return Err(MensagoError::ErrNotFound);
+    }
+    if values[0].len() != 1 {
+        return Err(MensagoError::ErrSchemaFailure);
+    }
+    let pubstr = values[0][0].to_string();
 
     if pubstr.len() == 0 {
         return Err(MensagoError::ErrEmptyData);
@@ -362,13 +367,20 @@ pub fn get_key(
 /// Returns a key based on its category. If the category given uses a pair of keys, the public key
 /// is returned.
 pub fn get_key_by_category(
-    conn: &rusqlite::Connection,
+    conn: &DBConn,
     category: &KeyCategory,
 ) -> Result<CryptoString, MensagoError> {
-    let mut stmt = conn.prepare("SELECT public FROM keys WHERE category=?1")?;
-    let pubstr = stmt.query_row([category.to_string()], |row| {
-        Ok(row.get::<usize, String>(0).unwrap())
-    })?;
+    let values = conn.query(
+        "SELECT public FROM keys WHERE category=?1",
+        [category.to_string()],
+    )?;
+    if values.len() != 1 {
+        return Err(MensagoError::ErrNotFound);
+    }
+    if values[0].len() != 1 {
+        return Err(MensagoError::ErrSchemaFailure);
+    }
+    let pubstr = values[0][0].to_string();
 
     if pubstr.len() == 0 {
         return Err(MensagoError::ErrEmptyData);
@@ -386,18 +398,17 @@ pub fn get_key_by_category(
 }
 
 /// Utility function that just checks to see if a specific workspace exists in the database
-fn check_workspace_exists(
-    conn: &rusqlite::Connection,
-    waddr: &WAddress,
-) -> Result<(), MensagoError> {
-    let mut stmt = conn.prepare("SELECT wid FROM workspaces WHERE wid=?1 AND domain=?2")?;
-    match stmt.exists([waddr.get_wid().as_string(), waddr.get_domain().as_string()]) {
+fn check_workspace_exists(conn: &DBConn, waddr: &WAddress) -> Result<(), MensagoError> {
+    match conn.exists(
+        "SELECT wid FROM workspaces WHERE wid=?1 AND domain=?2",
+        [waddr.get_wid().as_string(), waddr.get_domain().as_string()],
+    ) {
         Ok(v) => {
             if !v {
                 return Err(MensagoError::ErrNotFound);
             }
         }
-        Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+        Err(e) => return Err(e),
     };
 
     Ok(())
@@ -522,13 +533,12 @@ mod tests {
         let testname = String::from("get_set_credentials");
         let test_path = setup_test(&testname);
 
-        let _ = setup_profile(&testname, &test_path)?;
+        let mut profman = setup_profile(&testname, &test_path)?;
+        let mut profile = profman.get_active_profile_mut().unwrap();
 
-        let mut profile_path = test_path.clone();
-        profile_path.push("primary");
-        let w = setup_workspace(&testname, &profile_path)?;
+        let w = setup_workspace(&testname, &profile.path)?;
 
-        let conn = match w.open_storage() {
+        let conn = match profile.get_db() {
             Ok(v) => v,
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
@@ -540,7 +550,7 @@ mod tests {
         };
 
         // Case #1: get credentials
-        match get_credentials(&conn, &w.get_waddress().unwrap()) {
+        match get_credentials(conn, &w.get_waddress().unwrap()) {
             Ok(v) => {
                 let pwhash = ArgonHash::from_hashstr(
                     "$argon2id$v=19$m=1048576,t=1,p=2\
@@ -633,17 +643,16 @@ mod tests {
         let testname = String::from("add_remove_session");
         let test_path = setup_test(&testname);
 
-        let _ = setup_profile(&testname, &test_path)?;
+        let mut profman = setup_profile(&testname, &test_path)?;
+        let mut profile = profman.get_active_profile_mut().unwrap();
 
-        let mut profile_path = test_path.clone();
-        profile_path.push("primary");
-        let w = setup_workspace(&testname, &profile_path)?;
+        let w = setup_workspace(&testname, &profile.path)?;
 
-        let conn = match w.open_storage() {
+        let conn = match profile.get_db() {
             Ok(v) => v,
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
-                    "{}: error connecting to workspace secrets db: {}",
+                    "{}: error connecting to workspace db: {}",
                     testname,
                     e.to_string()
                 )))
@@ -683,7 +692,7 @@ mod tests {
         }
 
         // Case #3: get session keypair
-        match get_session_keypair(&conn, &waddr) {
+        match get_session_keypair(conn, &waddr) {
             Ok(v) => {
                 if v.get_public_str() != devpair.get_public_str()
                     || v.get_private_str() != devpair.get_private_str()
@@ -704,7 +713,7 @@ mod tests {
         }
 
         // Case #4: remove session keypair
-        match remove_device_session(&conn, &devid) {
+        match remove_device_session(conn, &devid) {
             Ok(_) => (),
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
@@ -716,7 +725,7 @@ mod tests {
         }
 
         // Case #5: remove nonexistent keypair
-        match remove_device_session(&conn, &devid) {
+        match remove_device_session(conn, &devid) {
             Ok(_) => {
                 return Err(MensagoError::ErrProgramException(format!(
                     "{}: error failed to catch removing nonexistent device session",
@@ -727,7 +736,7 @@ mod tests {
         }
 
         // Case #6: get nonexistent keypair
-        match get_session_keypair(&conn, &waddr) {
+        match get_session_keypair(conn, &waddr) {
             Ok(_) => {
                 return Err(MensagoError::ErrProgramException(format!(
                     "{}: error failed to catch getting nonexistent device session",
@@ -745,17 +754,16 @@ mod tests {
         let testname = String::from("add_remove_get_keypair");
         let test_path = setup_test(&testname);
 
-        let _ = setup_profile(&testname, &test_path)?;
+        let mut profman = setup_profile(&testname, &test_path)?;
+        let mut profile = profman.get_active_profile_mut().unwrap();
 
-        let mut profile_path = test_path.clone();
-        profile_path.push("primary");
-        let w = setup_workspace(&testname, &profile_path)?;
+        let w = setup_workspace(&testname, &profile.path)?;
 
-        let conn = match w.open_storage() {
+        let conn = match profile.get_db() {
             Ok(v) => v,
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
-                    "{}: error connecting to workspace secrets db: {}",
+                    "{}: error connecting to workspace db: {}",
                     testname,
                     e.to_string()
                 )))
@@ -770,7 +778,7 @@ mod tests {
 
         // Case #1: add keypair
         let keyhash = match add_keypair(
-            &conn,
+            conn,
             &waddr,
             &crvkey,
             &crskey,
@@ -789,7 +797,7 @@ mod tests {
         };
 
         // Case #2: get keypair
-        match get_keypair(&conn, &keyhash) {
+        match get_keypair(conn, &keyhash) {
             Ok(v) => {
                 if v[0] != crvkey || v[1] != crskey {
                     return Err(MensagoError::ErrProgramException(format!(
@@ -808,7 +816,7 @@ mod tests {
         }
 
         // Case #3: get keypair by category
-        match get_keypair_by_category(&conn, &KeyCategory::ConReqSigning) {
+        match get_keypair_by_category(conn, &KeyCategory::ConReqSigning) {
             Ok(v) => {
                 if v[0] != crvkey || v[1] != crskey {
                     return Err(MensagoError::ErrProgramException(format!(
@@ -834,17 +842,16 @@ mod tests {
         let testname = String::from("add_remove_get_key");
         let test_path = setup_test(&testname);
 
-        let _ = setup_profile(&testname, &test_path)?;
+        let mut profman = setup_profile(&testname, &test_path)?;
+        let mut profile = profman.get_active_profile_mut().unwrap();
 
-        let mut profile_path = test_path.clone();
-        profile_path.push("primary");
-        let w = setup_workspace(&testname, &profile_path)?;
+        let w = setup_workspace(&testname, &profile.path)?;
 
-        let conn = match w.open_storage() {
+        let conn = match profile.get_db() {
             Ok(v) => v,
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
-                    "{}: error connecting to workspace secrets db: {}",
+                    "{}: error connecting to workspace db: {}",
                     testname,
                     e.to_string()
                 )))
@@ -858,7 +865,7 @@ mod tests {
             CryptoString::from("XSALSA20:L_fPZVo1rGPozl^N)bm2$Dc%xyihXmzV}7w^d0xm").unwrap();
 
         let keyhash = match add_key(
-            &conn,
+            conn,
             &waddr,
             &storagekey,
             "blake2b-256",
@@ -875,7 +882,7 @@ mod tests {
         };
 
         // Case #2: get symmetric key
-        match get_key(&conn, &keyhash) {
+        match get_key(conn, &keyhash) {
             Ok(v) => {
                 if v != storagekey {
                     return Err(MensagoError::ErrProgramException(format!(
@@ -894,7 +901,7 @@ mod tests {
         }
 
         // Case #3: get key by category
-        match get_key_by_category(&conn, &KeyCategory::Storage) {
+        match get_key_by_category(conn, &KeyCategory::Storage) {
             Ok(v) => {
                 if v != storagekey {
                     return Err(MensagoError::ErrProgramException(format!(
@@ -920,24 +927,23 @@ mod tests {
         let testname = String::from("test_utility");
         let test_path = setup_test(&testname);
 
-        let _ = setup_profile(&testname, &test_path)?;
+        let mut profman = setup_profile(&testname, &test_path)?;
+        let mut profile = profman.get_active_profile_mut().unwrap();
 
-        let mut profile_path = test_path.clone();
-        profile_path.push("primary");
-        let w = setup_workspace(&testname, &profile_path)?;
+        let w = setup_workspace(&testname, &profile.path)?;
 
-        let conn = match w.open_storage() {
+        let conn = match profile.get_db() {
             Ok(v) => v,
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
-                    "{}: error connecting to workspace storage db: {}",
+                    "{}: error connecting to workspace db: {}",
                     testname,
                     e.to_string()
                 )))
             }
         };
 
-        match check_workspace_exists(&conn, &w.get_waddress().unwrap()) {
+        match check_workspace_exists(conn, &w.get_waddress().unwrap()) {
             Ok(_) => (),
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
@@ -949,7 +955,7 @@ mod tests {
         };
 
         match check_workspace_exists(
-            &conn,
+            conn,
             &WAddress::from("12345678-1234-5678-4321-abcdefabcdef/example.com").unwrap(),
         ) {
             Ok(_) => {

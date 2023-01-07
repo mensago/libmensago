@@ -1433,7 +1433,7 @@ pub fn setup_db_test(
 
 /// Testing function for quickly checking a table value for a model in the client database.
 pub fn check_db_value(
-    conn: &mut DBConn,
+    conn: &DBConn,
     tablename: &str,
     id: &RandomID,
     column: &str,
