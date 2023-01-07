@@ -1433,7 +1433,7 @@ pub fn setup_db_test(
 
 /// Testing function for quickly checking a table value for a model in the client database.
 pub fn check_db_value(
-    conn: &mut rusqlite::Connection,
+    conn: &mut DBConn,
     tablename: &str,
     id: &RandomID,
     column: &str,
@@ -1449,23 +1449,24 @@ pub fn check_db_value(
     // part of the query. We're also doing the same thing for the column because the escaping
     // done for substitution causes the column name to be returned from the query instead of
     // the value of the row in that column. Not great, but it *is* safe in this instance.
-    let mut stmt =
-        conn.prepare(format!("SELECT {} FROM {} WHERE id = ?1", column, tablename).as_str())?;
+    let values = conn.query(
+        format!("SELECT {} FROM {} WHERE id = ?1", column, tablename).as_str(),
+        &[&id.to_string()],
+    )?;
+    if values.len() != 1 {
+        return Err(MensagoError::ErrNotFound);
+    }
+    if values[0].len() != 1 {
+        return Err(MensagoError::ErrSchemaFailure);
+    }
 
-    let dbvalue = match stmt.query_row(&[&id.to_string()], |row| {
-        Ok(row.get::<usize, String>(0).unwrap())
-    }) {
-        Ok(v) => v,
-        Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-    };
-
-    if dbvalue == value {
+    if values[0][0].to_string() == value {
         return Ok(());
     }
 
     Err(MensagoError::ErrDatabaseException(format!(
         "wanted {}, got {}",
-        value, dbvalue,
+        value, values[0][0],
     )))
 }
 

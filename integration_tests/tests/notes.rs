@@ -13,8 +13,7 @@ mod tests {
         let (_, _, mut profman) = setup_db_test(testname)?;
 
         let profile = profman.get_active_profile_mut().unwrap();
-        let mut db = profile.open_storage()?;
-        let mut dbconn = match profile.get_db() {
+        let mut db = match profile.get_db() {
             Ok(v) => v,
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
@@ -78,7 +77,7 @@ mod tests {
         }
 
         // Load from db
-        let loadmodel = match NoteModel::load_from_db(&model.id, &mut dbconn) {
+        let loadmodel = match NoteModel::load_from_db(&model.id, &mut db) {
             Ok(v) => v,
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
@@ -130,8 +129,7 @@ mod tests {
         let (_, _, mut profman) = setup_db_test(testname)?;
 
         let profile = profman.get_active_profile_mut().unwrap();
-        let mut db = profile.open_storage()?;
-        let mut dbconn = match profile.get_db() {
+        let mut db = match profile.get_db() {
             Ok(v) => v,
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
@@ -153,7 +151,7 @@ mod tests {
             }
         };
 
-        let notebooks = match get_notebooks(&mut dbconn) {
+        let notebooks = match get_notebooks(&mut db) {
             Ok(v) => v,
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
@@ -184,8 +182,7 @@ mod tests {
         let (_, _, mut profman) = setup_db_test(testname)?;
 
         let profile = profman.get_active_profile_mut().unwrap();
-        let mut db = profile.open_storage()?;
-        let mut dbconn = match profile.get_db() {
+        let mut db = match profile.get_db() {
             Ok(v) => v,
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
@@ -207,7 +204,7 @@ mod tests {
             }
         };
 
-        let notes = match get_notes(&mut dbconn, "Default") {
+        let notes = match get_notes(&mut db, "Default") {
             Ok(v) => v,
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
@@ -254,8 +251,7 @@ mod tests {
         let (_, _, mut profman) = setup_db_test(testname)?;
 
         let profile = profman.get_active_profile_mut().unwrap();
-        let mut db = profile.open_storage()?;
-        let mut dbconn = match profile.get_db() {
+        let mut db = match profile.get_db() {
             Ok(v) => v,
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
@@ -277,7 +273,7 @@ mod tests {
             }
         };
 
-        let notes = match get_notes(&mut dbconn, "Default") {
+        let notes = match get_notes(&mut db, "Default") {
             Ok(v) => v,
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
@@ -296,7 +292,7 @@ mod tests {
             )));
         }
 
-        let mut note = match NoteModel::load_from_db(&noteitem.id, &mut dbconn) {
+        let mut note = match NoteModel::load_from_db(&noteitem.id, &mut db) {
             Ok(v) => v,
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
@@ -307,7 +303,7 @@ mod tests {
             }
         };
 
-        match note.update_title(&mut dbconn, "Test Note #2") {
+        match note.update_title(&mut db, "Test Note #2") {
             Ok(_) => (),
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
@@ -318,7 +314,7 @@ mod tests {
             }
         };
 
-        match note.update_text(&mut dbconn, "Dummy data for test note #2") {
+        match note.update_text(&mut db, "Dummy data for test note #2") {
             Ok(_) => (),
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
@@ -329,30 +325,24 @@ mod tests {
             }
         };
 
-        let mut stmt = db.prepare("SELECT title FROM notes WHERE id=?1")?;
-
-        let title = stmt.query_row([note.id.as_string()], |row| {
-            Ok(row.get::<usize, String>(0).unwrap())
-        })?;
-
-        if title != note.title {
-            return Err(MensagoError::ErrProgramException(format!(
-                "{}: test note had wrong title: {}",
-                testname, title,
-            )));
+        match check_db_value(&mut db, "notes", &note.id, "title", &note.title) {
+            Ok(_) => (),
+            Err(_) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: test note had wrong title: {}",
+                    testname, note.title
+                )))
+            }
         }
 
-        let mut stmt = db.prepare("SELECT body FROM notes WHERE id=?1")?;
-
-        let body = stmt.query_row([note.id.as_string()], |row| {
-            Ok(row.get::<usize, String>(0).unwrap())
-        })?;
-
-        if body != note.body {
-            return Err(MensagoError::ErrProgramException(format!(
-                "{}: test note had wrong body text: {}",
-                testname, body,
-            )));
+        match check_db_value(&mut db, "notes", &note.id, "body", &note.body) {
+            Ok(_) => (),
+            Err(_) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: test note had wrong body: {}",
+                    testname, note.body
+                )))
+            }
         }
 
         Ok(())

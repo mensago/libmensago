@@ -15,8 +15,7 @@ mod tests {
         let (_, _, mut profman) = setup_db_test(testname)?;
 
         let profile = profman.get_active_profile_mut().unwrap();
-        let mut db = profile.open_storage()?;
-        let mut dbconn = match profile.get_db() {
+        let mut db = match profile.get_db() {
             Ok(v) => v,
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
@@ -97,7 +96,7 @@ mod tests {
         }
 
         // Load from db
-        let loadmodel = match AttachmentModel::load_from_db(&model.id, &mut dbconn) {
+        let loadmodel = match AttachmentModel::load_from_db(&model.id, &mut db) {
             Ok(v) => v,
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
@@ -149,8 +148,7 @@ mod tests {
         let (_, _, mut profman) = setup_db_test(testname)?;
 
         let profile = profman.get_active_profile_mut().unwrap();
-        let mut db = profile.open_storage()?;
-        let mut dbconn = match profile.get_db() {
+        let mut db = match profile.get_db() {
             Ok(v) => v,
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
@@ -233,7 +231,7 @@ mod tests {
         }
 
         // Load from db
-        let loadmodel = match ImageModel::load_from_db(&model.id, &mut dbconn) {
+        let loadmodel = match ImageModel::load_from_db(&model.id, &mut db) {
             Ok(v) => v,
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(

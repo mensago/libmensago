@@ -13,10 +13,19 @@ mod tests {
 
         // The list of full data is as follows:
         // let (config, pwhash, profman) = setup_db_test(testname)?;
-        let (_, _, profman) = setup_db_test(testname)?;
+        let (_, _, mut profman) = setup_db_test(testname)?;
 
-        let profile = profman.get_active_profile().unwrap();
-        let mut db = profile.open_storage()?;
+        let profile = profman.get_active_profile_mut().unwrap();
+        let mut db = match profile.get_db() {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: new db conn failed to connect: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        };
 
         let conid = RandomID::from("00000000-1111-2222-3333-444444444444").unwrap();
         let itemtype = "social";
@@ -133,10 +142,19 @@ mod tests {
 
         // The list of full data is as follows:
         // let (config, pwhash, profman) = setup_db_test(testname)?;
-        let (_, _, profman) = setup_db_test(testname)?;
+        let (_, _, mut profman) = setup_db_test(testname)?;
 
-        let profile = profman.get_active_profile().unwrap();
-        let mut db = profile.open_storage()?;
+        let profile = profman.get_active_profile_mut().unwrap();
+        let mut db = match profile.get_db() {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: new db conn failed to connect: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        };
 
         let conid = RandomID::from("00000000-1111-2222-3333-444444444444").unwrap();
         let mut model = NamePartModel::new(&conid);
@@ -240,10 +258,19 @@ mod tests {
 
         // The list of full data is as follows:
         // let (config, pwhash, profman) = setup_db_test(testname)?;
-        let (_, _, profman) = setup_db_test(testname)?;
+        let (_, _, mut profman) = setup_db_test(testname)?;
 
-        let profile = profman.get_active_profile().unwrap();
-        let mut db = profile.open_storage()?;
+        let profile = profman.get_active_profile_mut().unwrap();
+        let mut db = match profile.get_db() {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: new db conn failed to connect: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        };
 
         let conid = RandomID::from("00000000-1111-2222-3333-444444444444").unwrap();
         let mut model = NameModel::new(&conid, "Corbin");
@@ -346,10 +373,19 @@ mod tests {
 
         // The list of full data is as follows:
         // let (config, pwhash, profman) = setup_db_test(testname)?;
-        let (_, _, profman) = setup_db_test(testname)?;
+        let (_, _, mut profman) = setup_db_test(testname)?;
 
-        let profile = profman.get_active_profile().unwrap();
-        let mut db = profile.open_storage()?;
+        let profile = profman.get_active_profile_mut().unwrap();
+        let mut db = match profile.get_db() {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: new db conn failed to connect: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        };
 
         let conid = RandomID::from("00000000-1111-2222-3333-444444444444").unwrap();
         let wid = RandomID::from("11111111-1111-1111-1111-111111111111").unwrap();
@@ -469,10 +505,19 @@ mod tests {
 
         // The list of full data is as follows:
         // let (config, pwhash, profman) = setup_db_test(testname)?;
-        let (_, _, profman) = setup_db_test(testname)?;
+        let (_, _, mut profman) = setup_db_test(testname)?;
 
-        let profile = profman.get_active_profile().unwrap();
-        let mut db = profile.open_storage()?;
+        let profile = profman.get_active_profile_mut().unwrap();
+        let mut db = match profile.get_db() {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: new db conn failed to connect: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        };
 
         let conid = RandomID::from("00000000-1111-2222-3333-444444444444").unwrap();
         let testkey =
@@ -593,10 +638,19 @@ mod tests {
 
         // The list of full data is as follows:
         // let (config, pwhash, profman) = setup_db_test(testname)?;
-        let (_, _, profman) = setup_db_test(testname)?;
+        let (_, _, mut profman) = setup_db_test(testname)?;
 
-        let profile = profman.get_active_profile().unwrap();
-        let mut db = profile.open_storage()?;
+        let profile = profman.get_active_profile_mut().unwrap();
+        let mut db = match profile.get_db() {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: new db conn failed to connect: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        };
 
         let conid = RandomID::from("00000000-1111-2222-3333-444444444444").unwrap();
         let mut model = AddressModel::new(&conid, "Home");
@@ -715,10 +769,19 @@ mod tests {
 
         // The list of full data is as follows:
         // let (config, pwhash, profman) = setup_db_test(testname)?;
-        let (_, _, profman) = setup_db_test(testname)?;
+        let (_, _, mut profman) = setup_db_test(testname)?;
 
-        let profile = profman.get_active_profile().unwrap();
-        let mut db = profile.open_storage()?;
+        let profile = profman.get_active_profile_mut().unwrap();
+        let mut db = match profile.get_db() {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: new db conn failed to connect: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        };
 
         let conid = RandomID::from("00000000-1111-2222-3333-444444444444").unwrap();
         let imgtype = Mime::from_str("image/webp").unwrap();
@@ -835,10 +898,19 @@ mod tests {
 
         // The list of full data is as follows:
         // let (config, pwhash, profman) = setup_db_test(testname)?;
-        let (_, _, profman) = setup_db_test(testname)?;
+        let (_, _, mut profman) = setup_db_test(testname)?;
 
-        let profile = profman.get_active_profile().unwrap();
-        let mut db = profile.open_storage()?;
+        let profile = profman.get_active_profile_mut().unwrap();
+        let mut db = match profile.get_db() {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: new db conn failed to connect: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        };
 
         let conid = RandomID::from("00000000-1111-2222-3333-444444444444").unwrap();
         let filetype = Mime::from_str("text/plain").unwrap();
@@ -959,10 +1031,19 @@ mod tests {
 
         // The list of full data is as follows:
         // let (config, pwhash, profman) = setup_db_test(testname)?;
-        let (_, _, profman) = setup_db_test(testname)?;
+        let (_, _, mut profman) = setup_db_test(testname)?;
 
-        let profile = profman.get_active_profile().unwrap();
-        let mut db = profile.open_storage()?;
+        let profile = profman.get_active_profile_mut().unwrap();
+        let mut db = match profile.get_db() {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: new db conn failed to connect: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        };
 
         let modelid = RandomID::from("00000000-1111-2222-3333-444444444444").unwrap();
         let mut model =

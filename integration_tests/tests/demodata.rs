@@ -1,7 +1,7 @@
 use libmensago::*;
 use libmensago::{DBModel, MensagoError};
 
-pub fn import_demonotes(db: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+pub fn import_demonotes(db: &mut DBConn) -> Result<(), MensagoError> {
     let txtnote = NoteModel::import(
         "tests/demofiles/pilgrimsprogress.txt",
         DocFormat::Text,
@@ -40,10 +40,19 @@ mod tests {
 
         // The list of full data is as follows:
         // let (config, pwhash, profman) = setup_db_test(testname)?;
-        let (_, _, profman) = setup_db_test(testname)?;
+        let (_, _, mut profman) = setup_db_test(testname)?;
 
-        let profile = profman.get_active_profile().unwrap();
-        let mut db = profile.open_storage()?;
+        let profile = profman.get_active_profile_mut().unwrap();
+        let mut db = match profile.get_db() {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: new db conn failed to connect: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        };
 
         match import_demonotes(&mut db) {
             Ok(_) => (),
