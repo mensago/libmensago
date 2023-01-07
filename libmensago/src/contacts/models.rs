@@ -116,30 +116,28 @@ impl StringModel {
 }
 
 impl DBModel for StringModel {
-    fn delete_from_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
-        match conn.execute(
+    fn delete_from_db(&self, conn: &mut DBConn) -> Result<(), MensagoError> {
+        conn.execute(
             "DELETE FROM contact_keyvalue WHERE id=?1",
             &[&self.id.to_string()],
-        ) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
-        }
+        )
     }
 
-    fn refresh_from_db(&mut self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
-        let mut stmt =
-            conn.prepare("SELECT conid,itemtype,label,value FROM contact_keyvalue WHERE id = ?1")?;
-        let (conid, itemtype, label, value) = match stmt.query_row(&[&self.id.to_string()], |row| {
-            Ok((
-                row.get::<usize, String>(0).unwrap(),
-                row.get::<usize, String>(1).unwrap(),
-                row.get::<usize, String>(2).unwrap(),
-                row.get::<usize, String>(3).unwrap(),
-            ))
-        }) {
-            Ok(v) => v,
-            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-        };
+    fn refresh_from_db(&mut self, conn: &mut DBConn) -> Result<(), MensagoError> {
+        let values = conn.query(
+            "SELECT conid,itemtype,label,value FROM contact_keyvalue WHERE id = ?1",
+            &[&self.id.to_string()],
+        )?;
+        if values.len() != 1 {
+            return Err(MensagoError::ErrNotFound);
+        }
+        if values[0].len() != 4 {
+            return Err(MensagoError::ErrSchemaFailure);
+        }
+        let conid = values[0][0].to_string();
+        let itemtype = values[0][1].to_string();
+        let label = values[0][2].to_string();
+        let value = values[0][3].to_string();
 
         self.contact_id = match RandomID::from(&conid) {
             Some(v) => v,
@@ -157,8 +155,8 @@ impl DBModel for StringModel {
         Ok(())
     }
 
-    fn set_in_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
-        match conn.execute(
+    fn set_in_db(&self, conn: &mut DBConn) -> Result<(), MensagoError> {
+        conn.execute(
             "INSERT OR REPLACE INTO contact_keyvalue(id,itemtype,conid,label,value) 
             VALUES(?1,?2,?3,?4,?5)",
             &[
@@ -168,10 +166,7 @@ impl DBModel for StringModel {
                 &self.label,
                 &self.value,
             ],
-        ) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
-        }
+        )
     }
 }
 
@@ -331,10 +326,7 @@ impl NamePartModel {
         Ok(out)
     }
 
-    pub fn set_all(
-        models: &Vec<NamePartModel>,
-        conn: &mut rusqlite::Connection,
-    ) -> Result<(), MensagoError> {
+    pub fn set_all(models: &Vec<NamePartModel>, conn: &mut DBConn) -> Result<(), MensagoError> {
         for model in models.iter() {
             model.set_in_db(conn)?;
         }
@@ -351,7 +343,7 @@ impl NamePartModel {
 }
 
 impl DBModel for NamePartModel {
-    fn delete_from_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+    fn delete_from_db(&self, conn: &mut DBConn) -> Result<(), MensagoError> {
         match conn.execute(
             "DELETE FROM contact_nameparts WHERE id=?1",
             &[&self.id.to_string()],
@@ -361,28 +353,28 @@ impl DBModel for NamePartModel {
         }
     }
 
-    fn refresh_from_db(&mut self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
-        let mut stmt = conn
-            .prepare("SELECT conid,parttype,value,priority FROM contact_nameparts WHERE id = ?1")?;
-        let (conid, parttype, value, priority) =
-            match stmt.query_row(&[&self.id.to_string()], |row| {
-                Ok((
-                    row.get::<usize, String>(0).unwrap(),
-                    row.get::<usize, String>(1).unwrap(),
-                    row.get::<usize, String>(2).unwrap(),
-                    row.get::<usize, String>(3).unwrap(),
-                ))
-            }) {
-                Ok(v) => v,
-                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-            };
+    fn refresh_from_db(&mut self, conn: &mut DBConn) -> Result<(), MensagoError> {
+        let values = conn.query(
+            "SELECT conid,parttype,value,priority FROM contact_nameparts WHERE id = ?1",
+            &[&self.id.to_string()],
+        )?;
+        if values.len() != 1 {
+            return Err(MensagoError::ErrNotFound);
+        }
+        if values[0].len() != 4 {
+            return Err(MensagoError::ErrSchemaFailure);
+        }
+        let conidstr = values[0][0].to_string();
+        let parttype = values[0][1].to_string();
+        let value = values[0][2].to_string();
+        let priority = values[0][3].to_string();
 
-        self.contact_id = match RandomID::from(&conid) {
+        self.contact_id = match RandomID::from(&conidstr) {
             Some(v) => v,
             None => {
                 return Err(MensagoError::ErrDatabaseException(format!(
                     "Bad contact ID received from database: '{}'",
-                    conid
+                    conidstr
                 )))
             }
         };
@@ -401,8 +393,8 @@ impl DBModel for NamePartModel {
         Ok(())
     }
 
-    fn set_in_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
-        match conn.execute(
+    fn set_in_db(&self, conn: &mut DBConn) -> Result<(), MensagoError> {
+        conn.execute(
             "INSERT OR REPLACE INTO contact_nameparts(id, conid, parttype, value, priority) VALUES(?1,?2,?3,?4,?5)",
             &[
                 &self.id.to_string(),
@@ -411,10 +403,7 @@ impl DBModel for NamePartModel {
                 &self.value.to_string(),
                 &self.priority.to_string(),
             ],
-        ) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
-        }
+        )
     }
 }
 
@@ -505,7 +494,7 @@ impl NameModel {
 }
 
 impl DBModel for NameModel {
-    fn delete_from_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+    fn delete_from_db(&self, conn: &mut DBConn) -> Result<(), MensagoError> {
         match conn.execute(
             "DELETE FROM contact_names WHERE id=?1",
             &[&self.id.to_string()],
@@ -517,7 +506,7 @@ impl DBModel for NameModel {
         NamePartModel::delete_all(&self.contact_id, conn)
     }
 
-    fn refresh_from_db(&mut self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+    fn refresh_from_db(&mut self, conn: &mut DBConn) -> Result<(), MensagoError> {
         {
             let mut stmt = conn.prepare(
             "SELECT conid,formatted_name,given_name,family_name,prefix FROM contact_names WHERE id = ?1",
@@ -561,7 +550,7 @@ impl DBModel for NameModel {
         Ok(())
     }
 
-    fn set_in_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+    fn set_in_db(&self, conn: &mut DBConn) -> Result<(), MensagoError> {
         match conn.execute(
             "INSERT OR REPLACE INTO contact_names(id, conid, formatted_name, given_name, family_name, 
             prefix) VALUES(?1,?2,?3,?4,?5,?6)",
@@ -688,10 +677,7 @@ impl MensagoModel {
         Ok(out)
     }
 
-    pub fn set_all(
-        models: &Vec<MensagoModel>,
-        conn: &mut rusqlite::Connection,
-    ) -> Result<(), MensagoError> {
+    pub fn set_all(models: &Vec<MensagoModel>, conn: &mut DBConn) -> Result<(), MensagoError> {
         for model in models.iter() {
             model.set_in_db(conn)?;
         }
@@ -708,7 +694,7 @@ impl MensagoModel {
 }
 
 impl DBModel for MensagoModel {
-    fn delete_from_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+    fn delete_from_db(&self, conn: &mut DBConn) -> Result<(), MensagoError> {
         match conn.execute(
             "DELETE FROM contact_mensago WHERE id=?1",
             &[&self.id.to_string()],
@@ -718,7 +704,7 @@ impl DBModel for MensagoModel {
         }
     }
 
-    fn refresh_from_db(&mut self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+    fn refresh_from_db(&mut self, conn: &mut DBConn) -> Result<(), MensagoError> {
         let mut stmt =
             conn.prepare("SELECT conid,label,uid,wid,domain FROM contact_mensago WHERE id = ?1")?;
         let (conidstr, labelstr, uidstr, widstr, domstr) =
@@ -771,7 +757,7 @@ impl DBModel for MensagoModel {
         Ok(())
     }
 
-    fn set_in_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+    fn set_in_db(&self, conn: &mut DBConn) -> Result<(), MensagoError> {
         let uidstr = match &self.uid {
             Some(v) => v.to_string(),
             None => String::new(),
@@ -890,10 +876,7 @@ impl KeyModel {
         Ok(out)
     }
 
-    pub fn set_all(
-        models: &Vec<MensagoModel>,
-        conn: &mut rusqlite::Connection,
-    ) -> Result<(), MensagoError> {
+    pub fn set_all(models: &Vec<MensagoModel>, conn: &mut DBConn) -> Result<(), MensagoError> {
         for model in models.iter() {
             model.set_in_db(conn)?;
         }
@@ -910,7 +893,7 @@ impl KeyModel {
 }
 
 impl DBModel for KeyModel {
-    fn delete_from_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+    fn delete_from_db(&self, conn: &mut DBConn) -> Result<(), MensagoError> {
         match conn.execute(
             "DELETE FROM contact_keys WHERE id=?1",
             &[&self.id.to_string()],
@@ -920,7 +903,7 @@ impl DBModel for KeyModel {
         }
     }
 
-    fn refresh_from_db(&mut self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+    fn refresh_from_db(&mut self, conn: &mut DBConn) -> Result<(), MensagoError> {
         let mut stmt = conn.prepare(
             "SELECT conid,label,category,value,timestamp FROM contact_keys WHERE id = ?1",
         )?;
@@ -979,7 +962,7 @@ impl DBModel for KeyModel {
         Ok(())
     }
 
-    fn set_in_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+    fn set_in_db(&self, conn: &mut DBConn) -> Result<(), MensagoError> {
         match conn.execute(
             "INSERT OR REPLACE INTO contact_keys(id, conid, label, category, value, timestamp) 
             VALUES(?1,?2,?3,?4,?5,?6)",
@@ -1111,10 +1094,7 @@ impl AddressModel {
         Ok(out)
     }
 
-    pub fn set_all(
-        models: &Vec<MensagoModel>,
-        conn: &mut rusqlite::Connection,
-    ) -> Result<(), MensagoError> {
+    pub fn set_all(models: &Vec<MensagoModel>, conn: &mut DBConn) -> Result<(), MensagoError> {
         for model in models.iter() {
             model.set_in_db(conn)?;
         }
@@ -1131,7 +1111,7 @@ impl AddressModel {
 }
 
 impl DBModel for AddressModel {
-    fn delete_from_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+    fn delete_from_db(&self, conn: &mut DBConn) -> Result<(), MensagoError> {
         match conn.execute(
             "DELETE FROM contact_address WHERE id=?1",
             &[&self.id.to_string()],
@@ -1141,7 +1121,7 @@ impl DBModel for AddressModel {
         }
     }
 
-    fn refresh_from_db(&mut self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+    fn refresh_from_db(&mut self, conn: &mut DBConn) -> Result<(), MensagoError> {
         let mut stmt = conn.prepare(
             "SELECT conid,label,street,extended,locality,region,postalcode,country,preferred 
             FROM contact_address WHERE id = ?1",
@@ -1185,7 +1165,7 @@ impl DBModel for AddressModel {
         Ok(())
     }
 
-    fn set_in_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+    fn set_in_db(&self, conn: &mut DBConn) -> Result<(), MensagoError> {
         match conn.execute(
             "INSERT OR REPLACE INTO contact_address(id,conid,label,street,extended,locality,region,
             postalcode,country,preferred) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)",
@@ -1271,7 +1251,7 @@ impl PhotoModel {
         Ok(out)
     }
 
-    pub fn delete(conid: &RandomID, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+    pub fn delete(conid: &RandomID, conn: &mut DBConn) -> Result<(), MensagoError> {
         match conn.execute(
             "DELETE FROM contact_photo WHERE conid=?1",
             &[&conid.to_string()],
@@ -1283,7 +1263,7 @@ impl PhotoModel {
 }
 
 impl DBModel for PhotoModel {
-    fn delete_from_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+    fn delete_from_db(&self, conn: &mut DBConn) -> Result<(), MensagoError> {
         match conn.execute(
             "DELETE FROM contact_photo WHERE id=?1",
             &[&self.id.to_string()],
@@ -1293,7 +1273,7 @@ impl DBModel for PhotoModel {
         }
     }
 
-    fn refresh_from_db(&mut self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+    fn refresh_from_db(&mut self, conn: &mut DBConn) -> Result<(), MensagoError> {
         {
             let mut stmt =
                 conn.prepare("SELECT conid,mime,data FROM contact_photo WHERE id = ?1")?;
@@ -1335,7 +1315,7 @@ impl DBModel for PhotoModel {
         Ok(())
     }
 
-    fn set_in_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+    fn set_in_db(&self, conn: &mut DBConn) -> Result<(), MensagoError> {
         match conn.execute(
             "INSERT OR REPLACE INTO contact_photo(id,conid,mime,data) VALUES(?1,?2,?3,?4)",
             rusqlite::params![
@@ -1467,7 +1447,7 @@ impl FileModel {
 }
 
 impl DBModel for FileModel {
-    fn delete_from_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+    fn delete_from_db(&self, conn: &mut DBConn) -> Result<(), MensagoError> {
         match conn.execute(
             "DELETE FROM contact_files WHERE id=?1",
             &[&self.id.to_string()],
@@ -1477,7 +1457,7 @@ impl DBModel for FileModel {
         }
     }
 
-    fn refresh_from_db(&mut self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+    fn refresh_from_db(&mut self, conn: &mut DBConn) -> Result<(), MensagoError> {
         {
             let mut stmt =
                 conn.prepare("SELECT conid,name,mime,data FROM contact_files WHERE id = ?1")?;
@@ -1521,7 +1501,7 @@ impl DBModel for FileModel {
         Ok(())
     }
 
-    fn set_in_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+    fn set_in_db(&self, conn: &mut DBConn) -> Result<(), MensagoError> {
         match conn.execute(
             "INSERT OR REPLACE INTO contact_files(id,conid,name,mime,data) VALUES(?1,?2,?3,?4,?5)",
             rusqlite::params![
@@ -1715,7 +1695,7 @@ impl ContactDataModel {
 }
 
 impl DBModel for ContactDataModel {
-    fn delete_from_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+    fn delete_from_db(&self, conn: &mut DBConn) -> Result<(), MensagoError> {
         // No annotation check is needed for this call because annotations have different ids
         // from their owners
         match conn.execute("DELETE FROM contacts WHERE id=?1", &[&self.id.to_string()]) {
@@ -1736,7 +1716,7 @@ impl DBModel for ContactDataModel {
         Ok(())
     }
 
-    fn refresh_from_db(&mut self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+    fn refresh_from_db(&mut self, conn: &mut DBConn) -> Result<(), MensagoError> {
         let mut stmt = conn.prepare(
             "SELECT entitytype,contactgroup,gender,bio,anniversary,birthday,organization,orgunits,
             title,categories,languages,notes FROM contacts WHERE conid = ?1 AND annotation=?2",
@@ -1844,7 +1824,7 @@ impl DBModel for ContactDataModel {
         Ok(())
     }
 
-    fn set_in_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+    fn set_in_db(&self, conn: &mut DBConn) -> Result<(), MensagoError> {
         let annlinkstr = match &self.annotation_link {
             Some(v) => v.to_string(),
             None => String::new(),

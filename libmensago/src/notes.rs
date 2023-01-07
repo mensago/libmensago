@@ -229,38 +229,35 @@ impl NoteModel {
 }
 
 impl DBModel for NoteModel {
-    fn delete_from_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+    fn delete_from_db(&self, conn: &mut DBConn) -> Result<(), MensagoError> {
         match conn.execute("DELETE FROM notes WHERE id=?1", &[&self.id.to_string()]) {
             Ok(_) => (),
             Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
         }
 
-        // TODO: resolve DBConn dependency in NoteModel::DBModel::delete_from_db
-        // AttachmentModel::delete_all(&self.id, conn)?;
+        AttachmentModel::delete_all(&self.id, conn)?;
 
         Ok(())
     }
 
-    fn refresh_from_db(&mut self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
-        let mut stmt = conn.prepare(
+    fn refresh_from_db(&mut self, conn: &mut DBConn) -> Result<(), MensagoError> {
+        let values = conn.query(
             "SELECT title,format,body,created,updated,notebook,tags FROM notes WHERE id = ?1",
+            &[&self.id.to_string()],
         )?;
-        let (title, formatstr, body, createdstr, updatedstr, notebook, tagstr) = match stmt
-            .query_row(&[&self.id.to_string()], |row| {
-                Ok((
-                    row.get::<usize, String>(0).unwrap(),
-                    row.get::<usize, String>(1).unwrap(),
-                    row.get::<usize, String>(2).unwrap(),
-                    row.get::<usize, String>(3).unwrap(),
-                    row.get::<usize, String>(4).unwrap(),
-                    row.get::<usize, String>(5).unwrap(),
-                    row.get::<usize, String>(6).unwrap(),
-                ))
-            }) {
-            Ok(v) => v,
-            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-        };
-        drop(stmt);
+        if values.len() != 1 {
+            return Err(MensagoError::ErrNotFound);
+        }
+        if values[0].len() != 7 {
+            return Err(MensagoError::ErrSchemaFailure);
+        }
+        let title = values[0][0].to_string();
+        let formatstr = values[0][1].to_string();
+        let body = values[0][2].to_string();
+        let createdstr = values[0][3].to_string();
+        let updatedstr = values[0][4].to_string();
+        let notebook = values[0][5].to_string();
+        let tagstr = values[0][6].to_string();
 
         let docformat = match DocFormat::from_str(&formatstr) {
             Ok(v) => v,
@@ -300,16 +297,13 @@ impl DBModel for NoteModel {
         self.notebook = notebook;
         self.tags = taglist.items;
 
-        // TODO: update refresh_from_db to use DBConn
-        // self.images = ImageModel::load_all(&self.id, conn)?;
-        // self.attachments = AttachmentModel::load_all(&self.id, conn)?;
-        self.images = Vec::new();
-        self.attachments = Vec::new();
+        self.images = ImageModel::load_all(&self.id, conn)?;
+        self.attachments = AttachmentModel::load_all(&self.id, conn)?;
 
         Ok(())
     }
 
-    fn set_in_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+    fn set_in_db(&self, conn: &mut DBConn) -> Result<(), MensagoError> {
         match conn.execute(
             "INSERT OR REPLACE INTO notes(id,title,format,body,created,updated,notebook,tags) 
             VALUES(?1,?2,?3,?4,?5,?6,?7,?8)",
