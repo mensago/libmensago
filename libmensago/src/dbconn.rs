@@ -88,6 +88,38 @@ impl DBConn {
         Ok(())
     }
 
+    /// get_db_value() is a convenience method for when you just want one column value from one row.
+    /// Happens more often than you'd think.
+    pub fn get_db_value(
+        &mut self,
+        tablename: &str,
+        column: &str,
+        id: &str,
+    ) -> Result<DBValue, MensagoError> {
+        if tablename.len() == 0 || column.len() == 0 {
+            return Err(MensagoError::ErrEmptyData);
+        }
+
+        // Doing regular string substitution in a SQL query is usually a recipe for an injection
+        // attack. We're doing this here because (1) using the regular syntax for inserting values
+        // into queries creates syntax errors when used for table names and (2) we control that
+        // part of the query. We're also doing the same thing for the column because the escaping
+        // done for substitution causes the column name to be returned from the query instead of
+        // the value of the row in that column. Not great, but it *is* safe in this instance.
+        let rows = self.query(
+            format!("SELECT {} FROM {} WHERE id = ?1", column, tablename).as_str(),
+            [id],
+        )?;
+        if rows.len() != 1 {
+            return Err(MensagoError::ErrNotFound);
+        }
+        if rows[0].len() != 1 {
+            return Err(MensagoError::ErrSchemaFailure);
+        }
+
+        Ok(rows[0][0].clone())
+    }
+
     /// is_connected() returns true if the instance is connected to a SQLite database
     pub fn is_connected(&self) -> bool {
         let connhandle = self.db.lock().unwrap();
@@ -131,7 +163,7 @@ impl DBConn {
         }
     }
 
-    /// query_row() executes a query intended to only return one row of results.
+    /// query() executes a query intended to only return one row of results.
     pub fn query<P: rusqlite::Params>(
         &mut self,
         cmd: &str,
