@@ -1,6 +1,5 @@
 use crate::*;
 use libkeycard::*;
-use rusqlite;
 use std::str::FromStr;
 
 /// MessageModel represents a Mensago message
@@ -218,37 +217,32 @@ impl MessageModel {
 }
 
 impl DBModel for MessageModel {
-    fn delete_from_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
-        match conn.execute("DELETE FROM messages WHERE id=?1", &[&self.id.to_string()]) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
-        }
+    fn delete_from_db(&self, conn: &mut DBConn) -> Result<(), MensagoError> {
+        conn.execute("DELETE FROM messages WHERE id=?1", &[&self.id.to_string()])
     }
 
-    fn refresh_from_db(&mut self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
-        let mut stmt = conn.prepare(
+    fn refresh_from_db(&mut self, conn: &mut DBConn) -> Result<(), MensagoError> {
+        let values = conn.query(
             "SELECT from,to,cc,bcc,date,format,thread_id,subject,body FROM messages 
             WHERE id = ?1",
+            &[&self.id.to_string()],
         )?;
-        let (fromstr, conidstr, tostr, ccstr, bccstr, datestr, formatstr, thridstr, subject, body) =
-            match stmt.query_row(&[&self.id.to_string()], |row| {
-                Ok((
-                    row.get::<usize, String>(0).unwrap(),
-                    row.get::<usize, String>(1).unwrap(),
-                    row.get::<usize, String>(2).unwrap(),
-                    row.get::<usize, String>(3).unwrap(),
-                    row.get::<usize, String>(4).unwrap(),
-                    row.get::<usize, String>(5).unwrap(),
-                    row.get::<usize, String>(6).unwrap(),
-                    row.get::<usize, String>(7).unwrap(),
-                    row.get::<usize, String>(8).unwrap(),
-                    row.get::<usize, String>(9).unwrap(),
-                ))
-            }) {
-                Ok(v) => v,
-                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-            };
-        drop(stmt);
+        if values.len() != 1 {
+            return Err(MensagoError::ErrNotFound);
+        }
+        if values[0].len() != 10 {
+            return Err(MensagoError::ErrSchemaFailure);
+        }
+        let fromstr = values[0][0].to_string();
+        let conidstr = values[0][1].to_string();
+        let tostr = values[0][2].to_string();
+        let ccstr = values[0][3].to_string();
+        let bccstr = values[0][4].to_string();
+        let datestr = values[0][5].to_string();
+        let formatstr = values[0][6].to_string();
+        let thridstr = values[0][7].to_string();
+        let subject = values[0][8].to_string();
+        let body = values[0][9].to_string();
 
         self.from = match WAddress::from(&fromstr) {
             Some(v) => v,
@@ -327,20 +321,17 @@ impl DBModel for MessageModel {
         self.subject = subject;
         self.body = body;
 
-        // TODO: update refresh_from_db to use DBConn
-        // self.images = ImageModel::load_all(&self.id, conn)?;
-        // self.attachments = AttachmentModel::load_all(&self.id, conn)?;
-        self.images = Vec::new();
-        self.attachments = Vec::new();
+        self.images = ImageModel::load_all(&self.id, conn)?;
+        self.attachments = AttachmentModel::load_all(&self.id, conn)?;
 
         Ok(())
     }
 
-    fn set_in_db(&self, conn: &mut rusqlite::Connection) -> Result<(), MensagoError> {
+    fn set_in_db(&self, conn: &mut DBConn) -> Result<(), MensagoError> {
         let ccstr = SeparatedStrList::from_vec(&self.cc, ",").join();
         let bccstr = SeparatedStrList::from_vec(&self.bcc, ",").join();
 
-        match conn.execute(
+        conn.execute(
             "INSERT OR REPLACE INTO 
             messages(id,from,to,cc,bcc,date,format,thread_id,subject,body)
             VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11)",
@@ -356,9 +347,6 @@ impl DBModel for MessageModel {
                 &self.subject,
                 &self.body,
             ],
-        ) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
-        }
+        )
     }
 }
