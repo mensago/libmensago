@@ -507,40 +507,36 @@ impl DBModel for NameModel {
     }
 
     fn refresh_from_db(&mut self, conn: &mut DBConn) -> Result<(), MensagoError> {
-        {
-            let mut stmt = conn.prepare(
+        let values = conn.query(
             "SELECT conid,formatted_name,given_name,family_name,prefix FROM contact_names WHERE id = ?1",
+            &[&self.id.to_string()],
         )?;
-            let (conidstr, formattedname, givenname, familyname, prefix) =
-                match stmt.query_row(&[&self.id.to_string()], |row| {
-                    Ok((
-                        row.get::<usize, String>(0).unwrap(),
-                        row.get::<usize, String>(1).unwrap(),
-                        row.get::<usize, String>(2).unwrap(),
-                        row.get::<usize, String>(3).unwrap(),
-                        row.get::<usize, String>(4).unwrap(),
-                    ))
-                }) {
-                    Ok(v) => v,
-                    Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-                };
-
-            let conid = match RandomID::from(&conidstr) {
-                Some(v) => v,
-                None => {
-                    return Err(MensagoError::ErrDatabaseException(format!(
-                        "Bad contact ID received from database: '{}'",
-                        conidstr
-                    )))
-                }
-            };
-
-            self.contact_id = conid;
-            self.formatted_name = formattedname;
-            self.given_name = givenname;
-            self.family_name = familyname;
-            self.prefix = prefix;
+        if values.len() != 1 {
+            return Err(MensagoError::ErrNotFound);
         }
+        if values[0].len() != 7 {
+            return Err(MensagoError::ErrSchemaFailure);
+        }
+        let conidstr = values[0][0].to_string();
+        let formattedname = values[0][1].to_string();
+        let givenname = values[0][2].to_string();
+        let familyname = values[0][3].to_string();
+        let prefix = values[0][4].to_string();
+
+        let conid = match RandomID::from(&conidstr) {
+            Some(v) => v,
+            None => {
+                return Err(MensagoError::ErrDatabaseException(format!(
+                    "Bad contact ID received from database: '{}'",
+                    conidstr
+                )))
+            }
+        };
+        self.contact_id = conid;
+        self.formatted_name = formattedname;
+        self.given_name = givenname;
+        self.family_name = familyname;
+        self.prefix = prefix;
 
         self.additional_names =
             NamePartModel::load_all(&self.contact_id, NamePartType::Additional, conn)?;
@@ -695,31 +691,29 @@ impl MensagoModel {
 
 impl DBModel for MensagoModel {
     fn delete_from_db(&self, conn: &mut DBConn) -> Result<(), MensagoError> {
-        match conn.execute(
+        conn.execute(
             "DELETE FROM contact_mensago WHERE id=?1",
             &[&self.id.to_string()],
-        ) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
-        }
+        )
     }
 
     fn refresh_from_db(&mut self, conn: &mut DBConn) -> Result<(), MensagoError> {
-        let mut stmt =
-            conn.prepare("SELECT conid,label,uid,wid,domain FROM contact_mensago WHERE id = ?1")?;
-        let (conidstr, labelstr, uidstr, widstr, domstr) =
-            match stmt.query_row(&[&self.id.to_string()], |row| {
-                Ok((
-                    row.get::<usize, String>(0).unwrap(),
-                    row.get::<usize, String>(1).unwrap(),
-                    row.get::<usize, String>(2).unwrap(),
-                    row.get::<usize, String>(3).unwrap(),
-                    row.get::<usize, String>(4).unwrap(),
-                ))
-            }) {
-                Ok(v) => v,
-                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-            };
+        let values = conn.query(
+            "SELECT conid,label,uid,wid,domain FROM contact_mensago WHERE id = ?1",
+            &[&self.id.to_string()],
+        )?;
+        if values.len() != 1 {
+            return Err(MensagoError::ErrNotFound);
+        }
+        if values[0].len() != 5 {
+            return Err(MensagoError::ErrSchemaFailure);
+        }
+        let conidstr = values[0][0].to_string();
+        let labelstr = values[0][1].to_string();
+        let uidstr = values[0][2].to_string();
+        let widstr = values[0][3].to_string();
+        let domstr = values[0][4].to_string();
+
         self.label = labelstr;
 
         self.contact_id = match RandomID::from(&conidstr) {
@@ -763,7 +757,7 @@ impl DBModel for MensagoModel {
             None => String::new(),
         };
 
-        match conn.execute(
+        conn.execute(
             "INSERT OR REPLACE INTO contact_mensago(id, conid, label, uid, wid, domain) VALUES(?1,?2,?3,?4,?5,?6)",
             &[
                 &self.id.to_string(),
@@ -773,10 +767,7 @@ impl DBModel for MensagoModel {
                 &self.wid.to_string(),
                 &self.domain.to_string(),
             ],
-        ) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
-        }
+        )
     }
 }
 
@@ -894,32 +885,29 @@ impl KeyModel {
 
 impl DBModel for KeyModel {
     fn delete_from_db(&self, conn: &mut DBConn) -> Result<(), MensagoError> {
-        match conn.execute(
+        conn.execute(
             "DELETE FROM contact_keys WHERE id=?1",
             &[&self.id.to_string()],
-        ) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
-        }
+        )
     }
 
     fn refresh_from_db(&mut self, conn: &mut DBConn) -> Result<(), MensagoError> {
-        let mut stmt = conn.prepare(
+        let values = conn.query(
             "SELECT conid,label,category,value,timestamp FROM contact_keys WHERE id = ?1",
+            &[&self.id.to_string()],
         )?;
-        let (conidstr, labelstr, catstr, keystr, timestr) =
-            match stmt.query_row(&[&self.id.to_string()], |row| {
-                Ok((
-                    row.get::<usize, String>(0).unwrap(),
-                    row.get::<usize, String>(1).unwrap(),
-                    row.get::<usize, String>(2).unwrap(),
-                    row.get::<usize, String>(3).unwrap(),
-                    row.get::<usize, String>(4).unwrap(),
-                ))
-            }) {
-                Ok(v) => v,
-                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-            };
+        if values.len() != 1 {
+            return Err(MensagoError::ErrNotFound);
+        }
+        if values[0].len() != 5 {
+            return Err(MensagoError::ErrSchemaFailure);
+        }
+        let conidstr = values[0][0].to_string();
+        let labelstr = values[0][1].to_string();
+        let catstr = values[0][2].to_string();
+        let keystr = values[0][3].to_string();
+        let timestr = values[0][4].to_string();
+
         self.label = labelstr;
 
         self.contact_id = match RandomID::from(&conidstr) {
@@ -963,7 +951,7 @@ impl DBModel for KeyModel {
     }
 
     fn set_in_db(&self, conn: &mut DBConn) -> Result<(), MensagoError> {
-        match conn.execute(
+        conn.execute(
             "INSERT OR REPLACE INTO contact_keys(id, conid, label, category, value, timestamp) 
             VALUES(?1,?2,?3,?4,?5,?6)",
             &[
@@ -974,10 +962,7 @@ impl DBModel for KeyModel {
                 &self.key.to_string(),
                 &self.timestamp.to_string(),
             ],
-        ) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
-        }
+        )
     }
 }
 
@@ -1112,37 +1097,34 @@ impl AddressModel {
 
 impl DBModel for AddressModel {
     fn delete_from_db(&self, conn: &mut DBConn) -> Result<(), MensagoError> {
-        match conn.execute(
+        conn.execute(
             "DELETE FROM contact_address WHERE id=?1",
             &[&self.id.to_string()],
-        ) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
-        }
+        )
     }
 
     fn refresh_from_db(&mut self, conn: &mut DBConn) -> Result<(), MensagoError> {
-        let mut stmt = conn.prepare(
+        let values = conn.query(
             "SELECT conid,label,street,extended,locality,region,postalcode,country,preferred 
             FROM contact_address WHERE id = ?1",
+            &[&self.id.to_string()],
         )?;
-        let (conidstr, label, street, extended, locality, region, postalcode, country, preferred) =
-            match stmt.query_row(&[&self.id.to_string()], |row| {
-                Ok((
-                    row.get::<usize, String>(0).unwrap(),
-                    row.get::<usize, String>(1).unwrap(),
-                    row.get::<usize, String>(2).unwrap(),
-                    row.get::<usize, String>(3).unwrap(),
-                    row.get::<usize, String>(4).unwrap(),
-                    row.get::<usize, String>(5).unwrap(),
-                    row.get::<usize, String>(6).unwrap(),
-                    row.get::<usize, String>(7).unwrap(),
-                    row.get::<usize, bool>(8).unwrap(),
-                ))
-            }) {
-                Ok(v) => v,
-                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-            };
+        if values.len() != 1 {
+            return Err(MensagoError::ErrNotFound);
+        }
+        if values[0].len() != 9 {
+            return Err(MensagoError::ErrSchemaFailure);
+        }
+        let conidstr = values[0][0].to_string();
+        let label = values[0][1].to_string();
+        let street = values[0][2].to_string();
+        let extended = values[0][3].to_string();
+        let locality = values[0][4].to_string();
+        let region = values[0][5].to_string();
+        let postalcode = values[0][6].to_string();
+        let country = values[0][7].to_string();
+        let preferred = values[0][8].to_bool().unwrap();
+
         self.label = label;
         self.street = street;
         self.extended = extended;
@@ -1166,7 +1148,7 @@ impl DBModel for AddressModel {
     }
 
     fn set_in_db(&self, conn: &mut DBConn) -> Result<(), MensagoError> {
-        match conn.execute(
+        conn.execute(
             "INSERT OR REPLACE INTO contact_address(id,conid,label,street,extended,locality,region,
             postalcode,country,preferred) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)",
             rusqlite::params![
@@ -1181,10 +1163,7 @@ impl DBModel for AddressModel {
                 &self.country,
                 &self.preferred,
             ],
-        ) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
-        }
+        )
     }
 }
 
@@ -1264,59 +1243,56 @@ impl PhotoModel {
 
 impl DBModel for PhotoModel {
     fn delete_from_db(&self, conn: &mut DBConn) -> Result<(), MensagoError> {
-        match conn.execute(
+        conn.execute(
             "DELETE FROM contact_photo WHERE id=?1",
             &[&self.id.to_string()],
-        ) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
-        }
+        )
     }
 
     fn refresh_from_db(&mut self, conn: &mut DBConn) -> Result<(), MensagoError> {
-        {
-            let mut stmt =
-                conn.prepare("SELECT conid,mime,data FROM contact_photo WHERE id = ?1")?;
-            let (conidstr, mimestr, imgdata) =
-                match stmt.query_row(&[&self.id.to_string()], |row| {
-                    Ok((
-                        row.get::<usize, String>(0).unwrap(),
-                        row.get::<usize, String>(1).unwrap(),
-                        row.get::<usize, Vec<u8>>(2).unwrap(),
-                    ))
-                }) {
-                    Ok(v) => v,
-                    Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-                };
-
-            let conid = match RandomID::from(&conidstr) {
-                Some(v) => v,
-                None => {
-                    return Err(MensagoError::ErrDatabaseException(format!(
-                        "Bad contact ID received from database: '{}'",
-                        conidstr
-                    )))
-                }
-            };
-            let imgtype = match Mime::from_str(&mimestr) {
-                Ok(v) => v,
-                Err(_) => {
-                    return Err(MensagoError::ErrDatabaseException(format!(
-                        "Bad photo MIME type received from database: '{}'",
-                        mimestr
-                    )))
-                }
-            };
-
-            self.contact_id = conid;
-            self.mime_type = imgtype;
-            self.data = imgdata;
+        let values = conn.query(
+            "SELECT conid,mime,data FROM contact_photo WHERE id = ?1",
+            &[&self.id.to_string()],
+        )?;
+        if values.len() != 1 {
+            return Err(MensagoError::ErrNotFound);
         }
+        if values[0].len() != 7 {
+            return Err(MensagoError::ErrSchemaFailure);
+        }
+        let conidstr = values[0][0].to_string();
+        let mimestr = values[0][1].to_string();
+        let imgdata = values[0][2].to_vec().unwrap();
+
+        let conid = match RandomID::from(&conidstr) {
+            Some(v) => v,
+            None => {
+                return Err(MensagoError::ErrDatabaseException(format!(
+                    "Bad contact ID received from database: '{}'",
+                    conidstr
+                )))
+            }
+        };
+
+        let imgtype = match Mime::from_str(&mimestr) {
+            Ok(v) => v,
+            Err(_) => {
+                return Err(MensagoError::ErrDatabaseException(format!(
+                    "Bad photo MIME type received from database: '{}'",
+                    mimestr
+                )))
+            }
+        };
+
+        self.contact_id = conid;
+        self.mime_type = imgtype;
+        self.data = imgdata;
+
         Ok(())
     }
 
     fn set_in_db(&self, conn: &mut DBConn) -> Result<(), MensagoError> {
-        match conn.execute(
+        conn.execute(
             "INSERT OR REPLACE INTO contact_photo(id,conid,mime,data) VALUES(?1,?2,?3,?4)",
             rusqlite::params![
                 &self.id.to_string(),
@@ -1324,10 +1300,7 @@ impl DBModel for PhotoModel {
                 &self.mime_type.to_string(),
                 &self.data,
             ],
-        ) {
-            Ok(_) => Ok(()),
-            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-        }
+        )
     }
 }
 
@@ -1448,61 +1421,57 @@ impl FileModel {
 
 impl DBModel for FileModel {
     fn delete_from_db(&self, conn: &mut DBConn) -> Result<(), MensagoError> {
-        match conn.execute(
+        conn.execute(
             "DELETE FROM contact_files WHERE id=?1",
             &[&self.id.to_string()],
-        ) {
-            Ok(_) => Ok(()),
-            Err(e) => Err(MensagoError::ErrDatabaseException(e.to_string())),
-        }
+        )
     }
 
     fn refresh_from_db(&mut self, conn: &mut DBConn) -> Result<(), MensagoError> {
-        {
-            let mut stmt =
-                conn.prepare("SELECT conid,name,mime,data FROM contact_files WHERE id = ?1")?;
-            let (conidstr, name, mimestr, imgdata) =
-                match stmt.query_row(&[&self.id.to_string()], |row| {
-                    Ok((
-                        row.get::<usize, String>(0).unwrap(),
-                        row.get::<usize, String>(1).unwrap(),
-                        row.get::<usize, String>(2).unwrap(),
-                        row.get::<usize, Vec<u8>>(3).unwrap(),
-                    ))
-                }) {
-                    Ok(v) => v,
-                    Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-                };
-
-            let conid = match RandomID::from(&conidstr) {
-                Some(v) => v,
-                None => {
-                    return Err(MensagoError::ErrDatabaseException(format!(
-                        "Bad contact ID received from database: '{}'",
-                        conidstr
-                    )))
-                }
-            };
-            let imgtype = match Mime::from_str(&mimestr) {
-                Ok(v) => v,
-                Err(_) => {
-                    return Err(MensagoError::ErrDatabaseException(format!(
-                        "Bad file MIME type received from database: '{}'",
-                        mimestr
-                    )))
-                }
-            };
-
-            self.contact_id = conid;
-            self.name = name;
-            self.mime_type = imgtype;
-            self.data = imgdata;
+        let values = conn.query(
+            "SELECT conid,name,mime,data FROM contact_files WHERE id = ?1",
+            &[&self.id.to_string()],
+        )?;
+        if values.len() != 1 {
+            return Err(MensagoError::ErrNotFound);
         }
+        if values[0].len() != 4 {
+            return Err(MensagoError::ErrSchemaFailure);
+        }
+        let conidstr = values[0][0].to_string();
+        let name = values[0][1].to_string();
+        let mimestr = values[0][2].to_string();
+        let imgdata = values[0][3].to_vec().unwrap();
+
+        let conid = match RandomID::from(&conidstr) {
+            Some(v) => v,
+            None => {
+                return Err(MensagoError::ErrDatabaseException(format!(
+                    "Bad contact ID received from database: '{}'",
+                    conidstr
+                )))
+            }
+        };
+        let imgtype = match Mime::from_str(&mimestr) {
+            Ok(v) => v,
+            Err(_) => {
+                return Err(MensagoError::ErrDatabaseException(format!(
+                    "Bad file MIME type received from database: '{}'",
+                    mimestr
+                )))
+            }
+        };
+
+        self.contact_id = conid;
+        self.name = name;
+        self.mime_type = imgtype;
+        self.data = imgdata;
+
         Ok(())
     }
 
     fn set_in_db(&self, conn: &mut DBConn) -> Result<(), MensagoError> {
-        match conn.execute(
+        conn.execute(
             "INSERT OR REPLACE INTO contact_files(id,conid,name,mime,data) VALUES(?1,?2,?3,?4,?5)",
             rusqlite::params![
                 &self.id.to_string(),
@@ -1511,10 +1480,7 @@ impl DBModel for FileModel {
                 &self.mime_type.to_string(),
                 &self.data,
             ],
-        ) {
-            Ok(_) => Ok(()),
-            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-        }
+        )
     }
 }
 
@@ -1717,48 +1683,29 @@ impl DBModel for ContactDataModel {
     }
 
     fn refresh_from_db(&mut self, conn: &mut DBConn) -> Result<(), MensagoError> {
-        let mut stmt = conn.prepare(
+        let values = conn.query(
             "SELECT entitytype,contactgroup,gender,bio,anniversary,birthday,organization,orgunits,
             title,categories,languages,notes FROM contacts WHERE conid = ?1 AND annotation=?2",
+            &[&self.id.to_string()],
         )?;
-        let (
-            entitytypestr,
-            group,
-            gender,
-            bio,
-            anniversary,
-            birthday,
-            organization,
-            orgunitstr,
-            title,
-            categorystr,
-            languagestr,
-            notes,
-        ) = match stmt.query_row(
-            rusqlite::params![&self.id.to_string(), &self.is_annotation],
-            |row| {
-                Ok((
-                    row.get::<usize, String>(0).unwrap(),
-                    row.get::<usize, String>(1).unwrap(),
-                    row.get::<usize, String>(2).unwrap(),
-                    row.get::<usize, String>(3).unwrap(),
-                    row.get::<usize, String>(4).unwrap(),
-                    row.get::<usize, String>(5).unwrap(),
-                    row.get::<usize, String>(6).unwrap(),
-                    row.get::<usize, String>(7).unwrap(),
-                    row.get::<usize, String>(8).unwrap(),
-                    row.get::<usize, String>(9).unwrap(),
-                    row.get::<usize, String>(10).unwrap(),
-                    row.get::<usize, String>(11).unwrap(),
-                ))
-            },
-        ) {
-            Ok(v) => v,
-            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-        };
-
-        // Drop so we can use conn again later on
-        drop(stmt);
+        if values.len() != 1 {
+            return Err(MensagoError::ErrNotFound);
+        }
+        if values[0].len() != 12 {
+            return Err(MensagoError::ErrSchemaFailure);
+        }
+        let entitytypestr = values[0][0].to_string();
+        let group = values[0][1].to_string();
+        let gender = values[0][2].to_string();
+        let bio = values[0][3].to_string();
+        let anniversary = values[0][4].to_string();
+        let birthday = values[0][5].to_string();
+        let organization = values[0][6].to_string();
+        let orgunitstr = values[0][7].to_string();
+        let title = values[0][8].to_string();
+        let categorystr = values[0][9].to_string();
+        let languagestr = values[0][10].to_string();
+        let notes = values[0][11].to_string();
 
         self.entity_type = match EntityType::try_from(entitytypestr.as_str()) {
             Ok(v) => v,
