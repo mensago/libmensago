@@ -93,7 +93,7 @@ impl Client {
         }
 
         let record = get_mgmt_record(address.get_domain(), self.dns.as_mut())?;
-        let profile = match self.pman.get_active_profile() {
+        let profile = match self.pman.get_active_profile_mut() {
             Some(v) => v,
             None => return Err(MensagoError::ErrNoProfile),
         };
@@ -111,11 +111,11 @@ impl Client {
         login(&mut self.conn, waddr.get_wid(), &serverkey)?;
 
         let db = profile.get_db()?;
-        let passhash = get_credentials(&db, &waddr)?;
+        let passhash = get_credentials(db, &waddr)?;
 
         password(&mut self.conn, &passhash)?;
 
-        let devpair = get_session_keypair(&db, &waddr)?;
+        let devpair = get_session_keypair(db, &waddr)?;
         self.is_admin = device(&mut self.conn, waddr.get_wid(), &devpair)?;
 
         self.login_active = true;
@@ -331,17 +331,17 @@ impl Client {
             None => return Err(MensagoError::ErrNoProfile),
         };
 
-        let mut db = profile.get_db()?;
-
-        let cardopt = get_card_from_db(
-            db,
-            &profile.get_waddress().unwrap().to_string(),
-            EntryType::User,
-            false,
-        )?;
+        // Some extra variables to quiet the borrow checker
+        let waddr = profile.get_waddress().unwrap().clone();
+        let domstr = profile.domain.as_ref().unwrap().to_string();
+        let uid = profile.uid.clone();
+        let profname = profile.name.clone();
 
         let mgmtrec = get_mgmt_record(profile.domain.as_ref().unwrap(), self.dns.as_mut())?;
         let ovkey = VerificationKey::from(&mgmtrec.pvk);
+
+        let db = profile.get_db()?;
+        let cardopt = get_card_from_db(db, &waddr.as_string(), EntryType::User, false)?;
 
         if cardopt.is_some() {
             let mut card = cardopt.unwrap();
@@ -364,7 +364,7 @@ impl Client {
 
             add_keypair(
                 db,
-                &profile.get_waddress().unwrap(),
+                &waddr,
                 &keys["crsigning.public"],
                 &keys["crsigning.private"],
                 get_preferred_hash_algorithm(self.use_certified),
@@ -373,7 +373,7 @@ impl Client {
             )?;
             add_keypair(
                 db,
-                &profile.get_waddress().unwrap(),
+                &waddr,
                 &keys["crencryption.public"],
                 &keys["crencryption.private"],
                 get_preferred_hash_algorithm(self.use_certified),
@@ -382,7 +382,7 @@ impl Client {
             )?;
             add_keypair(
                 db,
-                &profile.get_waddress().unwrap(),
+                &waddr,
                 &keys["signing.public"],
                 &keys["signing.private"],
                 get_preferred_hash_algorithm(self.use_certified),
@@ -391,7 +391,7 @@ impl Client {
             )?;
             add_keypair(
                 db,
-                &profile.get_waddress().unwrap(),
+                &waddr,
                 &keys["encryption.public"],
                 &keys["encryption.private"],
                 get_preferred_hash_algorithm(self.use_certified),
@@ -451,15 +451,9 @@ impl Client {
         let mut entry = Entry::new(EntryType::User).unwrap();
         entry.set_fields(&vec![
             (String::from("Index"), String::from("1")),
-            (String::from("Name"), profile.name.clone()),
-            (
-                String::from("Workspace-ID"),
-                profile.wid.as_ref().unwrap().to_string(),
-            ),
-            (
-                String::from("Domain"),
-                profile.domain.as_ref().unwrap().to_string(),
-            ),
+            (String::from("Name"), profname),
+            (String::from("Workspace-ID"), waddr.get_wid().to_string()),
+            (String::from("Domain"), domstr),
             (
                 String::from("Contact-Request-Verification-Key"),
                 crspair.get_public_str(),
@@ -472,11 +466,8 @@ impl Client {
             (String::from("Verification-Key"), vkey.get_public_str()),
         ])?;
 
-        if profile.uid.is_some() {
-            entry.set_field(
-                "User-ID",
-                profile.uid.as_ref().unwrap().to_string().as_str(),
-            )?;
+        if uid.is_some() {
+            entry.set_field("User-ID", uid.as_ref().unwrap().to_string().as_str())?;
         }
 
         // We don't worry about checking entry compliance because addentry() handles it
@@ -496,7 +487,9 @@ impl Client {
         };
 
         let mut w = Workspace::new(&profile.path);
+        let db = profile.get_db()?;
         w.generate(
+            db,
             reginfo.uid.as_ref(),
             &reginfo.domain,
             &reginfo.wid,

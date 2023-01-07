@@ -29,7 +29,7 @@ use sys_info;
 use crate::{base::*, dbconn::*, types::*};
 
 /// Gets the password hash for the workspace
-pub fn get_credentials(conn: &DBConn, waddr: &WAddress) -> Result<ArgonHash, MensagoError> {
+pub fn get_credentials(conn: &mut DBConn, waddr: &WAddress) -> Result<ArgonHash, MensagoError> {
     let values = conn.query(
         "SELECT password FROM workspaces WHERE wid=?1 AND domain=?2",
         [waddr.get_wid().as_string(), waddr.get_domain().as_string()],
@@ -51,7 +51,7 @@ pub fn get_credentials(conn: &DBConn, waddr: &WAddress) -> Result<ArgonHash, Men
 
 /// Sets the password and hash type for the specified workspace
 pub fn set_credentials(
-    conn: &DBConn,
+    conn: &mut DBConn,
     waddr: &WAddress,
     pwh: Option<&ArgonHash>,
 ) -> Result<(), MensagoError> {
@@ -80,7 +80,7 @@ pub fn set_credentials(
 
 /// Adds a device ID to a workspace
 pub fn add_device_session(
-    conn: &DBConn,
+    conn: &mut DBConn,
     waddr: &WAddress,
     devid: &RandomID,
     devpair: &EncryptionPair,
@@ -122,7 +122,7 @@ pub fn add_device_session(
 }
 
 /// Removes an authorized device from the workspace
-pub fn remove_device_session(conn: &DBConn, devid: &RandomID) -> Result<(), MensagoError> {
+pub fn remove_device_session(conn: &mut DBConn, devid: &RandomID) -> Result<(), MensagoError> {
     match conn.exists(
         "SELECT devid FROM sessions WHERE devid=?1",
         [devid.as_string()],
@@ -140,7 +140,7 @@ pub fn remove_device_session(conn: &DBConn, devid: &RandomID) -> Result<(), Mens
 
 /// Returns the device key for a server session
 pub fn get_session_keypair(
-    conn: &DBConn,
+    conn: &mut DBConn,
     waddr: &WAddress,
 ) -> Result<EncryptionPair, MensagoError> {
     let values = conn.query(
@@ -164,7 +164,7 @@ pub fn get_session_keypair(
 
 /// Adds a key pair to a workspace.
 pub fn add_keypair(
-    conn: &DBConn,
+    conn: &mut DBConn,
     waddr: &WAddress,
     pubkey: &CryptoString,
     privkey: &CryptoString,
@@ -208,15 +208,15 @@ pub fn add_keypair(
 }
 
 /// Deletes a cryptography keypair from a workspace.
-pub fn remove_keypair(conn: &DBConn, keyhash: &CryptoString) -> Result<(), MensagoError> {
-    remove_key(&conn, &keyhash)
+pub fn remove_keypair(conn: &mut DBConn, keyhash: &CryptoString) -> Result<(), MensagoError> {
+    remove_key(conn, &keyhash)
 }
 
 /// Returns a pair of CryptoStrings, where the public key is in element 0 and the private key is in
 /// element 1. This is to accommodate retrieval of all key types. If a symmetric key is obtained
 /// through this call, the public and private key values will be the same.
 pub fn get_keypair(
-    conn: &DBConn,
+    conn: &mut DBConn,
     keyhash: &CryptoString,
 ) -> Result<[CryptoString; 2], MensagoError> {
     let values = conn.query(
@@ -250,7 +250,7 @@ pub fn get_keypair(
 
 /// Returns a keypair based on its category
 pub fn get_keypair_by_category(
-    conn: &DBConn,
+    conn: &mut DBConn,
     category: &KeyCategory,
 ) -> Result<[CryptoString; 2], MensagoError> {
     let values = conn.query(
@@ -285,7 +285,7 @@ pub fn get_keypair_by_category(
 /// Adds a single symmetric key to a workspace. It also creates a hash of the Base85-encoded
 /// public key using the requested algorithm and adds it to the database
 pub fn add_key(
-    conn: &DBConn,
+    conn: &mut DBConn,
     waddr: &WAddress,
     key: &CryptoString,
     hashtype: &str,
@@ -321,7 +321,7 @@ pub fn add_key(
 /// Deletes a cryptography key from a workspace. Note that the algorithm must match, i.e. if a key
 /// is stored using a BLAKE2B-256 hash, passing a BLAKE3-256 hash of the exact same key will result
 /// in a ErrNotFound error.
-pub fn remove_key(conn: &DBConn, keyhash: &CryptoString) -> Result<(), MensagoError> {
+pub fn remove_key(conn: &mut DBConn, keyhash: &CryptoString) -> Result<(), MensagoError> {
     match conn.exists("SELECT keyid FROM keys WHERE keyid=?1", [keyhash.as_str()]) {
         Ok(v) => {
             if !v {
@@ -336,7 +336,7 @@ pub fn remove_key(conn: &DBConn, keyhash: &CryptoString) -> Result<(), MensagoEr
 
 /// Gets a key given its hash. As with get_keypair(), if the hash given does not use the
 /// same algorithm, this function will not find the key.
-pub fn get_key(conn: &DBConn, keyhash: &CryptoString) -> Result<CryptoString, MensagoError> {
+pub fn get_key(conn: &mut DBConn, keyhash: &CryptoString) -> Result<CryptoString, MensagoError> {
     let values = conn.query(
         "SELECT public FROM keys WHERE keyid=?1",
         [keyhash.to_string()],
@@ -367,7 +367,7 @@ pub fn get_key(conn: &DBConn, keyhash: &CryptoString) -> Result<CryptoString, Me
 /// Returns a key based on its category. If the category given uses a pair of keys, the public key
 /// is returned.
 pub fn get_key_by_category(
-    conn: &DBConn,
+    conn: &mut DBConn,
     category: &KeyCategory,
 ) -> Result<CryptoString, MensagoError> {
     let values = conn.query(
@@ -398,7 +398,7 @@ pub fn get_key_by_category(
 }
 
 /// Utility function that just checks to see if a specific workspace exists in the database
-fn check_workspace_exists(conn: &DBConn, waddr: &WAddress) -> Result<(), MensagoError> {
+fn check_workspace_exists(conn: &mut DBConn, waddr: &WAddress) -> Result<(), MensagoError> {
     match conn.exists(
         "SELECT wid FROM workspaces WHERE wid=?1 AND domain=?2",
         [waddr.get_wid().as_string(), waddr.get_domain().as_string()],
@@ -487,15 +487,18 @@ mod tests {
         Ok(profman)
     }
 
-    fn setup_workspace(testname: &str, profpath: &PathBuf) -> Result<Workspace, MensagoError> {
+    fn setup_workspace(testname: &str, profile: &mut Profile) -> Result<Workspace, MensagoError> {
         // Hash of "CheeseCustomerSmugnessDelegatorGenericUnaudited"
         let pw = String::from(
             "$argon2id$v=19$m=1048576,t=1,p=2$jc/H+Cn1NwJBJOTmFqAdlA$\
 			b2zoU9ZNhHlo/ZYuSJwoqUAXEdf1cbN3fxmbQhP0zJc",
         );
 
-        let mut w = Workspace::new(profpath);
+        let mut w = Workspace::new(&profile.path);
+        let db = profile.get_db()?;
+
         match w.generate(
+            db,
             Some(&UserID::from("csimons").unwrap()),
             Domain::from("example.com").as_ref().unwrap(),
             RandomID::from("b5a9367e-680d-46c0-bb2c-73932a6d4007")
@@ -514,7 +517,7 @@ mod tests {
         }
 
         let pwhash = ArgonHash::from_hashstr(&pw);
-        match w.add_to_db(&pwhash) {
+        match w.add_to_db(db, &pwhash) {
             Ok(_) => (),
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
@@ -534,9 +537,9 @@ mod tests {
         let test_path = setup_test(&testname);
 
         let mut profman = setup_profile(&testname, &test_path)?;
-        let mut profile = profman.get_active_profile_mut().unwrap();
+        let profile = profman.get_active_profile_mut().unwrap();
 
-        let w = setup_workspace(&testname, &profile.path)?;
+        let w = setup_workspace(&testname, profile)?;
 
         let conn = match profile.get_db() {
             Ok(v) => v,
@@ -583,9 +586,9 @@ mod tests {
         );
         let newhash = ArgonHash::from_hashstr(&newpw);
 
-        match set_credentials(&conn, &w.get_waddress().unwrap(), Some(&newhash)) {
+        match set_credentials(conn, &w.get_waddress().unwrap(), Some(&newhash)) {
             Ok(_) => {
-                match get_credentials(&conn, &w.get_waddress().unwrap()) {
+                match get_credentials(conn, &w.get_waddress().unwrap()) {
                     Ok(v) => {
                         if v != newhash {
                             println!("Wanted:\n{}-----\nGot:\n{}", newhash, v);
@@ -614,9 +617,9 @@ mod tests {
         }
 
         // Case #3: clearing credentials
-        match set_credentials(&conn, &w.get_waddress().unwrap(), None) {
+        match set_credentials(conn, &w.get_waddress().unwrap(), None) {
             Ok(_) => {
-                match get_credentials(&conn, &w.get_waddress().unwrap()) {
+                match get_credentials(conn, &w.get_waddress().unwrap()) {
                     Ok(_) => {
                         return Err(MensagoError::ErrProgramException(format!(
                             "{}: failed to clear credentials",
@@ -644,9 +647,9 @@ mod tests {
         let test_path = setup_test(&testname);
 
         let mut profman = setup_profile(&testname, &test_path)?;
-        let mut profile = profman.get_active_profile_mut().unwrap();
+        let profile = profman.get_active_profile_mut().unwrap();
 
-        let w = setup_workspace(&testname, &profile.path)?;
+        let w = setup_workspace(&testname, profile)?;
 
         let conn = match profile.get_db() {
             Ok(v) => v,
@@ -669,7 +672,7 @@ mod tests {
         .unwrap();
         let devname = String::from("mypc");
 
-        match add_device_session(&conn, &waddr, &devid, &devpair, Some(&devname)) {
+        match add_device_session(conn, &waddr, &devid, &devpair, Some(&devname)) {
             Ok(_) => (),
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
@@ -681,7 +684,7 @@ mod tests {
         }
 
         // Case #2: try to add duplicate
-        match add_device_session(&conn, &waddr, &devid, &devpair, Some(&devname)) {
+        match add_device_session(conn, &waddr, &devid, &devpair, Some(&devname)) {
             Ok(_) => {
                 return Err(MensagoError::ErrProgramException(format!(
                     "{}: error failed to catch adding duplicate device session",
@@ -755,9 +758,9 @@ mod tests {
         let test_path = setup_test(&testname);
 
         let mut profman = setup_profile(&testname, &test_path)?;
-        let mut profile = profman.get_active_profile_mut().unwrap();
+        let profile = profman.get_active_profile_mut().unwrap();
 
-        let w = setup_workspace(&testname, &profile.path)?;
+        let w = setup_workspace(&testname, profile)?;
 
         let conn = match profile.get_db() {
             Ok(v) => v,
@@ -843,9 +846,9 @@ mod tests {
         let test_path = setup_test(&testname);
 
         let mut profman = setup_profile(&testname, &test_path)?;
-        let mut profile = profman.get_active_profile_mut().unwrap();
+        let profile = profman.get_active_profile_mut().unwrap();
 
-        let w = setup_workspace(&testname, &profile.path)?;
+        let w = setup_workspace(&testname, profile)?;
 
         let conn = match profile.get_db() {
             Ok(v) => v,
@@ -928,9 +931,9 @@ mod tests {
         let test_path = setup_test(&testname);
 
         let mut profman = setup_profile(&testname, &test_path)?;
-        let mut profile = profman.get_active_profile_mut().unwrap();
+        let profile = profman.get_active_profile_mut().unwrap();
 
-        let w = setup_workspace(&testname, &profile.path)?;
+        let w = setup_workspace(&testname, profile)?;
 
         let conn = match profile.get_db() {
             Ok(v) => v,

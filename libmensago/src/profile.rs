@@ -457,7 +457,7 @@ impl Profile {
             Err(e) => return Err(e),
         };
 
-        w.add_to_db(pw)?;
+        w.add_to_db(conn, pw)?;
 
         self.wid = w.get_wid();
         self.uid = w.get_uid();
@@ -506,7 +506,7 @@ impl Profile {
     }
 
     /// Resolves a Mensago address to its corresponding workspace ID
-    pub fn resolve_address(&self, a: MAddress) -> Result<RandomID, MensagoError> {
+    pub fn resolve_address(&mut self, a: MAddress) -> Result<RandomID, MensagoError> {
         let conn = self.get_db()?;
 
         let values = conn.query(

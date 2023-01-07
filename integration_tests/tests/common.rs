@@ -874,7 +874,9 @@ pub fn setup_profile(
     // assigned to the admin. Test users are assigned 'user1' and 'user2' for clarity.
 
     let mut w = Workspace::new(&profile.path);
+    let db = profile.get_db()?;
     w.generate(
+        db,
         Some(&UserID::from(&profile_data.get("uid").as_ref().unwrap()).unwrap()),
         &Domain::from(&profile_data.get("domain").as_ref().unwrap()).unwrap(),
         &RandomID::from(&profile_data.get("wid").as_ref().unwrap()).unwrap(),
@@ -945,7 +947,7 @@ pub fn regcode_user(
     user_regcode: &str,
     pwhash: &ArgonHash,
 ) -> Result<RegInfo, MensagoError> {
-    let profile = profman.get_active_profile().unwrap();
+    let profile = profman.get_active_profile_mut().unwrap();
 
     let devid = RandomID::from(&profile_data["devid"]).unwrap();
     let regdata = match regcode(
@@ -975,8 +977,8 @@ pub fn regcode_user(
         &ADMIN_PROFILE_DATA["device.private"],
     )
     .unwrap();
-    let db = profile.open_storage()?;
-    match add_device_session(&db, &waddr, &devid, &devpair, None) {
+    let db = profile.get_db()?;
+    match add_device_session(db, &waddr, &devid, &devpair, None) {
         Ok(v) => v,
         Err(e) => {
             return Err(MensagoError::ErrProgramException(format!(
@@ -1060,7 +1062,7 @@ pub fn regcode_user(
     let mut admincard = Keycard::new(EntryType::User);
     admincard.entries.push(entry);
 
-    let dbconn = match profile.open_storage() {
+    let dbconn = match profile.get_db() {
         Ok(v) => v,
         Err(e) => {
             return Err(MensagoError::ErrProgramException(format!(
@@ -1070,7 +1072,7 @@ pub fn regcode_user(
         }
     };
 
-    match update_keycard_in_db(&dbconn, &admincard, false) {
+    match update_keycard_in_db(dbconn, &admincard, false) {
         Ok(v) => v,
         Err(e) => {
             return Err(MensagoError::ErrProgramException(format!(
@@ -1433,7 +1435,7 @@ pub fn setup_db_test(
 
 /// Testing function for quickly checking a table value for a model in the client database.
 pub fn check_db_value(
-    conn: &DBConn,
+    conn: &mut DBConn,
     tablename: &str,
     id: &RandomID,
     column: &str,

@@ -13,7 +13,7 @@ use libkeycard::*;
 /// directly. When check_ttl is true, Ok(None) will be returned if the keycard doesn't exist or if
 /// the Time-To-Live has expired.
 pub fn get_card_from_db(
-    conn: &DBConn,
+    conn: &mut DBConn,
     owner: &str,
     etype: EntryType,
     check_ttl: bool,
@@ -90,7 +90,7 @@ pub fn get_card_from_db(
 /// sure that for_caching is set to false to ensure that the user's local copy isn't accidentally
 /// deleted because its Time-To-Live value expired!
 pub fn update_keycard_in_db(
-    conn: &DBConn,
+    conn: &mut DBConn,
     card: &Keycard,
     for_caching: bool,
 ) -> Result<(), MensagoError> {

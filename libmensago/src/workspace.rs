@@ -1,15 +1,12 @@
-use crate::auth;
-use crate::base::*;
-use crate::dbfs::*;
-use crate::types::*;
+use crate::{auth, base::*, dbconn::*, dbfs::*, types::*};
 use eznacl::*;
 use libkeycard::*;
 use std::fs;
 use std::path::PathBuf;
 
-#[derive(Debug, PartialEq, PartialOrd, Clone)]
+/// The Workspace class is a model which represents a Mensago workspace
+#[derive(Debug, PartialEq, Clone)]
 pub struct Workspace {
-    dbpath: PathBuf,
     path: PathBuf,
     uid: Option<UserID>,
     wid: Option<RandomID>,
@@ -25,7 +22,6 @@ impl Workspace {
         storage.push("storage.db");
 
         return Workspace {
-            dbpath: storage,
             path: path.clone(),
             uid: None,
             wid: None,
@@ -33,21 +29,6 @@ impl Workspace {
             _type: String::from("identity"),
             pwhash: String::from(""),
         };
-    }
-
-    /// Returns a connection to the workspace's storage database
-    pub fn open_storage(&self) -> Result<rusqlite::Connection, MensagoError> {
-        match rusqlite::Connection::open_with_flags(
-            &self.dbpath,
-            rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE,
-        ) {
-            Ok(v) => Ok(v),
-            Err(e) => {
-                return Err(MensagoError::ErrDatabaseException(String::from(
-                    e.to_string(),
-                )));
-            }
-        }
     }
 
     /// Returns the workspace ID of the workspace, assuming one has been set
@@ -109,24 +90,24 @@ impl Workspace {
     }
 
     /// Sets the human-friendly name for the workspace
-    pub fn set_userid(&mut self, uid: Option<&UserID>) -> Result<(), MensagoError> {
+    pub fn set_userid(
+        &mut self,
+        conn: &mut DBConn,
+        uid: Option<&UserID>,
+    ) -> Result<(), MensagoError> {
         let uidstr = match uid {
             Some(v) => v.to_string(),
             None => String::new(),
         };
-        let conn = self.open_storage()?;
 
-        match conn.execute(
+        conn.execute(
             "UPDATE workspaces SET userid=?1 WHERE wid=?2 AND domain=?3",
             &[
                 uidstr.as_str(),
                 self.wid.as_ref().unwrap().as_string(),
                 self.domain.as_ref().unwrap().as_string(),
             ],
-        ) {
-            Ok(_) => (),
-            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-        }
+        )?;
         self.uid = match uid {
             Some(v) => Some(v.clone()),
             None => None,
@@ -138,6 +119,7 @@ impl Workspace {
     /// Creates all the data needed for an individual workspace account
     pub fn generate(
         &mut self,
+        conn: &mut DBConn,
         uid: Option<&UserID>,
         server: &Domain,
         wid: &RandomID,
@@ -153,20 +135,11 @@ impl Workspace {
 
         let waddr = WAddress::from_parts(&wid, &server);
 
-        let conn = match self.open_storage() {
-            Ok(v) => v,
-            Err(e) => {
-                return Err(MensagoError::ErrDatabaseException(String::from(
-                    e.to_string(),
-                )));
-            }
-        };
-
         // Generate and add the workspace's various crypto keys
 
         let crepair = eznacl::EncryptionPair::generate("CURVE25519").unwrap();
         let _ = auth::add_keypair(
-            &conn,
+            conn,
             &waddr,
             &crepair.get_public_key(),
             &crepair.get_private_key(),
@@ -177,7 +150,7 @@ impl Workspace {
 
         let crspair = eznacl::SigningPair::generate("ED25519").unwrap();
         let _ = auth::add_keypair(
-            &conn,
+            conn,
             &waddr,
             &crspair.get_public_key(),
             &crspair.get_private_key(),
@@ -188,7 +161,7 @@ impl Workspace {
 
         let epair = eznacl::EncryptionPair::generate("CURVE25519").unwrap();
         let _ = auth::add_keypair(
-            &conn,
+            conn,
             &waddr,
             &epair.get_public_key(),
             &epair.get_private_key(),
@@ -199,7 +172,7 @@ impl Workspace {
 
         let spair = eznacl::SigningPair::generate("ED25519").unwrap();
         let _ = auth::add_keypair(
-            &conn,
+            conn,
             &waddr,
             &spair.get_public_key(),
             &spair.get_private_key(),
@@ -210,7 +183,7 @@ impl Workspace {
 
         let folderkey = eznacl::SecretKey::generate("XSALSA20").unwrap();
         let _ = auth::add_key(
-            &conn,
+            conn,
             &waddr,
             &folderkey.get_public_key(),
             "sha-256",
@@ -219,7 +192,7 @@ impl Workspace {
 
         let storagekey = eznacl::SecretKey::generate("XSALSA20").unwrap();
         let _ = auth::add_key(
-            &conn,
+            conn,
             &waddr,
             &storagekey.get_public_key(),
             "sha-256",
@@ -237,13 +210,16 @@ impl Workspace {
             "/files",
             "/files/attachments",
         ] {
-            self.add_folder(&FolderMap {
-                fid: RandomID::generate(),
-                address: waddr.clone(),
-                keyid: fkeyhash.clone(),
-                path: DBPath::from(folder).unwrap(),
-                permissions: String::from("admin"),
-            })?;
+            self.add_folder(
+                conn,
+                &FolderMap {
+                    fid: RandomID::generate(),
+                    address: waddr.clone(),
+                    keyid: fkeyhash.clone(),
+                    path: DBPath::from(folder).unwrap(),
+                    permissions: String::from("admin"),
+                },
+            )?;
         }
 
         // Create the folders for files and attachments
@@ -257,31 +233,45 @@ impl Workspace {
             };
         }
 
-        self.set_userid(uid)?;
+        self.set_userid(conn, uid)?;
 
         Ok(())
     }
 
     /// Loads the workspace information from the local database. If no workspace ID is specified,
     /// the identity workspace for the profile is loaded.
-    pub fn load_from_db(&mut self, wid: Option<RandomID>) -> Result<(), MensagoError> {
-        // For the fully-commented version of this code, see profile::get_identity()
-
-        let conn = self.open_storage()?;
-
+    pub fn load_from_db(
+        &mut self,
+        conn: &mut DBConn,
+        wid: Option<RandomID>,
+    ) -> Result<(), MensagoError> {
         let widstr = match wid {
             Some(w) => String::from(w.to_string()),
             None => {
-                let mut stmt =
-                    conn.prepare("SELECT wid FROM workspaces WHERE type = 'identity'")?;
-                stmt.query_row([], |row| row.get::<usize, String>(0))?
+                let values =
+                    conn.query("SELECT wid FROM workspaces WHERE type = 'identity'", [])?;
+                if values.len() != 1 {
+                    return Err(MensagoError::ErrNotFound);
+                }
+                if values[0].len() != 1 {
+                    return Err(MensagoError::ErrSchemaFailure);
+                }
+                values[0][0].to_string()
             }
         };
 
-        let mut stmt = conn.prepare("SELECT domain,userid FROM workspaces WHERE wid = ?1")?;
-        let (domstr, uidstr) = stmt.query_row([widstr.to_string()], |row| {
-            Ok((row.get::<usize, String>(0)?, row.get::<usize, String>(1)?))
-        })?;
+        let values = conn.query(
+            "SELECT domain,userid FROM workspaces WHERE wid = ?1",
+            [widstr.to_string()],
+        )?;
+        if values.len() != 1 {
+            return Err(MensagoError::ErrNotFound);
+        }
+        if values[0].len() != 2 {
+            return Err(MensagoError::ErrSchemaFailure);
+        }
+        let domstr = values[0][0].to_string();
+        let uidstr = values[0][1].to_string();
 
         let tempdom = match Domain::from(&domstr) {
             Some(v) => v,
@@ -318,20 +308,15 @@ impl Workspace {
     }
 
     /// Adds the workspace instance to the storage database as the profile's identity workspace
-    pub fn add_to_db(&self, pw: &ArgonHash) -> Result<(), MensagoError> {
-        let conn = self.open_storage()?;
-
-        match conn
-            .prepare("SELECT wid FROM workspaces WHERE type = 'identity'")?
-            .exists([])
-        {
+    pub fn add_to_db(&self, conn: &mut DBConn, pw: &ArgonHash) -> Result<(), MensagoError> {
+        match conn.exists("SELECT wid FROM workspaces WHERE type = 'identity'", []) {
             Ok(v) => {
                 if v {
                     return Err(MensagoError::ErrExists);
                 }
             }
             Err(_) => (),
-        };
+        }
 
         let uidstr = match &self.uid {
             Some(v) => String::from(v.to_string()),
@@ -339,7 +324,7 @@ impl Workspace {
         };
 
         if uidstr.len() > 0 {
-            match conn.execute(
+            conn.execute(
                 "INSERT INTO workspaces(wid,userid,domain,password,pwhashtype,type)
 			VALUES(?1,?2,?3,?4,?5,?6)",
                 &[
@@ -350,12 +335,9 @@ impl Workspace {
                     pw.get_hashtype(),
                     &self._type,
                 ],
-            ) {
-                Ok(_) => return Ok(()),
-                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-            }
+            )?;
         } else {
-            match conn.execute(
+            conn.execute(
                 "INSERT INTO workspaces(wid,userid,domain,password,pwhashtype,type)
 			VALUES(?1,?2,?3,?4,?5)",
                 &[
@@ -365,77 +347,25 @@ impl Workspace {
                     pw.get_hashtype(),
                     &self._type,
                 ],
-            ) {
-                Ok(_) => return Ok(()),
-                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-            }
+            )?;
         }
+        Ok(())
     }
 
     /// Removes ALL DATA associated with a workspace. Don't call this unless you mean to erase all
     /// evidence that a particular workspace ever existed.
-    pub fn remove_from_db(&self) -> Result<(), MensagoError> {
+    pub fn remove_from_db(&self, conn: &mut DBConn) -> Result<(), MensagoError> {
         let address =
             WAddress::from_parts(self.wid.as_ref().unwrap(), &self.domain.as_ref().unwrap());
 
         // Clear out storage database
-        {
-            let conn = self.open_storage()?;
-
-            match conn
-                .prepare("SELECT wid FROM workspaces WHERE wid=?1 AND domain=?2")?
-                .exists([
-                    self.wid.as_ref().unwrap().to_string(),
-                    self.domain.as_ref().unwrap().to_string(),
-                ]) {
-                Ok(v) => {
-                    if !v {
-                        return Err(MensagoError::ErrNotFound);
-                    }
-                }
-                Err(e) => {
-                    return Err(MensagoError::ErrDatabaseException(String::from(
-                        e.to_string(),
-                    )));
-                }
-            }
-
-            match conn.execute(
-                "DELETE FROM workspaces WHERE wid=?1 AND domain=?2",
-                &[
-                    self.wid.as_ref().unwrap().as_string(),
-                    self.domain.as_ref().unwrap().as_string(),
-                ],
-            ) {
-                Ok(_) => (),
-                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-            }
-
-            for table_name in ["folders", "messages", "notes", "keys", "sessions"] {
-                match conn.execute(
-                    &format!("DELETE FROM {} WHERE address=?1", table_name),
-                    [address.as_string()],
-                ) {
-                    Ok(_) => (),
-                    Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Removes a workspace from the storage database. NOTE: This only removes the workspace entry
-    /// itself. It does not remove keys, sessions, or other associated data.
-    pub fn remove_workspace_entry(&self) -> Result<(), MensagoError> {
-        let conn = self.open_storage()?;
-
-        match conn
-            .prepare("SELECT wid FROM workspaces WHERE wid=?1 AND domain=?2")?
-            .exists([
+        match conn.exists(
+            "SELECT wid FROM workspaces WHERE wid=?1 AND domain=?2",
+            [
                 self.wid.as_ref().unwrap().to_string(),
                 self.domain.as_ref().unwrap().to_string(),
-            ]) {
+            ],
+        ) {
             Ok(v) => {
                 if !v {
                     return Err(MensagoError::ErrNotFound);
@@ -448,36 +378,61 @@ impl Workspace {
             }
         }
 
-        match conn.execute(
+        conn.execute(
             "DELETE FROM workspaces WHERE wid=?1 AND domain=?2",
             &[
                 self.wid.as_ref().unwrap().as_string(),
                 self.domain.as_ref().unwrap().as_string(),
             ],
-        ) {
-            Ok(_) => (),
-            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+        )?;
+
+        for table_name in ["folders", "messages", "notes", "keys", "sessions"] {
+            conn.execute(
+                &format!("DELETE FROM {} WHERE address=?1", table_name),
+                [address.as_string()],
+            )?;
         }
 
         Ok(())
     }
 
-    /// Adds a mapping of a folder ID to a specific path in the workspace
-    pub fn add_folder(&self, fmap: &FolderMap) -> Result<(), MensagoError> {
-        let conn = match rusqlite::Connection::open_with_flags(
-            &self.dbpath,
-            rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE,
+    /// Removes a workspace from the storage database. NOTE: This only removes the workspace entry
+    /// itself. It does not remove keys, sessions, or other associated data.
+    pub fn remove_workspace_entry(&self, conn: &mut DBConn) -> Result<(), MensagoError> {
+        match conn.exists(
+            "SELECT wid FROM workspaces WHERE wid=?1 AND domain=?2",
+            [
+                self.wid.as_ref().unwrap().to_string(),
+                self.domain.as_ref().unwrap().to_string(),
+            ],
         ) {
-            Ok(v) => v,
+            Ok(v) => {
+                if !v {
+                    return Err(MensagoError::ErrNotFound);
+                }
+            }
             Err(e) => {
                 return Err(MensagoError::ErrDatabaseException(String::from(
                     e.to_string(),
                 )));
             }
-        };
+        }
 
-        let mut stmt = conn.prepare("SELECT fid FROM folders WHERE fid=?1")?;
-        match stmt.exists([fmap.fid.as_string()]) {
+        conn.execute(
+            "DELETE FROM workspaces WHERE wid=?1 AND domain=?2",
+            &[
+                self.wid.as_ref().unwrap().as_string(),
+                self.domain.as_ref().unwrap().as_string(),
+            ],
+        )
+    }
+
+    /// Adds a mapping of a folder ID to a specific path in the workspace
+    pub fn add_folder(&self, conn: &mut DBConn, fmap: &FolderMap) -> Result<(), MensagoError> {
+        match conn.exists(
+            "SELECT fid FROM folders WHERE fid=?1",
+            [fmap.fid.as_string()],
+        ) {
             Ok(v) => {
                 if v {
                     return Err(MensagoError::ErrExists);
@@ -486,7 +441,7 @@ impl Workspace {
             Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
         };
 
-        match conn.execute(
+        conn.execute(
             "INSERT INTO folders(fid,address,keyid,path,name,permissions)
 			VALUES(?1,?2,?3,?4,?5,?6)",
             [
@@ -497,43 +452,15 @@ impl Workspace {
                 String::from(fmap.path.basename()),
                 fmap.permissions.clone(),
             ],
-        ) {
-            Ok(_) => return Ok(()),
-            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-        }
+        )
     }
 
     /// Deletes a mapping of a folder ID to a specific path in the workspace
-    pub fn remove_folder(&self, fid: &RandomID) -> Result<(), MensagoError> {
-        let conn = match rusqlite::Connection::open_with_flags(
-            &self.dbpath,
-            rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE,
-        ) {
-            Ok(v) => v,
-            Err(e) => {
-                return Err(MensagoError::ErrDatabaseException(String::from(
-                    e.to_string(),
-                )));
-            }
-        };
-
-        // Check to see if the folder ID passed to the function exists
-        let mut stmt = match conn.prepare("SELECT fid FROM folders WHERE fid=?1") {
-            Ok(v) => v,
-            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-        };
-
-        let mut rows = match stmt.query([fid.as_string()]) {
-            Ok(v) => v,
-            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-        };
-
-        match rows.next() {
-            Ok(optrow) => {
-                match optrow {
-                    // This means that the device ID wasn't found
-                    None => return Err(MensagoError::ErrNotFound),
-                    Some(_) => (),
+    pub fn remove_folder(&self, conn: &mut DBConn, fid: &RandomID) -> Result<(), MensagoError> {
+        match conn.exists("SELECT fid FROM folders WHERE fid=?1", [fid.as_string()]) {
+            Ok(v) => {
+                if !v {
+                    return Err(MensagoError::ErrNotFound);
                 }
             }
             Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
@@ -546,37 +473,19 @@ impl Workspace {
     }
 
     /// Gets the specified folder mapping.
-    pub fn get_folder(&self, fid: &RandomID) -> Result<FolderMap, MensagoError> {
-        let conn = match rusqlite::Connection::open_with_flags(
-            &self.dbpath,
-            rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE,
-        ) {
-            Ok(v) => v,
-            Err(e) => {
-                return Err(MensagoError::ErrDatabaseException(String::from(
-                    e.to_string(),
-                )));
-            }
-        };
+    pub fn get_folder(&self, conn: &mut DBConn, fid: &RandomID) -> Result<FolderMap, MensagoError> {
+        let values = conn.query(
+            "SELECT address,keyid,path,permissions FROM folders WHERE fid=?1",
+            [fid.to_string()],
+        )?;
+        if values.len() != 1 {
+            return Err(MensagoError::ErrNotFound);
+        }
+        if values[0].len() != 4 {
+            return Err(MensagoError::ErrSchemaFailure);
+        }
 
-        // For the fully-commented version of this query, see profile::get_identity()
-        let mut stmt =
-            conn.prepare("SELECT address,keyid,path,permissions FROM folders WHERE fid=?1")?;
-
-        let mut rows = stmt.query([fid.as_string()])?;
-
-        let option_row = match rows.next() {
-            Ok(v) => v,
-            Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
-        };
-
-        // Query unwrapping complete. Start extracting the data
-        let row = match option_row {
-            Some(v) => v,
-            None => return Err(MensagoError::ErrNotFound),
-        };
-
-        let waddr = match WAddress::from(&row.get::<usize, String>(0).unwrap()) {
+        let waddr = match WAddress::from(&values[0][0].to_string()) {
             Some(v) => v,
             None => {
                 return Err(MensagoError::ErrDatabaseException(String::from(
@@ -584,8 +493,7 @@ impl Workspace {
                 )))
             }
         };
-
-        let keyid = match CryptoString::from(&row.get::<usize, String>(1).unwrap()) {
+        let keyid = match CryptoString::from(&values[0][1].to_string()) {
             Some(v) => v,
             None => {
                 return Err(MensagoError::ErrDatabaseException(String::from(
@@ -594,14 +502,12 @@ impl Workspace {
             }
         };
 
-        let path = DBPath::from(&row.get::<usize, String>(2).unwrap())?;
-
         let fmap = FolderMap {
             fid: fid.clone(),
             address: waddr,
             keyid: keyid,
-            path: path,
-            permissions: String::from(&row.get::<usize, String>(3).unwrap()),
+            path: DBPath::from(&values[0][2].to_string())?,
+            permissions: values[0][3].to_string(),
         };
 
         Ok(fmap)
@@ -685,8 +591,11 @@ mod tests {
 			b2zoU9ZNhHlo/ZYuSJwoqUAXEdf1cbN3fxmbQhP0zJc",
         );
 
-        let mut w = Workspace::new(&profile.path);
+        let profpath = profile.path.clone();
+        let mut w = Workspace::new(&profpath);
+        let db = profile.get_db()?;
         match w.generate(
+            db,
             Some(&UserID::from("testname").unwrap()),
             Domain::from("example.com").as_ref().unwrap(),
             RandomID::from("b5a9367e-680d-46c0-bb2c-73932a6d4007")
@@ -706,7 +615,7 @@ mod tests {
 
         // Case #1: successful add
         let pwhash = ArgonHash::from_hashstr(&pw);
-        match w.add_to_db(&pwhash) {
+        match w.add_to_db(db, &pwhash) {
             Ok(_) => (),
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
@@ -718,7 +627,7 @@ mod tests {
         }
 
         // Case #2: try to add when already in db
-        match w.add_to_db(&pwhash) {
+        match w.add_to_db(db, &pwhash) {
             Ok(_) => {
                 return Err(MensagoError::ErrProgramException(format!(
                     "{}: failed to catch double adding workspace to db",
@@ -729,7 +638,7 @@ mod tests {
         }
 
         // Case #3: successful remove from db
-        match w.remove_from_db() {
+        match w.remove_from_db(db) {
             Ok(_) => (),
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
@@ -741,7 +650,7 @@ mod tests {
         }
 
         // Case #4: try to remove nonexistent
-        match w.remove_from_db() {
+        match w.remove_from_db(db) {
             Ok(_) => {
                 return Err(MensagoError::ErrProgramException(format!(
                     "{}: failed to catch removing nonexistent workspace from db",
@@ -752,8 +661,8 @@ mod tests {
         }
 
         // Case #4: try to load nonexistent identity
-        let mut testw = Workspace::new(&profile.path);
-        match testw.load_from_db(None) {
+        let mut testw = Workspace::new(&profpath);
+        match testw.load_from_db(db, None) {
             Ok(_) => {
                 return Err(MensagoError::ErrProgramException(format!(
                     "{}: failed to catch loading nonexistent identity from db",
@@ -764,7 +673,7 @@ mod tests {
         }
 
         // Case #5: try to load other nonexistent workspace
-        match testw.load_from_db(RandomID::from("00000000-0000-0000-0000-000000000000")) {
+        match testw.load_from_db(db, RandomID::from("00000000-0000-0000-0000-000000000000")) {
             Ok(_) => {
                 return Err(MensagoError::ErrProgramException(format!(
                     "{}: failed to catch loading nonexistent identity from db",
@@ -775,7 +684,7 @@ mod tests {
         }
 
         // Add again to test load_from_db and remove_workspace_entry()
-        match w.add_to_db(&pwhash) {
+        match w.add_to_db(db, &pwhash) {
             Ok(_) => (),
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
@@ -787,7 +696,7 @@ mod tests {
         }
 
         // Case #6: successful load
-        match testw.load_from_db(None) {
+        match testw.load_from_db(db, None) {
             Ok(_) => {
                 // load_from_db doesn't get the password hash, so we'll just add it here to make
                 // the comparison code simpler
@@ -809,7 +718,7 @@ mod tests {
         };
 
         // Case #7: successful remove_entry
-        match w.remove_workspace_entry() {
+        match w.remove_workspace_entry(db) {
             Ok(_) => (),
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
@@ -836,9 +745,13 @@ mod tests {
         let fkeyhash = get_hash("SHA-256", folderkey.get_public_str().as_bytes())?;
 
         let w = Workspace::new(&profile.path);
+        let db = profile.get_db()?;
 
         // Case #1: Trying to get a non-existent folder mapping
-        match w.get_folder(&RandomID::from("11111111-2222-3333-4444-555555666666").unwrap()) {
+        match w.get_folder(
+            db,
+            &RandomID::from("11111111-2222-3333-4444-555555666666").unwrap(),
+        ) {
             Ok(_) => {
                 return Err(MensagoError::ErrProgramException(format!(
                     "{}: failed to catch nonexistent folder mapping",
@@ -857,7 +770,7 @@ mod tests {
         };
 
         // Case #2: Test add_folder
-        match w.add_folder(&foldermap) {
+        match w.add_folder(db, &foldermap) {
             Ok(_) => (),
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
@@ -867,18 +780,6 @@ mod tests {
                 )))
             }
         }
-
-        let conn = match rusqlite::Connection::open_with_flags(
-            &w.dbpath,
-            rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE,
-        ) {
-            Ok(v) => v,
-            Err(e) => {
-                return Err(MensagoError::ErrDatabaseException(String::from(
-                    e.to_string(),
-                )));
-            }
-        };
 
         // The amount of work put into making this code check all fields here with a loop is
         // stupidly *ridiculous*. Passing the tuple parameters using the recommended method,
@@ -901,22 +802,18 @@ mod tests {
         ];
 
         for pair in fields {
-            let query = format!(
-                "SELECT {} FROM folders WHERE fid='{}'",
-                pair.0,
-                foldermap.fid.to_string()
-            );
-            match conn.prepare(&query)?.query_row([], |row| {
-                let value = row.get::<usize, String>(0)?;
-                if value != pair.1 {
-                    panic!(
-                        "test_dbpath: wanted {} for {}, got {}",
-                        &pair.1, &pair.0, value
-                    )
+            match db.get_db_value("folders", &pair.0, &foldermap.fid.to_string()) {
+                Ok(v) => {
+                    if v.to_string() != pair.1 {
+                        return Err(MensagoError::ErrProgramException(format!(
+                            "{}: wanted {} for {}, got {}",
+                            testname,
+                            &pair.1,
+                            &pair.0,
+                            v.to_string(),
+                        )));
+                    }
                 }
-                Ok(())
-            }) {
-                Ok(_) => (),
                 Err(e) => {
                     return Err(MensagoError::ErrProgramException(format!(
                         "{}: error get folder mapping field {}: {}",
@@ -929,7 +826,7 @@ mod tests {
         }
 
         // Case #3: trying to add a folder again
-        match w.add_folder(&foldermap) {
+        match w.add_folder(db, &foldermap) {
             Ok(_) => {
                 return Err(MensagoError::ErrProgramException(format!(
                     "{}: failed to catch duplicate folder mapping",
@@ -940,7 +837,7 @@ mod tests {
         }
 
         // Case #4: successful get_folder()
-        match w.get_folder(&foldermap.fid) {
+        match w.get_folder(db, &foldermap.fid) {
             Ok(v) => {
                 if v.fid != foldermap.fid
                     || v.address != foldermap.address
@@ -964,8 +861,8 @@ mod tests {
         }
 
         // Case #5: successful remove_folder()
-        match w.remove_folder(&foldermap.fid) {
-            Ok(_) => match w.get_folder(&foldermap.fid) {
+        match w.remove_folder(db, &foldermap.fid) {
+            Ok(_) => match w.get_folder(db, &foldermap.fid) {
                 Ok(_) => {
                     return Err(MensagoError::ErrProgramException(format!(
                         "{}: remove_folder failed to remove db entry",
@@ -984,7 +881,7 @@ mod tests {
         }
 
         // Case #6: try to remove nonexistent folder
-        match w.remove_folder(&foldermap.fid) {
+        match w.remove_folder(db, &foldermap.fid) {
             Ok(_) => {
                 return Err(MensagoError::ErrProgramException(format!(
                     "{}: failed to catch removing nonexistent folder mapping",
