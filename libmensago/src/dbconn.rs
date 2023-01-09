@@ -57,10 +57,7 @@ impl DBConn {
             return Err(MensagoError::ErrExists);
         }
 
-        *connhandle = match rusqlite::Connection::open_with_flags(
-            path,
-            rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
-        ) {
+        *connhandle = match rusqlite::Connection::open(path) {
             Ok(v) => Some(v),
             Err(e) => return Err(MensagoError::RusqliteError(e)),
         };
