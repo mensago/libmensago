@@ -313,14 +313,8 @@ impl Profile {
         let mut storagepath = self.path.clone();
         storagepath.push("storage.db");
         if storagepath.exists() {
-            let db = rusqlite::Connection::open(storagepath)?;
-            match self.config.load_from_db(&db) {
-                Ok(v) => v,
-                Err(e) => return Err(MensagoError::ErrIO(e.to_string())),
-            };
-            db.close()
-                .expect("BUG: Profile.activate(): error closing database");
-            return Ok(());
+            let _ = self.get_db()?;
+            return self.config.load_from_db(&mut self.dbconn);
         }
 
         self.reset_db()
