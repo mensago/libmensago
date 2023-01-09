@@ -802,7 +802,7 @@ mod tests {
         ];
 
         for pair in fields {
-            match db.get_db_value("folders", &pair.0, &foldermap.fid.to_string()) {
+            match db.get_db_value("folders", &pair.0, "fid", &foldermap.fid.to_string()) {
                 Ok(v) => {
                     if v.to_string() != pair.1 {
                         return Err(MensagoError::ErrProgramException(format!(
@@ -816,7 +816,7 @@ mod tests {
                 }
                 Err(e) => {
                     return Err(MensagoError::ErrProgramException(format!(
-                        "{}: error get folder mapping field {}: {}",
+                        "{}: error getting folder mapping field {}: {}",
                         testname,
                         &pair.0,
                         e.to_string()

@@ -94,9 +94,10 @@ impl DBConn {
         &mut self,
         tablename: &str,
         column: &str,
+        idfield: &str,
         id: &str,
     ) -> Result<DBValue, MensagoError> {
-        if tablename.len() == 0 || column.len() == 0 {
+        if tablename.len() == 0 || column.len() == 0 || idfield.len() == 0 {
             return Err(MensagoError::ErrEmptyData);
         }
 
@@ -107,7 +108,11 @@ impl DBConn {
         // done for substitution causes the column name to be returned from the query instead of
         // the value of the row in that column. Not great, but it *is* safe in this instance.
         let rows = self.query(
-            format!("SELECT {} FROM {} WHERE id = ?1", column, tablename).as_str(),
+            format!(
+                "SELECT {} FROM {} WHERE {} = ?1",
+                column, tablename, idfield
+            )
+            .as_str(),
             [id],
         )?;
         if rows.len() != 1 {
