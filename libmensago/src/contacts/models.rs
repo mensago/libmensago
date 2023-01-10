@@ -1007,7 +1007,7 @@ impl AddressModel {
     pub fn load_from_db(id: &RandomID, conn: &mut DBConn) -> Result<AddressModel, MensagoError> {
         let values = conn.query(
             "SELECT conid,label,street,extended,locality,region,postalcode,country,preferred 
-        //     FROM contact_address WHERE id = ?1",
+            FROM contact_address WHERE id=?1",
             &[&id.to_string()],
         )?;
         if values.len() != 1 {
