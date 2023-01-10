@@ -3,6 +3,50 @@ mod tests {
     use libmensago::*;
 
     #[test]
+    fn test_dbconn_connect_disconnect() -> Result<(), MensagoError> {
+        // This test is also officially responsible for testing connect() and disconnect()
+        let testname = "test_dbconn_connect_disconnect";
+
+        // The list of full data is as follows:
+        // let (config, pwhash, profman) = setup_db_test(testname)?;
+        //
+        // Calling setup_db_test() is really overkill for what this test needs, but the extra
+        // setup work done is worth not having to write custom test setup logic.
+        let (_, _, mut profman) = setup_db_test(testname)?;
+
+        match profman.create_profile("secondary") {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{} failed to create test profile: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        }
+
+        assert!(profman
+            .get_active_profile_mut()
+            .unwrap()
+            .dbconn
+            .is_connected());
+
+        match profman.activate_profile("secondary") {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{} failed to activate secondary profile: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        }
+        assert!(!profman.get_profile_mut(0).unwrap().dbconn.is_connected());
+
+        Ok(())
+    }
+
+    #[test]
     fn test_dbconn_execute() -> Result<(), MensagoError> {
         // This test is also officially responsible for testing connect() and disconnect()
         let testname = "test_dbconn_execute";

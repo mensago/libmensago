@@ -573,7 +573,9 @@ impl ProfileManager {
             _ => return Err(MensagoError::ErrNotFound),
         };
 
-        self.profiles[active_index as usize].deactivate()?;
+        if self.active_index >= 0 {
+            self.profiles[self.active_index as usize].deactivate()?;
+        }
         self.profile_id = name_squashed;
         self.active_index = active_index;
         self.profiles[active_index as usize].activate()?;
