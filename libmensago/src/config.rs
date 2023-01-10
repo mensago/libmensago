@@ -394,16 +394,6 @@ impl Config {
                 }
             };
 
-            // conn.execute(
-            //     "INSERT OR REPLACE INTO appconfig(scope,scopevalue,fvalue)
-            // 	VALUES(?2,?3,?4) WHERE fname=?1;",
-            //     [
-            //         fname,
-            //         &field.scope.to_string(),
-            //         &field.scopevalue,
-            //         &field.value,
-            //     ],
-            // )?;
             match conn.exists("SELECT fname FROM appconfig WHERE fname=?1", [fname]) {
                 Ok(v) => {
                     let cmd = if v {
