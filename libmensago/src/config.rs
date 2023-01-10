@@ -394,18 +394,41 @@ impl Config {
                 }
             };
 
-            conn.execute(
-                "INSERT OR REPLACE INTO appconfig(scope,scopevalue,fvalue)
-				VALUES(?2,?3,?4) WHERE fname=?1;",
-                [
-                    fname,
-                    &field.scope.to_string(),
-                    &field.scopevalue,
-                    &field.value,
-                ],
-            )?;
+            // conn.execute(
+            //     "INSERT OR REPLACE INTO appconfig(scope,scopevalue,fvalue)
+            // 	VALUES(?2,?3,?4) WHERE fname=?1;",
+            //     [
+            //         fname,
+            //         &field.scope.to_string(),
+            //         &field.scopevalue,
+            //         &field.value,
+            //     ],
+            // )?;
+            match conn.exists("SELECT fname FROM appconfig WHERE fname=?1", [fname]) {
+                Ok(v) => {
+                    let cmd = if v {
+                        String::from(
+                            "UPDATE appconfig SET scope=?2,scopevalue=?3,fvalue=?4 WHERE fname=?1;",
+                        )
+                    } else {
+                        String::from(
+                            "INSERT INTO appconfig (fname,scope,scopevalue,fvalue) 
+								VALUES(?1,?2,?3,?4);",
+                        )
+                    };
+                    conn.execute(
+                        &cmd,
+                        [
+                            fname,
+                            &field.scope.to_string(),
+                            &field.scopevalue,
+                            &field.value,
+                        ],
+                    )?;
+                }
+                Err(e) => return Err(MensagoError::ErrDatabaseException(e.to_string())),
+            }
         }
-
         self.modified.clear();
 
         Ok(())
