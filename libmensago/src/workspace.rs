@@ -386,12 +386,16 @@ impl Workspace {
             ],
         )?;
 
-        for table_name in ["folders", "messages", "notes", "keys", "sessions"] {
+        for table_name in ["folders", "keys", "sessions"] {
             conn.execute(
                 &format!("DELETE FROM {} WHERE address=?1", table_name),
                 [address.as_string()],
             )?;
         }
+        conn.execute(
+            "DELETE FROM messages WHERE fromaddr=?1",
+            [address.as_string()],
+        )?;
 
         Ok(())
     }

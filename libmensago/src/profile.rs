@@ -63,7 +63,7 @@ static STORAGE_DB_SETUP_COMMANDS: &str = "
 	CREATE table 'messages'(
 		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
 		'id' TEXT NOT NULL UNIQUE,
-		'from'  TEXT NOT NULL,
+		'fromaddr'  TEXT NOT NULL,
         'conid' TEXT NOT NULL,
 		'to' TEXT NOT NULL,
 		'cc'  TEXT,
@@ -299,7 +299,7 @@ impl Profile {
         Ok(profile)
     }
 
-    /// Connects the profile to its associated database, initializing it if necessary.
+    /// Makes the profile active and ready for use
     pub fn activate(&mut self) -> Result<(), MensagoError> {
         let mut tempdir = self.path.clone();
         tempdir.push("temp");
@@ -318,6 +318,11 @@ impl Profile {
         }
 
         self.reset_db()
+    }
+
+    /// Deactivates the profile.
+    pub fn deactivate(&mut self) -> Result<(), MensagoError> {
+        self.dbconn.disconnect()
     }
 
     /// Sets the profile's internal flag that it is the default profile
@@ -556,7 +561,7 @@ impl ProfileManager {
         }
     }
 
-    /// Sets the named profile as active.
+    /// Sets the named profile as active and deactivates any active ones.
     pub fn activate_profile(&mut self, name: &str) -> Result<&Profile, MensagoError> {
         if name.len() == 0 {
             return Err(MensagoError::ErrEmptyData);
@@ -568,6 +573,7 @@ impl ProfileManager {
             _ => return Err(MensagoError::ErrNotFound),
         };
 
+        self.profiles[active_index as usize].deactivate()?;
         self.profile_id = name_squashed;
         self.active_index = active_index;
         self.profiles[active_index as usize].activate()?;
