@@ -197,7 +197,7 @@ impl AttachmentModel {
             [&ownid.as_string()],
         )?;
         if rows.len() == 0 {
-            return Err(MensagoError::ErrNotFound);
+            return Ok(Vec::new());
         }
         for row in rows {
             if row.len() != 1 || row[0].get_type() != DBValueType::Text {
@@ -378,7 +378,7 @@ impl ImageModel {
             [&ownid.as_string()],
         )?;
         if rows.len() == 0 {
-            return Err(MensagoError::ErrNotFound);
+            return Ok(Vec::new());
         }
         for row in rows {
             if row.len() != 1 || row[0].get_type() != DBValueType::Text {
