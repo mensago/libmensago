@@ -2,28 +2,16 @@ use libmensago::*;
 use libmensago::{DBModel, MensagoError};
 
 pub fn import_demonotes(db: &mut DBConn) -> Result<(), MensagoError> {
-    let txtnote = NoteModel::import(
-        "tests/demofiles/pilgrimsprogress.txt",
-        DocFormat::Text,
-        "The Pilgrim's Progress",
-        "Default",
-    )?;
+    let mut txtnote = NoteModel::new("The Pilgrim's Progress", DocFormat::Text, "Default");
+    txtnote.body = String::from(DEMO_NOTE_TXT);
     txtnote.set_in_db(db)?;
 
-    let mdnote = NoteModel::import(
-        "tests/demofiles/dartpass_readme.md",
-        DocFormat::Markdown,
-        "Dartpass: README",
-        "Default",
-    )?;
+    let mut mdnote = NoteModel::new("Dartpass: README", DocFormat::Markdown, "Default");
+    mdnote.body = String::from(DEMO_NOTE_MD);
     mdnote.set_in_db(db)?;
 
-    let sftmnote = NoteModel::import(
-        "tests/demofiles/roadnottaken.sftm",
-        DocFormat::SFTM,
-        "The Road Not Taken",
-        "SFTM",
-    )?;
+    let mut sftmnote = NoteModel::new("The Road Not Taken", DocFormat::SFTM, "SFTM");
+    sftmnote.body = String::from(DEMO_NOTE_SFTM);
     sftmnote.set_in_db(db)?;
 
     Ok(())
@@ -69,7 +57,7 @@ mod tests {
     }
 }
 
-static demo_note_txt: &str = r"
+static DEMO_NOTE_TXT: &str = r"
 THE PILGRIM'S PROGRESS
 
 From This World To That Which Is To Come
@@ -115,7 +103,7 @@ When at the first I took my pen in hand
   I did it my own self to gratify.
   ";
 
-static demo_note_md: &str = r"
+static DEMO_NOTE_MD: &str = r"
 # Dartpass
 
 Dartpass is a flexible command-line password generator designed for power users and administrators, written in Dart, and released under the Mozilla Public License 2.0.
@@ -160,7 +148,7 @@ Dartpass leverages the [Electronic Frontier Foundation's](https://www.eff.org/) 
 This is my first Dart project, so I'm pretty sure things aren't optimal even if they work well enough. Contributions are always welcome.
 ";
 
-static demo_note_sftm: &str = "
+static DEMO_NOTE_SFTM: &str = "
 [document type=\"sftm\" version=\"1.0\"][body]
 [h1]The Road Not Taken[/h1]
 [h2]By Robert Frost[/h2]
