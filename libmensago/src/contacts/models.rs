@@ -76,7 +76,7 @@ impl StringModel {
             [&conid.as_string(), itemtype],
         )?;
         if rows.len() == 0 {
-            return Err(MensagoError::ErrNotFound);
+            return Ok(Vec::new());
         }
         for row in rows {
             if row.len() != 1
@@ -299,7 +299,7 @@ impl NamePartModel {
             [&conid.as_string(), parttype.to_string().as_str()],
         )?;
         if rows.len() == 0 {
-            return Err(MensagoError::ErrNotFound);
+            return Ok(Vec::new());
         }
         for row in rows {
             if row.len() != 1 || row[0].get_type() != DBValueType::Text {
@@ -646,7 +646,7 @@ impl MensagoModel {
             [&conid.as_string()],
         )?;
         if rows.len() == 0 {
-            return Err(MensagoError::ErrNotFound);
+            return Ok(Vec::new());
         }
         for row in rows {
             if row.len() != 1 || row[0].get_type() != DBValueType::Text {
@@ -840,7 +840,7 @@ impl KeyModel {
             [&conid.as_string()],
         )?;
         if rows.len() == 0 {
-            return Err(MensagoError::ErrNotFound);
+            return Ok(Vec::new());
         }
         for row in rows {
             if row.len() != 1 || row[0].get_type() != DBValueType::Text {
@@ -1052,7 +1052,7 @@ impl AddressModel {
             [&conid.as_string()],
         )?;
         if rows.len() == 0 {
-            return Err(MensagoError::ErrNotFound);
+            return Ok(Vec::new());
         }
         for row in rows {
             if row.len() != 1 || row[0].get_type() != DBValueType::Text {
@@ -1383,7 +1383,7 @@ impl FileModel {
             [&conid.as_string()],
         )?;
         if rows.len() == 0 {
-            return Err(MensagoError::ErrNotFound);
+            return Ok(Vec::new());
         }
         for row in rows {
             if row.len() != 1 || row[0].get_type() != DBValueType::Text {
