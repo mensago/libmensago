@@ -396,7 +396,7 @@ pub fn get_notes(conn: &mut DBConn, notebook: &str) -> Result<Vec<NotebookItem>,
         out.push(NotebookItem {
             rowid: row[0].to_int().unwrap() as usize,
             id: noteid,
-            title: row[1].to_string(),
+            title: row[2].to_string(),
         });
     }
 
