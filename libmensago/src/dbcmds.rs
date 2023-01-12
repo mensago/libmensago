@@ -30,7 +30,7 @@ pub fn get_card_from_db(
         [owner],
     )?;
     if rows.len() == 0 {
-        return Err(MensagoError::ErrNotFound);
+        return Ok(None);
     }
     for row in rows {
         if row.len() != 1 || row[0].get_type() != DBValueType::Text {
