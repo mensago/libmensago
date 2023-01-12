@@ -7,10 +7,12 @@ use crate::base::MensagoError;
 use pretty_hex::simple_hex_write;
 use rusqlite;
 use rusqlite::types::*;
-use std::fmt;
-use std::path::PathBuf;
-use std::str;
-use std::sync::Mutex;
+use std::{
+    fmt,
+    path::PathBuf,
+    str,
+    sync::{mpsc, Mutex},
+};
 
 /// The DBConn type is a thread-safe shared connection to an SQLite3 database.
 #[derive(Debug)]
@@ -20,6 +22,7 @@ pub struct DBConn {
     // Yes, I know about POSIX non-UTF8 paths. If someone has a non-UTF8 path in their *NIX box,
     // they can fix their paths or go pound sand.👿
     path: String,
+    channel_groups: Vec<mpsc::Sender<DBUpdate>>,
 }
 
 impl fmt::Display for DBConn {
@@ -38,6 +41,7 @@ impl DBConn {
         DBConn {
             db: Mutex::new(None),
             path: String::new(),
+            channel_groups: Vec::new(),
         }
     }
 
@@ -225,11 +229,21 @@ impl DBConn {
         Ok(out)
     }
 
+    pub fn subscribe(
+        action: DBEventType,
+        channel: DBUpdateChannel,
+        subscriber: mpsc::Sender<DBUpdate>,
+    ) -> Result<(), MensagoError> {
+        // TODO: implement DBConn::subscribe()
+
+        Err(MensagoError::ErrUnimplemented)
+    }
+
     fn update_hook(action: rusqlite::hooks::Action, dbname: &str, tablename: &str, rowid: i64) {
         let dbaction = match action {
-            rusqlite::hooks::Action::SQLITE_INSERT => DBEvent::Insert,
-            rusqlite::hooks::Action::SQLITE_UPDATE => DBEvent::Update,
-            rusqlite::hooks::Action::SQLITE_DELETE => DBEvent::Delete,
+            rusqlite::hooks::Action::SQLITE_INSERT => DBEventType::Insert,
+            rusqlite::hooks::Action::SQLITE_UPDATE => DBEventType::Update,
+            rusqlite::hooks::Action::SQLITE_DELETE => DBEventType::Delete,
             _ => {
                 println!(
                     "BUG: UNKNOWN SQLite action on database {}, table {}, rowid {}",
@@ -253,25 +267,39 @@ impl DBConn {
     }
 }
 
-// Event Types
+/// DBEventType represents the kind of update made to a database table. It maps directly to the
+/// same types used by rusqlite, but exists so that higher-level code doesn't have to touch rusqlite.
 #[derive(Debug, Copy, Clone)]
-pub enum DBEvent {
+pub enum DBEventType {
     /// Received when a specific item in a row is changed
-    Update,
+    Update = 1,
 
     /// Received when items are added to or deleted from a table
-    Insert,
-    Delete,
+    Insert = 2,
+    Delete = 4,
+    All = 7,
 }
 
-// Event Channels
+///
 #[derive(Debug, Copy, Clone)]
-pub enum DBChannel {
-    Messages,
-    Contacts,
-    Schedule,
-    Tasks,
-    Notes,
+pub enum DBUpdateChannel {
+    Messages = 0,
+    Contacts = 1,
+    Schedule = 2,
+    Tasks = 3,
+    Notes = 4,
+}
+
+static g_total_channels: usize = 5;
+
+/// The DBUpdate structure doesn't contain much -- it doesn't need to. Technically, even the
+/// DBChannel property isn't strictly necessary. This structure is intended to be small and sent
+/// over subscribers' update channels to be notified when a specific row is modified.
+#[derive(Debug, Copy, Clone)]
+pub struct DBUpdate {
+    pub channel: DBUpdateChannel,
+    pub event: DBEventType,
+    pub rowid: i64,
 }
 
 /// DBValueType makes it easy to tell what type a DBValue has
