@@ -4,6 +4,7 @@
 //! is painful to use and this attempts to make database interactions less so.
 
 use crate::base::MensagoError;
+use libkeycard::RandomID;
 use pretty_hex::simple_hex_write;
 use rusqlite;
 use rusqlite::types::*;
@@ -22,7 +23,7 @@ pub struct DBConn {
     // Yes, I know about POSIX non-UTF8 paths. If someone has a non-UTF8 path in their *NIX box,
     // they can fix their paths or go pound sand.👿
     path: String,
-    channel_groups: Vec<mpsc::Sender<DBUpdate>>,
+    subscribers: Vec<Vec<DBUpdateSubscriber>>,
 }
 
 impl fmt::Display for DBConn {
@@ -38,10 +39,15 @@ impl fmt::Display for DBConn {
 impl DBConn {
     /// Creates a new, empty DBConn instance.
     pub fn new() -> DBConn {
+        let mut subscribers: Vec<Vec<DBUpdateSubscriber>> = Vec::new();
+        for _ in 0..g_total_channels {
+            subscribers.push(Vec::new());
+        }
+
         DBConn {
             db: Mutex::new(None),
             path: String::new(),
-            channel_groups: Vec::new(),
+            subscribers,
         }
     }
 
@@ -229,11 +235,17 @@ impl DBConn {
         Ok(out)
     }
 
+    /// subscribe() enables realtime notifications for changes made to the database of a specific
+    /// type. For performance reason, the updates are filtered to a specific channel, such as
+    /// receiving notifications for notes, calendar events, etc. It returns a RandomID used to
+    /// identify the subscriber for purposes of unsubscribing from notifications.
+    ///
+    /// Note that if the DBConn instance is disconnected, all subscriptions are removed.
     pub fn subscribe(
         action: DBEventType,
         channel: DBUpdateChannel,
-        subscriber: mpsc::Sender<DBUpdate>,
-    ) -> Result<(), MensagoError> {
+        callback: DBUpdateCallback,
+    ) -> Result<RandomID, MensagoError> {
         // TODO: implement DBConn::subscribe()
 
         Err(MensagoError::ErrUnimplemented)
@@ -267,6 +279,9 @@ impl DBConn {
     }
 }
 
+/// The DBUpdateCallback is provided by a subscriber to receive updates for a specific type of data.
+type DBUpdateCallback = fn(DBUpdateChannel, DBEventType, i64);
+
 /// DBEventType represents the kind of update made to a database table. It maps directly to the
 /// same types used by rusqlite, but exists so that higher-level code doesn't have to touch rusqlite.
 #[derive(Debug, Copy, Clone)]
@@ -280,7 +295,7 @@ pub enum DBEventType {
     All = 7,
 }
 
-///
+/// Used to request the type of database updates for a particular subscriber
 #[derive(Debug, Copy, Clone)]
 pub enum DBUpdateChannel {
     Messages = 0,
@@ -291,6 +306,13 @@ pub enum DBUpdateChannel {
 }
 
 static g_total_channels: usize = 5;
+
+/// Private structure for holding callback information
+#[derive(Debug, Clone)]
+struct DBUpdateSubscriber {
+    id: RandomID,
+    callback: DBUpdateCallback,
+}
 
 /// The DBUpdate structure doesn't contain much -- it doesn't need to. Technically, even the
 /// DBChannel property isn't strictly necessary. This structure is intended to be small and sent
