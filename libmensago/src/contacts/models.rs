@@ -79,10 +79,7 @@ impl StringModel {
             return Ok(Vec::new());
         }
         for row in rows {
-            if row.len() != 1
-                || row[0].get_type() != DBValueType::Text
-                || row[1].get_type() != DBValueType::Text
-            {
+            if row.len() != 1 || row[0].get_type() != DBValueType::Text {
                 return Err(MensagoError::ErrSchemaFailure);
             }
 
