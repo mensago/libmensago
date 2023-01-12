@@ -61,6 +61,10 @@ impl DBConn {
             Ok(v) => Some(v),
             Err(e) => return Err(MensagoError::RusqliteError(e)),
         };
+        (*connhandle)
+            .as_mut()
+            .unwrap()
+            .update_hook(Some(DBConn::update_hook));
 
         self.path = match path.to_str() {
             Some(v) => String::from(v),
@@ -220,6 +224,54 @@ impl DBConn {
 
         Ok(out)
     }
+
+    fn update_hook(action: rusqlite::hooks::Action, dbname: &str, tablename: &str, rowid: i64) {
+        let dbaction = match action {
+            rusqlite::hooks::Action::SQLITE_INSERT => DBEvent::Insert,
+            rusqlite::hooks::Action::SQLITE_UPDATE => DBEvent::Update,
+            rusqlite::hooks::Action::SQLITE_DELETE => DBEvent::Delete,
+            _ => {
+                println!(
+                    "BUG: UNKNOWN SQLite action on database {}, table {}, rowid {}",
+                    dbname, tablename, rowid
+                );
+                return;
+            }
+        };
+
+        // TODO: call update hook functions for all subscribers in DBConn::update_hook()
+        match tablename {
+            _ => {
+                // Enable this code to turn on update_hook tracing
+
+                // println!(
+                //     "DEBUG: update_hook on database {}, table {}, rowid {}",
+                //     dbname, tablename, rowid
+                // );
+            }
+        }
+    }
+}
+
+// Event Types
+#[derive(Debug, Copy, Clone)]
+pub enum DBEvent {
+    /// Received when a specific item in a row is changed
+    Update,
+
+    /// Received when items are added to or deleted from a table
+    Insert,
+    Delete,
+}
+
+// Event Channels
+#[derive(Debug, Copy, Clone)]
+pub enum DBChannel {
+    Messages,
+    Contacts,
+    Schedule,
+    Tasks,
+    Notes,
 }
 
 /// DBValueType makes it easy to tell what type a DBValue has
@@ -404,23 +456,4 @@ impl DBValue {
             DBValue::Null => Some(vec![]),
         }
     }
-}
-
-// Event Types
-pub enum DBEvent {
-    /// Received when a specific item in a row is changed
-    Update,
-
-    /// Received when items are added to or deleted from a table
-    Insert,
-    Delete,
-}
-
-// Event Channels
-pub enum DBChannel {
-    Messages,
-    Contacts,
-    Schedule,
-    Tasks,
-    Notes,
 }
