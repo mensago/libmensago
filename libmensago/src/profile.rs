@@ -11,14 +11,109 @@ use std::path::{Path, PathBuf};
 // String for initializing a new profile database
 static STORAGE_DB_SETUP_COMMANDS: &str = "
 	BEGIN;
-	CREATE TABLE 'workspaces' (
+	CREATE TABLE 'attachments' (
 		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
-		'wid' TEXT NOT NULL UNIQUE,
-		'userid' TEXT,
-		'domain' TEXT,
-		'password' TEXT,
-		'pwhashtype' TEXT,
-		'type' TEXT
+		'id'	    TEXT NOT NULL UNIQUE,
+		'ownid'	    TEXT NOT NULL,
+		'name'  	TEXT NOT NULL,
+		'mimetype'	TEXT NOT NULL,
+        'data'      BLOB
+	);
+	CREATE TABLE 'contacts' (
+		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
+		'id' TEXT NOT NULL UNIQUE,
+		'entitytype' TEXT NOT NULL,
+        'contactgroup' TEXT NOT NULL,
+        'gender' TEXT,
+        'bio' TEXT,
+        'anniversary' TEXT,
+        'birthday' TEXT,
+        'organization' TEXT,
+        'orgunits' TEXT,
+        'title' TEXT,
+        'categories' TEXT,
+        'languages' TEXT,
+        'notes' TEXT,
+        'annotation' BOOL,
+        'annotation_link' TEXT
+	);
+    CREATE TABLE 'contact_address' (
+		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
+        'id' TEXT NOT NULL UNIQUE,
+        'conid' TEXT NOT NULL,
+        'label' TEXT NOT NULL,
+        'street' TEXT,
+        'extended' TEXT,
+        'locality' TEXT,
+        'region' TEXT,
+        'postalcode' TEXT,
+        'country' TEXT,
+        'preferred' BOOL
+    );
+    CREATE TABLE 'contact_files' (
+		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
+        'id' TEXT NOT NULL UNIQUE,
+        'conid' TEXT NOT NULL,
+        'name' TEXT NOT NULL UNIQUE,
+        'mime' TEXT NOT NULL,
+        'data' BLOB
+    );
+    CREATE TABLE 'contact_keys' (
+		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
+		'id' TEXT NOT NULL UNIQUE,
+        'conid' TEXT NOT NULL,
+        'label' TEXT NOT NULL UNIQUE,
+        'category' TEXT NOT NULL,
+        'value' TEXT NOT NULL,
+		'timestamp' TEXT NOT NULL
+    );
+    CREATE TABLE 'contact_keyvalue' (
+		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
+        'id' TEXT NOT NULL UNIQUE,
+        'conid' TEXT NOT NULL,
+        'itemtype' TEXT NOT NULL,
+        'label' TEXT NOT NULL,
+        'value' TEXT
+    );
+    CREATE TABLE 'contact_mensago' (
+		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
+        'id' TEXT NOT NULL UNIQUE,
+        'conid' TEXT NOT NULL,
+        'label' TEXT NOT NULL,
+        'uid' TEXT NOT NULL,
+        'wid' TEXT NOT NULL,
+        'domain' TEXT NOT NULL
+    );
+    CREATE TABLE 'contact_names' (
+		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
+        'id' TEXT NOT NULL UNIQUE,
+        'conid' TEXT NOT NULL,
+        'formatted_name' TEXT,
+        'given_name' TEXT,
+        'family_name' TEXT,
+        'prefix' TEXT
+    );
+    CREATE TABLE 'contact_nameparts' (
+		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
+        'id' TEXT NOT NULL UNIQUE,
+        'conid' TEXT NOT NULL,
+        'parttype' TEXT NOT NULL,
+        'value' TEXT NOT NULL,
+        'priority' TEXT NOT NULL
+    );
+    CREATE TABLE 'contact_photo' (
+		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
+        'id' TEXT NOT NULL UNIQUE,
+        'conid' TEXT NOT NULL UNIQUE,
+        'mime' TEXT NOT NULL,
+        'data' BLOB
+    );
+	CREATE TABLE 'files' (
+		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
+		'id'	TEXT NOT NULL UNIQUE,
+		'name'	TEXT NOT NULL,
+		'type'	TEXT NOT NULL,
+		'path'	TEXT NOT NULL
 	);
 	CREATE table 'folders'(
 		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -28,6 +123,14 @@ static STORAGE_DB_SETUP_COMMANDS: &str = "
 		'path' TEXT NOT NULL,
 		'name' TEXT NOT NULL,
 		'permissions' TEXT NOT NULL
+	);
+	CREATE TABLE 'images' (
+		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
+		'id'	    TEXT NOT NULL UNIQUE,
+		'ownid'   TEXT NOT NULL,
+		'name'  	TEXT NOT NULL,
+		'mimetype'	TEXT NOT NULL,
+        'data'      BLOB
 	);
 	CREATE table 'keycards'(
 		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -51,15 +154,6 @@ static STORAGE_DB_SETUP_COMMANDS: &str = "
 		'public' TEXT,
 		'timestamp' TEXT NOT NULL
 	);
-	CREATE table 'sessions'(
-		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
-		'address' TEXT NOT NULL,
-		'devid' TEXT NOT NULL,
-		'devname' TEXT NOT NULL,
-		'public_key' TEXT NOT NULL,
-		'private_key' TEXT NOT NULL,
-		'os' TEXT NOT NULL
-	);
 	CREATE table 'messages'(
 		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
 		'id' TEXT NOT NULL UNIQUE,
@@ -76,110 +170,6 @@ static STORAGE_DB_SETUP_COMMANDS: &str = "
         'images' TEXT,
 		'attachments' TEXT
 	);
-	CREATE TABLE 'contacts' (
-		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
-		'id' TEXT NOT NULL UNIQUE,
-		'entitytype' TEXT NOT NULL,
-        'contactgroup' TEXT NOT NULL,
-        'gender' TEXT,
-        'bio' TEXT,
-        'anniversary' TEXT,
-        'birthday' TEXT,
-        'organization' TEXT,
-        'orgunits' TEXT,
-        'title' TEXT,
-        'categories' TEXT,
-        'languages' TEXT,
-        'notes' TEXT,
-        'annotation' BOOL,
-        'annotation_link' TEXT
-	);
-    CREATE TABLE 'contact_names' (
-		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
-        'id' TEXT NOT NULL UNIQUE,
-        'conid' TEXT NOT NULL,
-        'formatted_name' TEXT,
-        'given_name' TEXT,
-        'family_name' TEXT,
-        'prefix' TEXT
-    );
-    CREATE TABLE 'contact_nameparts' (
-		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
-        'id' TEXT NOT NULL UNIQUE,
-        'conid' TEXT NOT NULL,
-        'parttype' TEXT NOT NULL,
-        'value' TEXT NOT NULL,
-        'priority' TEXT NOT NULL
-    );
-    CREATE TABLE 'contact_mensago' (
-		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
-        'id' TEXT NOT NULL UNIQUE,
-        'conid' TEXT NOT NULL,
-        'label' TEXT NOT NULL,
-        'uid' TEXT NOT NULL,
-        'wid' TEXT NOT NULL,
-        'domain' TEXT NOT NULL
-    );
-    CREATE TABLE 'contact_address' (
-		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
-        'id' TEXT NOT NULL UNIQUE,
-        'conid' TEXT NOT NULL,
-        'label' TEXT NOT NULL,
-        'street' TEXT,
-        'extended' TEXT,
-        'locality' TEXT,
-        'region' TEXT,
-        'postalcode' TEXT,
-        'country' TEXT,
-        'preferred' BOOL
-    );
-    CREATE TABLE 'contact_keyvalue' (
-		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
-        'id' TEXT NOT NULL UNIQUE,
-        'conid' TEXT NOT NULL,
-        'itemtype' TEXT NOT NULL,
-        'label' TEXT NOT NULL,
-        'value' TEXT
-    );
-    CREATE TABLE 'contact_photo' (
-		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
-        'id' TEXT NOT NULL UNIQUE,
-        'conid' TEXT NOT NULL UNIQUE,
-        'mime' TEXT NOT NULL,
-        'data' BLOB
-    );
-    CREATE TABLE 'contact_files' (
-		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
-        'id' TEXT NOT NULL UNIQUE,
-        'conid' TEXT NOT NULL,
-        'name' TEXT NOT NULL UNIQUE,
-        'mime' TEXT NOT NULL,
-        'data' BLOB
-    );
-    CREATE TABLE 'contact_keys' (
-		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
-		'id' TEXT NOT NULL UNIQUE,
-        'conid' TEXT NOT NULL,
-        'label' TEXT NOT NULL UNIQUE,
-        'category' TEXT NOT NULL,
-        'value' TEXT NOT NULL,
-		'timestamp' TEXT NOT NULL
-    );
-	CREATE TABLE 'updates' (
-		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
-		'id'    TEXT NOT NULL UNIQUE,
-		'type'  TEXT NOT NULL,
-		'data'  TEXT NOT NULL,
-		'time'  TEXT NOT NULL
-	);
-	CREATE TABLE 'photos' (
-		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
-		'id'            TEXT NOT NULL UNIQUE,
-		'type'          TEXT NOT NULL,
-		'photodata'     BLOB,
-		'isannotation'  TEXT NOT NULL,
-		'contactgroup'  TEXT
-	);
 	CREATE TABLE 'notes' (
 		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
 		'id'	        TEXT NOT NULL UNIQUE,
@@ -193,28 +183,38 @@ static STORAGE_DB_SETUP_COMMANDS: &str = "
         'images'        TEXT,
         'attachments'   TEXT
 	);
-	CREATE TABLE 'images' (
+	CREATE TABLE 'photos' (
 		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
-		'id'	    TEXT NOT NULL UNIQUE,
-		'ownid'   TEXT NOT NULL,
-		'name'  	TEXT NOT NULL,
-		'mimetype'	TEXT NOT NULL,
-        'data'      BLOB
+		'id'            TEXT NOT NULL UNIQUE,
+		'type'          TEXT NOT NULL,
+		'photodata'     BLOB,
+		'isannotation'  TEXT NOT NULL,
+		'contactgroup'  TEXT
 	);
-	CREATE TABLE 'attachments' (
+	CREATE table 'sessions'(
 		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
-		'id'	    TEXT NOT NULL UNIQUE,
-		'ownid'	    TEXT NOT NULL,
-		'name'  	TEXT NOT NULL,
-		'mimetype'	TEXT NOT NULL,
-        'data'      BLOB
+		'address' TEXT NOT NULL,
+		'devid' TEXT NOT NULL,
+		'devname' TEXT NOT NULL,
+		'public_key' TEXT NOT NULL,
+		'private_key' TEXT NOT NULL,
+		'os' TEXT NOT NULL
 	);
-	CREATE TABLE 'files' (
+	CREATE TABLE 'updates' (
 		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
-		'id'	TEXT NOT NULL UNIQUE,
-		'name'	TEXT NOT NULL,
-		'type'	TEXT NOT NULL,
-		'path'	TEXT NOT NULL
+		'id'    TEXT NOT NULL UNIQUE,
+		'type'  TEXT NOT NULL,
+		'data'  TEXT NOT NULL,
+		'time'  TEXT NOT NULL
+	);
+	CREATE TABLE 'workspaces' (
+		'rowid' INTEGER PRIMARY KEY AUTOINCREMENT,
+		'wid' TEXT NOT NULL UNIQUE,
+		'userid' TEXT,
+		'domain' TEXT,
+		'password' TEXT,
+		'pwhashtype' TEXT,
+		'type' TEXT
 	);
 	COMMIT;";
 
