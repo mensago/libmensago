@@ -293,8 +293,15 @@ impl DBConn {
             }
         };
 
+        let mut sublist = SUBSCRIBER_LIST.read().unwrap();
+
         // TODO: call update hook functions for all subscribers in DBConn::update_hook()
         match tablename {
+            "notes" => {
+                for sub in &sublist[DBUpdateChannel::Notes as usize] {
+                    (sub.callback)(dbaction, tablename, rowid)
+                }
+            }
             _ => {
                 // Enable this code to turn on update_hook tracing
 
@@ -308,7 +315,7 @@ impl DBConn {
 }
 
 /// The DBUpdateCallback is provided by a subscriber to receive updates for a specific type of data.
-type DBUpdateCallback = fn(DBUpdateChannel, DBEventType, i64);
+type DBUpdateCallback = fn(DBEventType, &str, i64);
 
 /// DBEventType represents the kind of update made to a database table. It maps directly to the
 /// same types used by rusqlite, but exists so that higher-level code doesn't have to touch rusqlite.
@@ -336,7 +343,7 @@ pub enum DBUpdateChannel {
 static g_total_channels: usize = 5;
 
 /// Private structure for holding callback information
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone)]
 struct DBUpdateSubscriber {
     id: RandomID,
     events: DBEventType,
