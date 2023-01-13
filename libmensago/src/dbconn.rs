@@ -4,6 +4,7 @@
 //! is painful to use and this attempts to make database interactions less so.
 
 use crate::base::MensagoError;
+use lazy_static::lazy_static;
 use libkeycard::RandomID;
 use pretty_hex::simple_hex_write;
 use rusqlite;
@@ -12,8 +13,12 @@ use std::{
     fmt,
     path::PathBuf,
     str,
-    sync::{mpsc, Mutex},
+    sync::{Mutex, RwLock},
 };
+
+lazy_static! {
+    static ref SUBSCRIBER_LIST: RwLock<Vec<Vec<DBUpdateSubscriber>>> = RwLock::new(Vec::new());
+}
 
 /// The DBConn type is a thread-safe shared connection to an SQLite3 database.
 #[derive(Debug)]
@@ -23,7 +28,6 @@ pub struct DBConn {
     // Yes, I know about POSIX non-UTF8 paths. If someone has a non-UTF8 path in their *NIX box,
     // they can fix their paths or go pound sand.👿
     path: String,
-    subscribers: Vec<Vec<DBUpdateSubscriber>>,
 }
 
 impl fmt::Display for DBConn {
@@ -39,7 +43,7 @@ impl fmt::Display for DBConn {
 impl DBConn {
     /// Creates a new, empty DBConn instance.
     pub fn new() -> DBConn {
-        let mut subscribers: Vec<Vec<DBUpdateSubscriber>> = Vec::new();
+        let mut subscribers = SUBSCRIBER_LIST.write().unwrap();
         for _ in 0..g_total_channels {
             subscribers.push(Vec::new());
         }
@@ -47,7 +51,6 @@ impl DBConn {
         DBConn {
             db: Mutex::new(None),
             path: String::new(),
-            subscribers,
         }
     }
 
@@ -246,6 +249,8 @@ impl DBConn {
         channel: DBUpdateChannel,
         callback: DBUpdateCallback,
     ) -> Result<RandomID, MensagoError> {
+        let mut sublist = SUBSCRIBER_LIST.write().unwrap();
+
         // TODO: implement DBConn::subscribe()
 
         Err(MensagoError::ErrUnimplemented)
