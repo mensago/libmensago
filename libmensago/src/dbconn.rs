@@ -243,17 +243,40 @@ impl DBConn {
     /// receiving notifications for notes, calendar events, etc. It returns a RandomID used to
     /// identify the subscriber for purposes of unsubscribing from notifications.
     ///
-    /// Note that if the DBConn instance is disconnected, all subscriptions are removed.
+    /// Note that this call does not check to see if the callback is already in the subscriber list
+    /// for a particular event channel, so if you add it more than once, you'll get duplicate event
+    /// notifications.
     pub fn subscribe(
-        action: DBEventType,
+        events: DBEventType,
         channel: DBUpdateChannel,
         callback: DBUpdateCallback,
     ) -> Result<RandomID, MensagoError> {
         let mut sublist = SUBSCRIBER_LIST.write().unwrap();
 
-        // TODO: implement DBConn::subscribe()
+        let subid = RandomID::generate();
+        sublist[channel as usize].push(DBUpdateSubscriber {
+            id: subid.clone(),
+            events,
+            callback,
+        });
 
-        Err(MensagoError::ErrUnimplemented)
+        Ok(subid)
+    }
+
+    /// unsubscribe() removes the callback associated with the given subscriber ID
+    pub fn unsubscribe(channel: DBUpdateChannel, id: &RandomID) -> Result<(), MensagoError> {
+        let mut sublist = SUBSCRIBER_LIST.write().unwrap();
+
+        for i in 0..sublist[channel as usize].len() {
+            if sublist[channel as usize][i].id == *id {
+                // We don't care about order in the subscriber list, so swap_remove() gives us
+                // better performance than regular remove().
+                let _ = sublist.swap_remove(i);
+                return Ok(());
+            }
+        }
+
+        Err(MensagoError::ErrNotFound)
     }
 
     fn update_hook(action: rusqlite::hooks::Action, dbname: &str, tablename: &str, rowid: i64) {
@@ -289,7 +312,7 @@ type DBUpdateCallback = fn(DBUpdateChannel, DBEventType, i64);
 
 /// DBEventType represents the kind of update made to a database table. It maps directly to the
 /// same types used by rusqlite, but exists so that higher-level code doesn't have to touch rusqlite.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum DBEventType {
     /// Received when a specific item in a row is changed
     Update = 1,
@@ -313,9 +336,10 @@ pub enum DBUpdateChannel {
 static g_total_channels: usize = 5;
 
 /// Private structure for holding callback information
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 struct DBUpdateSubscriber {
     id: RandomID,
+    events: DBEventType,
     callback: DBUpdateCallback,
 }
 
