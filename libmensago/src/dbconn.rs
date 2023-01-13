@@ -44,7 +44,7 @@ impl DBConn {
     /// Creates a new, empty DBConn instance.
     pub fn new() -> DBConn {
         let mut subscribers = SUBSCRIBER_LIST.write().unwrap();
-        for _ in 0..g_total_channels {
+        for _ in 0..G_TOTAL_CHANNELS {
             subscribers.push(Vec::new());
         }
 
@@ -243,11 +243,14 @@ impl DBConn {
     /// receiving notifications for notes, calendar events, etc. It returns a RandomID used to
     /// identify the subscriber for purposes of unsubscribing from notifications.
     ///
+    /// The events parameter is merely a u8 used for bitflags that specify the type of updates to
+    /// receive.
+    ///
     /// Note that this call does not check to see if the callback is already in the subscriber list
     /// for a particular event channel, so if you add it more than once, you'll get duplicate event
     /// notifications.
     pub fn subscribe(
-        events: DBEventType,
+        events: u8,
         channel: DBUpdateChannel,
         callback: DBUpdateCallback,
     ) -> Result<RandomID, MensagoError> {
@@ -281,9 +284,9 @@ impl DBConn {
 
     fn update_hook(action: rusqlite::hooks::Action, dbname: &str, tablename: &str, rowid: i64) {
         let dbaction = match action {
-            rusqlite::hooks::Action::SQLITE_INSERT => DBEventType::Insert,
-            rusqlite::hooks::Action::SQLITE_UPDATE => DBEventType::Update,
-            rusqlite::hooks::Action::SQLITE_DELETE => DBEventType::Delete,
+            rusqlite::hooks::Action::SQLITE_INSERT => DBEVENT_INSERT,
+            rusqlite::hooks::Action::SQLITE_UPDATE => DBEVENT_UPDATE,
+            rusqlite::hooks::Action::SQLITE_DELETE => DBEVENT_DELETE,
             _ => {
                 println!(
                     "BUG: UNKNOWN SQLite action on database {}, table {}, rowid {}",
@@ -293,13 +296,30 @@ impl DBConn {
             }
         };
 
-        let mut sublist = SUBSCRIBER_LIST.read().unwrap();
+        let sublist = SUBSCRIBER_LIST.read().unwrap();
 
-        // TODO: call update hook functions for all subscribers in DBConn::update_hook()
         match tablename {
+            "messages" => {
+                for sub in &sublist[DBUpdateChannel::Messages as usize] {
+                    if sub.events & dbaction != 0 {
+                        (sub.callback)(dbaction, tablename, rowid)
+                    }
+                }
+            }
+            "contacts" | "contact_address" | "contact_files" | "contact_keys"
+            | "contact_keyvalue" | "contact_mensago" | "contact_names" | "contact_nameparts"
+            | "contact_photo" => {
+                for sub in &sublist[DBUpdateChannel::Contacts as usize] {
+                    if sub.events & dbaction != 0 {
+                        (sub.callback)(dbaction, tablename, rowid)
+                    }
+                }
+            }
             "notes" => {
                 for sub in &sublist[DBUpdateChannel::Notes as usize] {
-                    (sub.callback)(dbaction, tablename, rowid)
+                    if sub.events & dbaction != 0 {
+                        (sub.callback)(dbaction, tablename, rowid)
+                    }
                 }
             }
             _ => {
@@ -315,39 +335,31 @@ impl DBConn {
 }
 
 /// The DBUpdateCallback is provided by a subscriber to receive updates for a specific type of data.
-type DBUpdateCallback = fn(DBEventType, &str, i64);
+type DBUpdateCallback = fn(u8, &str, i64);
 
-/// DBEventType represents the kind of update made to a database table. It maps directly to the
-/// same types used by rusqlite, but exists so that higher-level code doesn't have to touch rusqlite.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum DBEventType {
-    /// Received when a specific item in a row is changed
-    Update = 1,
-
-    /// Received when items are added to or deleted from a table
-    Insert = 2,
-    Delete = 4,
-    All = 7,
-}
+pub const DBEVENT_UPDATE: u8 = 0x01;
+pub const DBEVENT_INSERT: u8 = 0x02;
+pub const DBEVENT_DELETE: u8 = 0x04;
+pub const DBEVENT_ALL: u8 = 0x07;
 
 /// Used to request the type of database updates for a particular subscriber
 #[derive(Debug, Copy, Clone)]
 pub enum DBUpdateChannel {
     Messages = 0,
     Contacts = 1,
-    Schedule = 2,
-    Tasks = 3,
+    // Schedule = 2,
+    // Tasks = 3,
     Notes = 4,
 }
 
-static g_total_channels: usize = 5;
+static G_TOTAL_CHANNELS: usize = 5;
 
 /// Private structure for holding callback information
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 struct DBUpdateSubscriber {
-    id: RandomID,
-    events: DBEventType,
-    callback: DBUpdateCallback,
+    pub id: RandomID,
+    pub events: u8,
+    pub callback: DBUpdateCallback,
 }
 
 /// The DBUpdate structure doesn't contain much -- it doesn't need to. Technically, even the
@@ -356,7 +368,7 @@ struct DBUpdateSubscriber {
 #[derive(Debug, Copy, Clone)]
 pub struct DBUpdate {
     pub channel: DBUpdateChannel,
-    pub event: DBEventType,
+    pub event: u8,
     pub rowid: i64,
 }
 
