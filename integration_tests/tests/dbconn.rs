@@ -53,9 +53,6 @@ mod tests {
 
         // The list of full data is as follows:
         // let (config, pwhash, profman) = setup_db_test(testname)?;
-        //
-        // Calling setup_db_test() is really overkill for what this test needs, but the extra
-        // setup work done is worth not having to write custom test setup logic.
         let (_, _, profman) = setup_db_test(testname)?;
         let profile = profman.get_active_profile().unwrap();
 
@@ -115,9 +112,6 @@ mod tests {
 
         // The list of full data is as follows:
         // let (config, pwhash, profman) = setup_db_test(testname)?;
-        //
-        // Calling setup_db_test() is really overkill for what this test needs, but the extra
-        // setup work done is worth not having to write custom test setup logic.
         let (_, _, profman) = setup_db_test(testname)?;
         let profile = profman.get_active_profile().unwrap();
 
@@ -233,6 +227,35 @@ mod tests {
                 rows[0][2].to_string(),
             )));
         }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_dbconn_updates() -> Result<(), MensagoError> {
+        let testname = "test_dbconn_updates";
+
+        let mut update_list: Vec<(u8, String, i64)> = Vec::new();
+        fn push_updates(update_type: u8, tablename: &str, rowid: i64) {
+            // update_list.push((update_type, String::from(tablename), rowid));
+        }
+
+        // The list of full data is as follows:
+        // let (config, pwhash, profman) = setup_db_test(testname)?;
+        let (_, _, mut profman) = setup_db_test(testname)?;
+        let profile = profman.get_active_profile_mut().unwrap();
+        let db = profile.get_db()?;
+
+        match DBConn::subscribe(DBEVENT_ALL, DBUpdateChannel::Notes, push_updates) {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: error subscribing to note updates: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        };
 
         Ok(())
     }
