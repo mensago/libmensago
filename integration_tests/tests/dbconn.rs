@@ -246,7 +246,7 @@ mod tests {
         let profile = profman.get_active_profile_mut().unwrap();
         let db = profile.get_db()?;
 
-        match DBConn::subscribe(DBEVENT_ALL, DBUpdateChannel::Notes, push_updates) {
+        match DBConn::subscribe(DBEVENT_ALL, DBUpdateChannel::Notes) {
             Ok(_) => (),
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(

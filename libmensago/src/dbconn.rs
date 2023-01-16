@@ -4,6 +4,7 @@
 //! is painful to use and this attempts to make database interactions less so.
 
 use crate::base::MensagoError;
+use crossbeam_channel;
 use lazy_static::lazy_static;
 use libkeycard::RandomID;
 use pretty_hex::simple_hex_write;
@@ -13,11 +14,12 @@ use std::{
     fmt,
     path::PathBuf,
     str,
-    sync::{Mutex, RwLock},
+    sync::{Arc, Mutex},
+    thread,
 };
 
 lazy_static! {
-    static ref SUBSCRIBER_LIST: RwLock<Vec<Vec<DBUpdateSubscriber>>> = RwLock::new(Vec::new());
+    static ref NOTE_SUBSCRIBER_COUNT: Arc<usize> = Arc::new(0);
 }
 
 /// The DBConn type is a thread-safe shared connection to an SQLite3 database.
@@ -28,6 +30,8 @@ pub struct DBConn {
     // Yes, I know about POSIX non-UTF8 paths. If someone has a non-UTF8 path in their *NIX box,
     // they can fix their paths or go pound sand.👿
     path: String,
+    receiver: crossbeam_channel::Receiver<DBUpdate>,
+    sender: crossbeam_channel::Sender<DBUpdate>,
 }
 
 impl fmt::Display for DBConn {
@@ -43,14 +47,13 @@ impl fmt::Display for DBConn {
 impl DBConn {
     /// Creates a new, empty DBConn instance.
     pub fn new() -> DBConn {
-        let mut subscribers = SUBSCRIBER_LIST.write().unwrap();
-        for _ in 0..G_TOTAL_CHANNELS {
-            subscribers.push(Vec::new());
-        }
+        let (sender, receiver) = crossbeam_channel::unbounded();
 
         DBConn {
             db: Mutex::new(None),
             path: String::new(),
+            receiver,
+            sender,
         }
     }
 
@@ -74,10 +77,40 @@ impl DBConn {
             Ok(v) => Some(v),
             Err(e) => return Err(MensagoError::RusqliteError(e)),
         };
-        (*connhandle)
-            .as_mut()
-            .unwrap()
-            .update_hook(Some(DBConn::update_hook));
+
+        let sender = self.sender.clone();
+        (*connhandle).as_mut().unwrap().update_hook(Some(
+            move |action: rusqlite::hooks::Action, dbname: &str, tablename: &str, rowid: i64| {
+                let dbaction = match action {
+                    rusqlite::hooks::Action::SQLITE_INSERT => DBEVENT_INSERT,
+                    rusqlite::hooks::Action::SQLITE_UPDATE => DBEVENT_UPDATE,
+                    rusqlite::hooks::Action::SQLITE_DELETE => DBEVENT_DELETE,
+                    _ => {
+                        println!(
+                            "BUG: UNKNOWN SQLite action on database {}, table {}, rowid {}",
+                            dbname, tablename, rowid
+                        );
+                        return;
+                    }
+                };
+
+                let uptype = match tablename {
+                    "messages" => DBUpdateChannel::Messages,
+                    "contacts" | "contact_address" | "contact_files" | "contact_keys"
+                    | "contact_keyvalue" | "contact_mensago" | "contact_names"
+                    | "contact_nameparts" | "contact_photo" => DBUpdateChannel::Contacts,
+                    "notes" => DBUpdateChannel::Notes,
+                    _ => return,
+                };
+
+                let _ = sender.send(DBUpdate {
+                    update: uptype,
+                    event: dbaction,
+                    table: String::from(tablename),
+                    rowid,
+                });
+            },
+        ));
 
         self.path = match path.to_str() {
             Some(v) => String::from(v),
@@ -252,90 +285,19 @@ impl DBConn {
     pub fn subscribe(
         events: u8,
         channel: DBUpdateChannel,
-        callback: DBUpdateCallback,
-    ) -> Result<RandomID, MensagoError> {
-        let mut sublist = SUBSCRIBER_LIST.write().unwrap();
+    ) -> Result<crossbeam_channel::Receiver<DBUpdate>, MensagoError> {
+        // TODO: implement subscribe()
 
-        let subid = RandomID::generate();
-        sublist[channel as usize].push(DBUpdateSubscriber {
-            id: subid.clone(),
-            events,
-            callback,
-        });
-
-        Ok(subid)
+        Err(MensagoError::ErrUnimplemented)
     }
 
     /// unsubscribe() removes the callback associated with the given subscriber ID
     pub fn unsubscribe(channel: DBUpdateChannel, id: &RandomID) -> Result<(), MensagoError> {
-        let mut sublist = SUBSCRIBER_LIST.write().unwrap();
+        // TODO: implement unsubscribe()
 
-        for i in 0..sublist[channel as usize].len() {
-            if sublist[channel as usize][i].id == *id {
-                // We don't care about order in the subscriber list, so swap_remove() gives us
-                // better performance than regular remove().
-                let _ = sublist.swap_remove(i);
-                return Ok(());
-            }
-        }
-
-        Err(MensagoError::ErrNotFound)
-    }
-
-    fn update_hook(action: rusqlite::hooks::Action, dbname: &str, tablename: &str, rowid: i64) {
-        let dbaction = match action {
-            rusqlite::hooks::Action::SQLITE_INSERT => DBEVENT_INSERT,
-            rusqlite::hooks::Action::SQLITE_UPDATE => DBEVENT_UPDATE,
-            rusqlite::hooks::Action::SQLITE_DELETE => DBEVENT_DELETE,
-            _ => {
-                println!(
-                    "BUG: UNKNOWN SQLite action on database {}, table {}, rowid {}",
-                    dbname, tablename, rowid
-                );
-                return;
-            }
-        };
-
-        let sublist = SUBSCRIBER_LIST.read().unwrap();
-
-        match tablename {
-            "messages" => {
-                for sub in &sublist[DBUpdateChannel::Messages as usize] {
-                    if sub.events & dbaction != 0 {
-                        (sub.callback)(dbaction, tablename, rowid)
-                    }
-                }
-            }
-            "contacts" | "contact_address" | "contact_files" | "contact_keys"
-            | "contact_keyvalue" | "contact_mensago" | "contact_names" | "contact_nameparts"
-            | "contact_photo" => {
-                for sub in &sublist[DBUpdateChannel::Contacts as usize] {
-                    if sub.events & dbaction != 0 {
-                        (sub.callback)(dbaction, tablename, rowid)
-                    }
-                }
-            }
-            "notes" => {
-                for sub in &sublist[DBUpdateChannel::Notes as usize] {
-                    if sub.events & dbaction != 0 {
-                        (sub.callback)(dbaction, tablename, rowid)
-                    }
-                }
-            }
-            _ => {
-                // Enable this code to turn on update_hook tracing
-
-                // println!(
-                //     "DEBUG: update_hook on database {}, table {}, rowid {}",
-                //     dbname, tablename, rowid
-                // );
-            }
-        }
+        Err(MensagoError::ErrUnimplemented)
     }
 }
-
-/// The DBUpdateCallback is provided by a subscriber to receive updates for a specific type of data.
-type DBUpdateCallback = fn(u8, &str, i64);
 
 pub const DBEVENT_UPDATE: u8 = 0x01;
 pub const DBEVENT_INSERT: u8 = 0x02;
@@ -345,30 +307,21 @@ pub const DBEVENT_ALL: u8 = 0x07;
 /// Used to request the type of database updates for a particular subscriber
 #[derive(Debug, Copy, Clone)]
 pub enum DBUpdateChannel {
-    Messages = 0,
-    Contacts = 1,
-    // Schedule = 2,
-    // Tasks = 3,
-    Notes = 4,
-}
-
-static G_TOTAL_CHANNELS: usize = 5;
-
-/// Private structure for holding callback information
-#[derive(Clone)]
-struct DBUpdateSubscriber {
-    pub id: RandomID,
-    pub events: u8,
-    pub callback: DBUpdateCallback,
+    Messages,
+    Contacts,
+    // Schedule,
+    // Tasks,
+    Notes,
 }
 
 /// The DBUpdate structure doesn't contain much -- it doesn't need to. Technically, even the
 /// DBChannel property isn't strictly necessary. This structure is intended to be small and sent
 /// over subscribers' update channels to be notified when a specific row is modified.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub struct DBUpdate {
-    pub channel: DBUpdateChannel,
+    pub update: DBUpdateChannel,
     pub event: u8,
+    pub table: String,
     pub rowid: i64,
 }
 
