@@ -309,7 +309,6 @@ impl DBConn {
     /// for a particular event channel, so if you add it more than once, you'll get duplicate event
     /// notifications.
     pub fn subscribe(
-        &self,
         updtype: DBUpdateChannel,
         tx: crossbeam_channel::Sender<DBUpdate>,
     ) -> Result<u64, MensagoError> {
@@ -413,7 +412,7 @@ pub const DBEVENT_DELETE: u8 = 0x04;
 pub const DBEVENT_ALL: u8 = 0x07;
 
 /// Used to request the type of database updates for a particular subscriber
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum DBUpdateChannel {
     Messages,
     Contacts,
@@ -425,7 +424,7 @@ pub enum DBUpdateChannel {
 /// The DBUpdate structure doesn't contain much -- it doesn't need to. Technically, even the
 /// DBChannel property isn't strictly necessary. This structure is intended to be small and sent
 /// over subscribers' update channels to be notified when a specific row is modified.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct DBUpdate {
     pub update: DBUpdateChannel,
     pub event: u8,
