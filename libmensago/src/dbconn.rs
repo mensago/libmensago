@@ -7,9 +7,12 @@ use crate::base::MensagoError;
 use crossbeam_channel;
 use lazy_static::lazy_static;
 use pretty_hex::simple_hex_write;
+use rand::{thread_rng, RngCore};
+
 use rusqlite;
 use rusqlite::types::*;
 use std::{
+    collections::HashMap,
     fmt,
     path::PathBuf,
     str,
@@ -17,9 +20,12 @@ use std::{
 };
 
 lazy_static! {
-    static ref MESSAGE_SUBSCRIBER_COUNT: RwLock<usize> = RwLock::new(0);
-    static ref CONTACT_SUBSCRIBER_COUNT: RwLock<usize> = RwLock::new(0);
-    static ref NOTE_SUBSCRIBER_COUNT: RwLock<usize> = RwLock::new(0);
+    static ref MESSAGE_SUBSCRIBERS: RwLock<HashMap<u64, crossbeam_channel::Sender<DBUpdate>>> =
+        RwLock::new(HashMap::new());
+    static ref CONTACT_SUBSCRIBERS: RwLock<HashMap<u64, crossbeam_channel::Sender<DBUpdate>>> =
+        RwLock::new(HashMap::new());
+    static ref NOTE_SUBSCRIBERS: RwLock<HashMap<u64, crossbeam_channel::Sender<DBUpdate>>> =
+        RwLock::new(HashMap::new());
 }
 
 /// The DBConn type is a thread-safe shared connection to an SQLite3 database.
@@ -30,15 +36,6 @@ pub struct DBConn {
     // Yes, I know about POSIX non-UTF8 paths. If someone has a non-UTF8 path in their *NIX box,
     // they can fix their paths or go pound sand.👿
     path: String,
-
-    msg_tx: crossbeam_channel::Sender<DBUpdate>,
-    msg_rx: crossbeam_channel::Receiver<DBUpdate>,
-
-    contact_tx: crossbeam_channel::Sender<DBUpdate>,
-    contact_rx: crossbeam_channel::Receiver<DBUpdate>,
-
-    note_tx: crossbeam_channel::Sender<DBUpdate>,
-    note_rx: crossbeam_channel::Receiver<DBUpdate>,
 }
 
 impl fmt::Display for DBConn {
@@ -54,19 +51,9 @@ impl fmt::Display for DBConn {
 impl DBConn {
     /// Creates a new, empty DBConn instance.
     pub fn new() -> DBConn {
-        let (msg_tx, msg_rx) = crossbeam_channel::unbounded();
-        let (contact_tx, contact_rx) = crossbeam_channel::unbounded();
-        let (note_tx, note_rx) = crossbeam_channel::unbounded();
-
         DBConn {
             db: Mutex::new(None),
             path: String::new(),
-            msg_tx,
-            msg_rx,
-            contact_tx,
-            contact_rx,
-            note_tx,
-            note_rx,
         }
     }
 
@@ -91,10 +78,6 @@ impl DBConn {
             Err(e) => return Err(MensagoError::RusqliteError(e)),
         };
 
-        let msg_sender = self.msg_tx.clone();
-        let contact_sender = self.contact_tx.clone();
-        let note_sender = self.note_tx.clone();
-
         (*connhandle).as_mut().unwrap().update_hook(Some(
             move |action: rusqlite::hooks::Action, dbname: &str, tablename: &str, rowid: i64| {
                 let dbaction = match action {
@@ -110,46 +93,45 @@ impl DBConn {
                     }
                 };
 
+                // TODO: Reduce copy-paste redundancy in DBConn::connect() once finalized
                 match tablename {
                     "messages" => {
-                        let handle = MESSAGE_SUBSCRIBER_COUNT.read().unwrap();
-                        if *handle <= 0 {
-                            return;
-                        }
+                        let handle = MESSAGE_SUBSCRIBERS.write().unwrap();
 
-                        let _ = msg_sender.send(DBUpdate {
-                            update: DBUpdateChannel::Messages,
-                            event: dbaction,
-                            table: String::from(tablename),
-                            rowid,
-                        });
+                        for txpair in &(*handle) {
+                            let _ = txpair.1.send(DBUpdate {
+                                update: DBUpdateChannel::Messages,
+                                event: dbaction,
+                                table: String::from(tablename),
+                                rowid,
+                            });
+                        }
                     }
                     "contacts" | "contact_address" | "contact_files" | "contact_keys"
                     | "contact_keyvalue" | "contact_mensago" | "contact_names"
                     | "contact_nameparts" | "contact_photo" => {
-                        let handle = CONTACT_SUBSCRIBER_COUNT.read().unwrap();
-                        if *handle <= 0 {
-                            return;
+                        let handle = CONTACT_SUBSCRIBERS.write().unwrap();
+
+                        for txpair in &(*handle) {
+                            let _ = txpair.1.send(DBUpdate {
+                                update: DBUpdateChannel::Contacts,
+                                event: dbaction,
+                                table: String::from(tablename),
+                                rowid,
+                            });
                         }
-                        let _ = contact_sender.send(DBUpdate {
-                            update: DBUpdateChannel::Contacts,
-                            event: dbaction,
-                            table: String::from(tablename),
-                            rowid,
-                        });
                     }
                     "notes" => {
-                        let handle = NOTE_SUBSCRIBER_COUNT.read().unwrap();
-                        if *handle <= 0 {
-                            return;
-                        }
+                        let handle = NOTE_SUBSCRIBERS.write().unwrap();
 
-                        let _ = note_sender.send(DBUpdate {
-                            update: DBUpdateChannel::Notes,
-                            event: dbaction,
-                            table: String::from(tablename),
-                            rowid,
-                        });
+                        for txpair in &(*handle) {
+                            let _ = txpair.1.send(DBUpdate {
+                                update: DBUpdateChannel::Notes,
+                                event: dbaction,
+                                table: String::from(tablename),
+                                rowid,
+                            });
+                        }
                     }
                     _ => return,
                 };
@@ -328,52 +310,100 @@ impl DBConn {
     /// notifications.
     pub fn subscribe(
         &self,
-        channel: DBUpdateChannel,
-    ) -> Result<crossbeam_channel::Receiver<DBUpdate>, MensagoError> {
-        match channel {
+        updtype: DBUpdateChannel,
+        tx: crossbeam_channel::Sender<DBUpdate>,
+    ) -> Result<u64, MensagoError> {
+        // TODO: Reduce copy-paste redundancy in DBConn::subscribe() once finalized
+        match updtype {
             DBUpdateChannel::Messages => {
-                let mut handle = MESSAGE_SUBSCRIBER_COUNT.write().unwrap();
-                *handle += 1;
-                Ok(self.msg_rx.clone())
+                let mut handle = MESSAGE_SUBSCRIBERS.write().unwrap();
+
+                let mut txid: u64 = 0;
+                for _ in 0..10 {
+                    let tempid = thread_rng().next_u64();
+                    if !handle.contains_key(&tempid) {
+                        txid = tempid;
+                        break;
+                    }
+                }
+
+                if txid == 0 {
+                    return Err(MensagoError::ErrRNGFail);
+                }
+
+                handle.insert(txid, tx.clone());
+
+                Ok(txid)
             }
             DBUpdateChannel::Contacts => {
-                let mut handle = CONTACT_SUBSCRIBER_COUNT.write().unwrap();
-                *handle += 1;
-                Ok(self.contact_rx.clone())
+                let mut handle = CONTACT_SUBSCRIBERS.write().unwrap();
+
+                let mut txid: u64 = 0;
+                for _ in 0..10 {
+                    let tempid = thread_rng().next_u64();
+                    if !handle.contains_key(&tempid) {
+                        txid = tempid;
+                        break;
+                    }
+                }
+
+                if txid == 0 {
+                    return Err(MensagoError::ErrRNGFail);
+                }
+
+                handle.insert(txid, tx.clone());
+
+                Ok(txid)
             }
             DBUpdateChannel::Notes => {
-                let mut handle = NOTE_SUBSCRIBER_COUNT.write().unwrap();
-                *handle += 1;
-                Ok(self.note_rx.clone())
+                let mut handle = NOTE_SUBSCRIBERS.write().unwrap();
+
+                let mut txid: u64 = 0;
+                for _ in 0..10 {
+                    let tempid = thread_rng().next_u64();
+                    if !handle.contains_key(&tempid) {
+                        txid = tempid;
+                        break;
+                    }
+                }
+
+                if txid == 0 {
+                    return Err(MensagoError::ErrRNGFail);
+                }
+
+                handle.insert(txid, tx.clone());
+
+                Ok(txid)
             }
         }
     }
 
-    /// unsubscribe() removes the callback associated with the given subscriber ID
-    pub fn unsubscribe(channel: DBUpdateChannel) -> Result<(), MensagoError> {
+    pub fn unsubscribe(channel: DBUpdateChannel, txid: u64) -> Result<(), MensagoError> {
+        // TODO: Reduce copy-paste redundancy in DBConn::unsubscribe() once finalized
         match channel {
             DBUpdateChannel::Messages => {
-                let mut handle = MESSAGE_SUBSCRIBER_COUNT.write().unwrap();
-                if *handle > 0 {
-                    *handle -= 1;
+                let mut handle = MESSAGE_SUBSCRIBERS.write().unwrap();
+                if !handle.contains_key(&txid) {
+                    return Err(MensagoError::ErrNotFound);
                 }
-                Ok(())
+                let _ = handle.remove(&txid);
             }
             DBUpdateChannel::Contacts => {
-                let mut handle = CONTACT_SUBSCRIBER_COUNT.write().unwrap();
-                if *handle > 0 {
-                    *handle -= 1;
+                let mut handle = CONTACT_SUBSCRIBERS.write().unwrap();
+                if !handle.contains_key(&txid) {
+                    return Err(MensagoError::ErrNotFound);
                 }
-                Ok(())
+                let _ = handle.remove(&txid);
             }
             DBUpdateChannel::Notes => {
-                let mut handle = NOTE_SUBSCRIBER_COUNT.write().unwrap();
-                if *handle > 0 {
-                    *handle -= 1;
+                let mut handle = NOTE_SUBSCRIBERS.write().unwrap();
+                if !handle.contains_key(&txid) {
+                    return Err(MensagoError::ErrNotFound);
                 }
-                Ok(())
+                let _ = handle.remove(&txid);
             }
         }
+        Ok(())
     }
 }
 

@@ -242,7 +242,8 @@ mod tests {
         let profile = profman.get_active_profile_mut().unwrap();
         let mut db = profile.get_db()?;
 
-        let rx = match db.subscribe(DBUpdateChannel::Notes) {
+        let (tx, rx) = crossbeam_channel::unbounded();
+        let rxid = match db.subscribe(DBUpdateChannel::Notes, tx) {
             Ok(v) => v,
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
