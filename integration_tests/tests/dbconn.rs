@@ -1,5 +1,6 @@
 mod tests {
     use crate::common::*;
+    use libkeycard::*;
     use libmensago::*;
 
     #[test]
@@ -235,19 +236,14 @@ mod tests {
     fn test_dbconn_updates() -> Result<(), MensagoError> {
         let testname = "test_dbconn_updates";
 
-        let mut update_list: Vec<(u8, String, i64)> = Vec::new();
-        fn push_updates(update_type: u8, tablename: &str, rowid: i64) {
-            // update_list.push((update_type, String::from(tablename), rowid));
-        }
-
         // The list of full data is as follows:
         // let (config, pwhash, profman) = setup_db_test(testname)?;
         let (_, _, mut profman) = setup_db_test(testname)?;
         let profile = profman.get_active_profile_mut().unwrap();
-        let db = profile.get_db()?;
+        let mut db = profile.get_db()?;
 
-        match DBConn::subscribe(DBEVENT_ALL, DBUpdateChannel::Notes) {
-            Ok(_) => (),
+        let rx = match db.subscribe(DBUpdateChannel::Notes) {
+            Ok(v) => v,
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
                     "{}: error subscribing to note updates: {}",
@@ -256,6 +252,37 @@ mod tests {
                 )))
             }
         };
+
+        let modelid = RandomID::from("00000000-1111-2222-3333-444444444444").unwrap();
+        let mut model = NoteModel::new("Untitled", DocFormat::Text, "Default");
+        model.id = modelid.clone();
+        model.body = String::from("This is some text.\n");
+
+        // Add to db
+        match model.set_in_db(&mut db) {
+            Ok(_) => (),
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: set_in_db() error: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        }
+
+        let event = match rx.recv() {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: error getting first update: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        };
+        println!("{:?}", event);
+
+        // TODO: finish test_dbconn_updates()
 
         Ok(())
     }

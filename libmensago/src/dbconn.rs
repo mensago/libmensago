@@ -6,7 +6,6 @@
 use crate::base::MensagoError;
 use crossbeam_channel;
 use lazy_static::lazy_static;
-use libkeycard::RandomID;
 use pretty_hex::simple_hex_write;
 use rusqlite;
 use rusqlite::types::*;
@@ -14,12 +13,13 @@ use std::{
     fmt,
     path::PathBuf,
     str,
-    sync::{Arc, Mutex},
-    thread,
+    sync::{Mutex, RwLock},
 };
 
 lazy_static! {
-    static ref NOTE_SUBSCRIBER_COUNT: Arc<usize> = Arc::new(0);
+    static ref MESSAGE_SUBSCRIBER_COUNT: RwLock<usize> = RwLock::new(0);
+    static ref CONTACT_SUBSCRIBER_COUNT: RwLock<usize> = RwLock::new(0);
+    static ref NOTE_SUBSCRIBER_COUNT: RwLock<usize> = RwLock::new(0);
 }
 
 /// The DBConn type is a thread-safe shared connection to an SQLite3 database.
@@ -30,8 +30,15 @@ pub struct DBConn {
     // Yes, I know about POSIX non-UTF8 paths. If someone has a non-UTF8 path in their *NIX box,
     // they can fix their paths or go pound sand.👿
     path: String,
-    receiver: crossbeam_channel::Receiver<DBUpdate>,
-    sender: crossbeam_channel::Sender<DBUpdate>,
+
+    msg_tx: crossbeam_channel::Sender<DBUpdate>,
+    msg_rx: crossbeam_channel::Receiver<DBUpdate>,
+
+    contact_tx: crossbeam_channel::Sender<DBUpdate>,
+    contact_rx: crossbeam_channel::Receiver<DBUpdate>,
+
+    note_tx: crossbeam_channel::Sender<DBUpdate>,
+    note_rx: crossbeam_channel::Receiver<DBUpdate>,
 }
 
 impl fmt::Display for DBConn {
@@ -47,13 +54,19 @@ impl fmt::Display for DBConn {
 impl DBConn {
     /// Creates a new, empty DBConn instance.
     pub fn new() -> DBConn {
-        let (sender, receiver) = crossbeam_channel::unbounded();
+        let (msg_tx, msg_rx) = crossbeam_channel::unbounded();
+        let (contact_tx, contact_rx) = crossbeam_channel::unbounded();
+        let (note_tx, note_rx) = crossbeam_channel::unbounded();
 
         DBConn {
             db: Mutex::new(None),
             path: String::new(),
-            receiver,
-            sender,
+            msg_tx,
+            msg_rx,
+            contact_tx,
+            contact_rx,
+            note_tx,
+            note_rx,
         }
     }
 
@@ -78,7 +91,10 @@ impl DBConn {
             Err(e) => return Err(MensagoError::RusqliteError(e)),
         };
 
-        let sender = self.sender.clone();
+        let msg_sender = self.msg_tx.clone();
+        let contact_sender = self.contact_tx.clone();
+        let note_sender = self.note_tx.clone();
+
         (*connhandle).as_mut().unwrap().update_hook(Some(
             move |action: rusqlite::hooks::Action, dbname: &str, tablename: &str, rowid: i64| {
                 let dbaction = match action {
@@ -94,21 +110,49 @@ impl DBConn {
                     }
                 };
 
-                let uptype = match tablename {
-                    "messages" => DBUpdateChannel::Messages,
+                match tablename {
+                    "messages" => {
+                        let handle = MESSAGE_SUBSCRIBER_COUNT.read().unwrap();
+                        if *handle <= 0 {
+                            return;
+                        }
+
+                        let _ = msg_sender.send(DBUpdate {
+                            update: DBUpdateChannel::Messages,
+                            event: dbaction,
+                            table: String::from(tablename),
+                            rowid,
+                        });
+                    }
                     "contacts" | "contact_address" | "contact_files" | "contact_keys"
                     | "contact_keyvalue" | "contact_mensago" | "contact_names"
-                    | "contact_nameparts" | "contact_photo" => DBUpdateChannel::Contacts,
-                    "notes" => DBUpdateChannel::Notes,
+                    | "contact_nameparts" | "contact_photo" => {
+                        let handle = CONTACT_SUBSCRIBER_COUNT.read().unwrap();
+                        if *handle <= 0 {
+                            return;
+                        }
+                        let _ = contact_sender.send(DBUpdate {
+                            update: DBUpdateChannel::Contacts,
+                            event: dbaction,
+                            table: String::from(tablename),
+                            rowid,
+                        });
+                    }
+                    "notes" => {
+                        let handle = NOTE_SUBSCRIBER_COUNT.read().unwrap();
+                        if *handle <= 0 {
+                            return;
+                        }
+
+                        let _ = note_sender.send(DBUpdate {
+                            update: DBUpdateChannel::Notes,
+                            event: dbaction,
+                            table: String::from(tablename),
+                            rowid,
+                        });
+                    }
                     _ => return,
                 };
-
-                let _ = sender.send(DBUpdate {
-                    update: uptype,
-                    event: dbaction,
-                    table: String::from(tablename),
-                    rowid,
-                });
             },
         ));
 
@@ -283,19 +327,53 @@ impl DBConn {
     /// for a particular event channel, so if you add it more than once, you'll get duplicate event
     /// notifications.
     pub fn subscribe(
-        events: u8,
+        &self,
         channel: DBUpdateChannel,
     ) -> Result<crossbeam_channel::Receiver<DBUpdate>, MensagoError> {
-        // TODO: implement subscribe()
-
-        Err(MensagoError::ErrUnimplemented)
+        match channel {
+            DBUpdateChannel::Messages => {
+                let mut handle = MESSAGE_SUBSCRIBER_COUNT.write().unwrap();
+                *handle += 1;
+                Ok(self.msg_rx.clone())
+            }
+            DBUpdateChannel::Contacts => {
+                let mut handle = CONTACT_SUBSCRIBER_COUNT.write().unwrap();
+                *handle += 1;
+                Ok(self.contact_rx.clone())
+            }
+            DBUpdateChannel::Notes => {
+                let mut handle = NOTE_SUBSCRIBER_COUNT.write().unwrap();
+                *handle += 1;
+                Ok(self.note_rx.clone())
+            }
+        }
     }
 
     /// unsubscribe() removes the callback associated with the given subscriber ID
-    pub fn unsubscribe(channel: DBUpdateChannel, id: &RandomID) -> Result<(), MensagoError> {
-        // TODO: implement unsubscribe()
-
-        Err(MensagoError::ErrUnimplemented)
+    pub fn unsubscribe(channel: DBUpdateChannel) -> Result<(), MensagoError> {
+        match channel {
+            DBUpdateChannel::Messages => {
+                let mut handle = MESSAGE_SUBSCRIBER_COUNT.write().unwrap();
+                if *handle > 0 {
+                    *handle -= 1;
+                }
+                Ok(())
+            }
+            DBUpdateChannel::Contacts => {
+                let mut handle = CONTACT_SUBSCRIBER_COUNT.write().unwrap();
+                if *handle > 0 {
+                    *handle -= 1;
+                }
+                Ok(())
+            }
+            DBUpdateChannel::Notes => {
+                let mut handle = NOTE_SUBSCRIBER_COUNT.write().unwrap();
+                if *handle > 0 {
+                    *handle -= 1;
+                }
+                Ok(())
+            }
+        }
     }
 }
 
