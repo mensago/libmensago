@@ -242,17 +242,33 @@ mod tests {
         let profile = profman.get_active_profile_mut().unwrap();
         let mut db = profile.get_db()?;
 
-        let (tx, rx) = crossbeam_channel::unbounded();
-        let rxid = match db.subscribe(DBUpdateChannel::Notes, tx) {
+        // Case #1: subscribe() x 2
+
+        let (tx1, rx1) = crossbeam_channel::unbounded();
+        let _ = match DBConn::subscribe(DBUpdateChannel::Notes, tx1) {
             Ok(v) => v,
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
-                    "{}: error subscribing to note updates: {}",
+                    "{}: error adding subscriber 1 to note updates: {}",
                     testname,
                     e.to_string()
                 )))
             }
         };
+
+        let (tx2, rx2) = crossbeam_channel::unbounded();
+        let rxid2 = match DBConn::subscribe(DBUpdateChannel::Notes, tx2) {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: error adding subscriber 2 to note updates: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        };
+
+        // Case #2: Getting updates to both subscribers
 
         let modelid = RandomID::from("00000000-1111-2222-3333-444444444444").unwrap();
         let mut model = NoteModel::new("Untitled", DocFormat::Text, "Default");
@@ -271,17 +287,72 @@ mod tests {
             }
         }
 
-        let event = match rx.recv() {
+        let mut event1 = match rx1.recv() {
             Ok(v) => v,
             Err(e) => {
                 return Err(MensagoError::ErrProgramException(format!(
-                    "{}: error getting first update: {}",
+                    "{}: error sub1 getting first update: {}",
                     testname,
                     e.to_string()
                 )))
             }
         };
-        println!("{:?}", event);
+        let event2 = match rx2.recv() {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: error sub2 getting first update: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        };
+
+        if event1 != event2 {
+            return Err(MensagoError::ErrProgramException(format!(
+                "{}: first update value mismatch for both subscribers",
+                testname
+            )));
+        }
+        if event1.event != DBEVENT_INSERT || event1.table != "notes" {
+            return Err(MensagoError::ErrProgramException(format!(
+                "{}: bad values in first update message: {:?}",
+                testname, event1
+            )));
+        }
+
+        // Case #3: unsubscribe()
+
+        match DBConn::unsubscribe(DBUpdateChannel::Notes, rxid2) {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: error removing subscriber 2 from note updates: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        };
+
+        // Case  #4: Modification update
+
+        model.update_title(db, "Untitled 2")?;
+        event1 = match rx1.recv() {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(MensagoError::ErrProgramException(format!(
+                    "{}: error sub1 getting modification update: {}",
+                    testname,
+                    e.to_string()
+                )))
+            }
+        };
+        if event1.event != DBEVENT_UPDATE || event1.table != "notes" {
+            return Err(MensagoError::ErrProgramException(format!(
+                "{}: bad values in second update message: {:?}",
+                testname, event1
+            )));
+        }
 
         // TODO: finish test_dbconn_updates()
 
