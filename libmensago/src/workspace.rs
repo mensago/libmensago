@@ -338,7 +338,7 @@ impl Workspace {
             )?;
         } else {
             conn.execute(
-                "INSERT INTO workspaces(wid,userid,domain,password,pwhashtype,type)
+                "INSERT INTO workspaces(wid,domain,password,pwhashtype,type)
 			VALUES(?1,?2,?3,?4,?5)",
                 &[
                     self.wid.as_ref().unwrap().as_string(),
