@@ -310,14 +310,14 @@ pub fn setup_test(config: &Document) -> Result<postgres::Client, MensagoError> {
 
 	-- passcodes table is used for password resets
 	CREATE TABLE passcodes(rowid SERIAL PRIMARY KEY, wid VARCHAR(36) NOT NULL UNIQUE,
-		passcode VARCHAR(128) NOT NULL, expires CHAR(16) NOT NULL);
+		passcode VARCHAR(128) NOT NULL, expires CHAR(20) NOT NULL);
 
 	-- For logging different types of failures, such as failed usernanme entry or a server's failure
 	-- to authenticate for delivery. Information stored here is to ensure that all parties which the
 	-- server interacts with behave themselves.
 	CREATE TABLE failure_log(rowid SERIAL PRIMARY KEY, type VARCHAR(16) NOT NULL,
 		id VARCHAR(36), source VARCHAR(36) NOT NULL, count INTEGER,
-		last_failure CHAR(16) NOT NULL, lockout_until CHAR(16));
+		last_failure CHAR(20) NOT NULL, lockout_until CHAR(20));
 
 	-- Preregistration information. Entries are removed upon successful account registration.
 	CREATE TABLE prereg(rowid SERIAL PRIMARY KEY, wid VARCHAR(36) NOT NULL UNIQUE,
@@ -325,11 +325,11 @@ pub fn setup_test(config: &Document) -> Result<postgres::Client, MensagoError> {
 
 	-- Stores all entries in the keycard tree
 	CREATE TABLE keycards(rowid SERIAL PRIMARY KEY, owner VARCHAR(292) NOT NULL,
-		creationtime CHAR(16) NOT NULL, index INTEGER NOT NULL,
+		creationtime CHAR(20) NOT NULL, index INTEGER NOT NULL,
 		entry VARCHAR(8192) NOT NULL, fingerprint VARCHAR(96) NOT NULL);
 
 	-- Keycard information for the organization
-	CREATE TABLE orgkeys(rowid SERIAL PRIMARY KEY, creationtime CHAR(16) NOT NULL, 
+	CREATE TABLE orgkeys(rowid SERIAL PRIMARY KEY, creationtime CHAR(20) NOT NULL, 
 		pubkey VARCHAR(7000), privkey VARCHAR(7000) NOT NULL, 
 		purpose VARCHAR(8) NOT NULL, fingerprint VARCHAR(96) NOT NULL);
 
