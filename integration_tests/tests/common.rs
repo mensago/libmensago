@@ -947,6 +947,9 @@ pub fn regcode_user(
     user_regcode: &str,
     pwhash: &ArgonHash,
 ) -> Result<RegInfo, MensagoError> {
+    // TODO: Investigate usage of USER1_PROFILE_DATA and ADMIN_PROFILE_DATA in regcode_user
+    // These usages are almost certainly bugs.
+
     let profile = profman.get_active_profile_mut().unwrap();
 
     let devid = RandomID::from(&profile_data["devid"]).unwrap();
@@ -972,6 +975,13 @@ pub fn regcode_user(
     };
 
     let waddr = WAddress::from(&ADMIN_PROFILE_DATA["waddress"]).unwrap();
+
+    // FIXME: This should most likely be
+    // let devpair = EncryptionPair::from_strings(
+    //     &profileData["device.public"],
+    //     &profileData["device.private"],
+    // ).unwrap();
+    // and placed before the call to regcode() so that it can use this, too
     let devpair = EncryptionPair::from_strings(
         &ADMIN_PROFILE_DATA["device.public"],
         &ADMIN_PROFILE_DATA["device.private"],
@@ -999,7 +1009,7 @@ pub fn regcode_user(
         }
     }
 
-    // Admin login complete. Now create and upload the admin account's root keycard entry
+    // Login complete. Now create and upload the root keycard entry
 
     let mut entry = Entry::new(EntryType::User).unwrap();
     entry.set_fields(&vec![
