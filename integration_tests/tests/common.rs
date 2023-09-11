@@ -947,10 +947,13 @@ pub fn regcode_user(
     user_regcode: &str,
     pwhash: &ArgonHash,
 ) -> Result<RegInfo, MensagoError> {
-    // TODO: Investigate usage of USER1_PROFILE_DATA and ADMIN_PROFILE_DATA in regcode_user
-    // These usages are almost certainly bugs.
-
     let profile = profman.get_active_profile_mut().unwrap();
+
+    let devpair = EncryptionPair::from_strings(
+        &profile_data["device.public"],
+        &profile_data["device.private"],
+    )
+    .unwrap();
 
     let devid = RandomID::from(&profile_data["devid"]).unwrap();
     let regdata = match regcode(
@@ -959,11 +962,7 @@ pub fn regcode_user(
         user_regcode,
         pwhash,
         &devid,
-        &EncryptionPair::from_strings(
-            &USER1_PROFILE_DATA["device.public"],
-            &USER1_PROFILE_DATA["device.private"],
-        )
-        .unwrap(),
+        &devpair,
     ) {
         Ok(v) => v,
         Err(e) => {
@@ -974,19 +973,8 @@ pub fn regcode_user(
         }
     };
 
-    let waddr = WAddress::from(&ADMIN_PROFILE_DATA["waddress"]).unwrap();
+    let waddr = WAddress::from(&profile_data["waddress"]).unwrap();
 
-    // FIXME: This should most likely be
-    // let devpair = EncryptionPair::from_strings(
-    //     &profileData["device.public"],
-    //     &profileData["device.private"],
-    // ).unwrap();
-    // and placed before the call to regcode() so that it can use this, too
-    let devpair = EncryptionPair::from_strings(
-        &ADMIN_PROFILE_DATA["device.public"],
-        &ADMIN_PROFILE_DATA["device.private"],
-    )
-    .unwrap();
     let db = profile.get_db()?;
     match add_device_session(db, &waddr, &devid, &devpair, None) {
         Ok(v) => v,
