@@ -904,6 +904,8 @@ pub fn unregister(
     conn: &mut ServerConnection,
     pwhash: &ArgonHash,
 ) -> Result<CmdStatus, MensagoError> {
+    // TODO: add support for the optional Workspace-ID parameter
+
     let req = ClientRequest::from(
         "UNREGISTER",
         &vec![("Password-Hash", pwhash.to_string().as_str())],
