@@ -8,7 +8,7 @@ This library will provide all the necessary business logic to implement a Mensag
 
 ## Development Status
 
-libmensago is pre-alpha and under active development. As of 12/2022 code for account registration, profile management, and other identity-related tasks are functionally complete and current development focus is on note and contact management in parallel with development of [Mensago Connect](https://gitlab.com/mensago/connect). Once the client has reached a corresponding feature goal, the messaging backend will be written and a release made afterward.
+libmensago is pre-alpha and active development is paused for the moment because of a change in development plans. Mensago Connect requires a GUI toolkit which is more mature than is available in the Rust ecosystem at this time. As such, Connect is being written in Kotlin for the JVM and the current Rust-based support libraries (eznacl, libkeycard, libmensago) are being ported to Kotlin. Development resource constraints do not permit working on both in parallel at this time, but because many future Mensago-related applications will depend on a C-compatible API, this library is not being abandoned, and development will resume at a future time. As of 1/2023 code for account registration, profile management, and other identity-related tasks are functionally complete.
 
 ## Usage
 
