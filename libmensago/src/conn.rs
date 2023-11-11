@@ -12,7 +12,7 @@ lazy_static! {
 }
 
 // Size, in bytes, of the read buffer
-const BUFFER_SIZE: usize = 16384;
+const BUFFER_SIZE: usize = 65535;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct GreetingData {
